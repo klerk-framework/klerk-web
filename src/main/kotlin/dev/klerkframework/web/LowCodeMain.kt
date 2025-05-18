@@ -18,7 +18,8 @@ public data class LowCodeConfig<C : KlerkContext>(
     val showOptionalParameters: (EventReference) -> Boolean,
     val cssPath: String,
     val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
-    val createCommandPath: String = "/_createevent"
+    val createCommandPath: String = "/_createevent",
+    val canSeeAdminUI: suspend (C) -> Boolean,
 ) {
     val fullCreateEventPath: String
         get() = "${basePath}${createCommandPath}"
@@ -80,43 +81,69 @@ public class LowCodeMain<C : KlerkContext, V>(
         }
 
         get(config.basePath) {
-            renderMain(call)
+            requireAdmin(call) {
+                renderMain(call)
+            }
         }
 
         get(auditPath) {
-            renderAudit(call, config, config.basePath, klerk)
+            requireAdmin(call) {
+                renderAudit(call, config, config.basePath, klerk)
+            }
         }
 
         get("$auditPath/{id}") {
-            renderAuditDetails(call, config, klerk)
+            requireAdmin(call) {
+                renderAuditDetails(call, config, klerk)
+            }
         }
 
         get(jobsPath) {
-            renderJobs(call, config, jobsPath, klerk)
+            requireAdmin(call) {
+                renderJobs(call, config, jobsPath, klerk)
+            }
         }
 
         get("${jobsPath}/{id}") {
-            renderJobDetails(call, config, klerk)
+            requireAdmin(call) {
+                renderJobDetails(call, config, klerk)
+            }
         }
 
         get(metricsPath) {
-            renderMetrics(call, config, metricsPath, klerk)
+            requireAdmin(call) {
+                renderMetrics(call, config, metricsPath, klerk)
+            }
         }
 
         get(documentationPath) {
-            renderDocumentation(call, config, klerk, documentationPath)
+            requireAdmin(call) {
+                renderDocumentation(call, config, klerk, documentationPath)
+            }
+        }
+
+        post("$documentationPath/functionInvocation") {
+            requireAdmin(call) {
+                renderFunctionInvocation(call, config, klerk)
+            }
         }
 
         get("$documentationPath/algorithms/{name}") {
-            renderAlgorithm(call, config, klerk)
+            requireAdmin(call) {
+                renderAlgorithm(call, config, klerk)
+            }
         }
 
         get(pluginsPath) {
-            renderPlugins(call, config, klerk)
+            requireAdmin(call) {
+                renderPlugins(call, config, klerk)
+            }
         }
 
         get("${config.basePath}/plugin") {
-            renderPluginPage(call, config, klerk)
+            requireAdmin(call) {
+                renderPluginPage(call, config, klerk)
+            }
         }
 
         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
@@ -124,7 +151,9 @@ public class LowCodeMain<C : KlerkContext, V>(
         }
 
         get(logPath) {
-            renderLog(call, config, klerk)
+            requireAdmin(call) {
+                renderLog(call, config, klerk)
+            }
         }
 
 
@@ -194,6 +223,16 @@ public class LowCodeMain<C : KlerkContext, V>(
             }
         }
     }
+
+    private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
+        val context = config.contextProvider(call)
+        if (!config.canSeeAdminUI(context)) {
+            call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { +"Not authorized" }
+            return
+        }
+        block()
+    }
+
 }
 
 public interface AdminUIPluginIntegration<C : KlerkContext, V> : KlerkPlugin<C, V> {

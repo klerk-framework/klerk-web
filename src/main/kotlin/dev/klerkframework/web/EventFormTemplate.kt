@@ -66,7 +66,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
     private fun text(parameter: EventParameter) = inputs.add(Pair(parameter.name, text))
 
     public fun email(property: KProperty1<*, StringContainer?>): Unit { inputs.add(Pair(property.name, email)) }
-    private fun email(parameter: EventParameter) = inputs.add(Pair(parameter.name, email))
+    private fun email(parameter: EventParameter) = inputs.add(Pair(parameter.name, email)) // use <input type="text" inputmode="email"> instead?
 
     public fun password(property: KProperty1<*, StringContainer?>): Unit { inputs.add(Pair(property.name, password)) }
     private fun password(parameter: EventParameter) = inputs.add(Pair(parameter.name, password))
@@ -727,7 +727,7 @@ public class EventForm<T : Any, C : KlerkContext>(
         apply(createLabel(propertyName, (theValue != null)))
         theValue as IntContainer?
         newInstance as IntContainer
-        input(number) {
+        input(number) {     // perhaps use `type=text inputmode=numeric` instead?
             id = propertyName
             name = propertyName
             value = theValue?.toString() ?: ""
@@ -1004,3 +1004,10 @@ private fun createParamClassFromCallParameters(parameterClass: KClass<*>, callPa
         }
     return constructors.first().callBy(parameters)
 }
+
+/*
+should we use https://developer.mozilla.org/en-US/docs/Web/CSS/:user-invalid ?
+input.setCustomValidity("Put the error here?"); reportValidity();
+https://adamsilver.io/blog/dont-use-the-maxlength-attribute-to-stop-users-from-exceeding-the-limit/
+Many people think it is not possible to get a good enough UX with the browsers validation API. Perhaps we could configure the template to include a js-form-validation-framework.
+ */

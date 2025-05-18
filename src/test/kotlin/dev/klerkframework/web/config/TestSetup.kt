@@ -216,7 +216,7 @@ data class Book(
     val writtenAt: BookWrittenAt,
     val readingTime: ReadingTime,
     val publishedAt: BookWrittenAt?,
-    val releasePartyPosition: ReleasePartyPosition,
+//    val releasePartyPosition: ReleasePartyPosition,
 ) {
     override fun toString() = title.value
 }
@@ -505,7 +505,7 @@ fun newBook(args: ArgForVoidEvent<Book, CreateBookParams, Context, MyCollections
         writtenAt = BookWrittenAt(Instant.fromEpochSeconds(100000)),
         readingTime = ReadingTime(23.hours),
         publishedAt = null,
-        releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456))
+      //  releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456))
     )
 }
 
@@ -643,12 +643,21 @@ class BookTitle(value: String) : StringContainer(value) {
     override val maxLength = 100
     override val maxLines: Int = 1
     override val regexPattern = ".*"
-    override val validators = setOf(::`title must be catchy`)
+    override val validators = setOf(::`title must not contain 'alpha'`, ::`title must not start with 'beta'`)
 
-    private fun `title must be catchy`(): InvalidParametersProblem? {
-        return null
+    private fun `title must not contain 'alpha'`(): InvalidParametersProblem? {
+        return if (valueWithoutAuthorization.contains("alpha")) {
+            InvalidParametersProblem("Sorry, the title must not contain 'alpha'")
+        } else null
+    }
+
+    private fun `title must not start with 'beta'`(): InvalidParametersProblem? {
+        return if (valueWithoutAuthorization.lowercase().startsWith("beta")) {
+            InvalidParametersProblem("'beta' must not be the first word")
+        } else null
     }
 }
+
 
 class BookTag(value: String) : StringContainer(value) {
     override val minLength: Int = 1

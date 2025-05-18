@@ -7,7 +7,7 @@ plugins {
     `maven-publish`
 }
 
-val ktorVersion = "2.3.10"
+val ktorVersion = "3.1.2"
 val klerkVersion = "1.0.0-beta.3"
 val gsonVersion = "2.9.0"
 val kotlinLoggingVersion = "2.1.21"
@@ -15,22 +15,31 @@ val sqliteJdbcVersion = "3.44.1.0"
 val slf4jVersion = "2.0.3"
 
 group = "dev.klerkframework"
-version = "1.0.0-alpha.1"
+version = "1.0.0-alpha.2"
 
 dependencies {
-    implementation("com.github.klerk-framework:klerk:$klerkVersion")
-    implementation("io.ktor:ktor-server-html-builder:$ktorVersion")
-    implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-server-auth:$ktorVersion")
-    implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
-    implementation("io.ktor:ktor-client-core:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("com.google.code.gson:gson:$gsonVersion")
+    compileOnly("com.github.klerk-framework:klerk:$klerkVersion")
+    compileOnly("io.ktor:ktor-server-html-builder:$ktorVersion")
+    compileOnly("io.ktor:ktor-server-core-jvm:$ktorVersion")
+    compileOnly("io.ktor:ktor-server-netty-jvm:$ktorVersion")
+    compileOnly("io.ktor:ktor-server-auth:$ktorVersion")
+    compileOnly("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
+    compileOnly("io.ktor:ktor-client-core:$ktorVersion")
+    compileOnly("io.ktor:ktor-client-cio:$ktorVersion")
+    compileOnly("com.google.code.gson:gson:$gsonVersion")
     implementation("io.github.microutils:kotlin-logging-jvm:$kotlinLoggingVersion")
     testImplementation(kotlin("test"))
     testImplementation("org.xerial:sqlite-jdbc:$sqliteJdbcVersion")
     testImplementation("org.slf4j:slf4j-simple:$slf4jVersion")
+    testImplementation("com.github.klerk-framework:klerk:${klerkVersion}")
+    testImplementation("io.ktor:ktor-server-html-builder:${ktorVersion}")
+    testImplementation("io.ktor:ktor-server-core-jvm:${ktorVersion}")
+    testImplementation("io.ktor:ktor-server-netty-jvm:${ktorVersion}")
+    testImplementation("io.ktor:ktor-server-auth:${ktorVersion}")
+    testImplementation("io.ktor:ktor-server-sessions-jvm:${ktorVersion}")
+    testImplementation("io.ktor:ktor-client-core:${ktorVersion}")
+    testImplementation("io.ktor:ktor-client-cio:${ktorVersion}")
+    testImplementation("com.google.code.gson:gson:${gsonVersion}")
 }
 
 publishing {

@@ -60,7 +60,8 @@ fun main() {
                 // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
                 cssPath = "https://unpkg.com/almond.css@latest/dist/almond.min.css",
                 showOptionalParameters = ::showOptionalParameters,
-                knownAlgorithms = setOf()
+                knownAlgorithms = setOf(),
+                canSeeAdminUI = ::canSeeAdminUI,
             )
         )
 
@@ -92,6 +93,9 @@ fun main() {
 
 }
 
+suspend fun canSeeAdminUI(context: Context): Boolean {
+    return true
+}
 
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
