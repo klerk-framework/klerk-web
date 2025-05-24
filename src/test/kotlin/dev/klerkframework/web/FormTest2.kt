@@ -1,23 +1,16 @@
 package dev.klerkframework.web
 
-import com.google.gson.Gson
-import dev.klerkframework.web.config.*
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.ActorIdentity
+import dev.klerkframework.klerk.EventWithParameters
+import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.datatypes.DataContainer
-import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.misc.EventParameters
-import io.ktor.http.*
-import io.ktor.server.application.*
+import dev.klerkframework.web.ParseResult.*
+import dev.klerkframework.web.config.*
+import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import dev.klerkframework.web.ParseResult.DryRun
-import dev.klerkframework.web.ParseResult.Invalid
-import dev.klerkframework.web.ParseResult.Parsed
-import io.ktor.server.engine.embeddedServer
 import kotlinx.coroutines.runBlocking
 import kotlinx.html.*
 import kotlin.reflect.full.memberProperties
@@ -90,13 +83,13 @@ fun main() {
                     mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
                 )) {
                     is Invalid -> EventFormTemplate.respondInvalid(result, call)
-                    is DryRun -> respondDryRun<Author>(
+                    is DryRun -> respondDryRun(
                         result.params,
                         result.key,
                         CreateAuthor,
-                        null,
                         call,
-                        klerk
+                        klerk,
+                        Context.swedishUnauthenticated(),
                     )
 
                     is Parsed -> call.respondHtml {
@@ -119,8 +112,9 @@ fun main() {
     }.start(wait = true)
 }
 
-detta borde väl flyttas från test?
-suspend fun <T : Any> respondDryRun(
+
+
+/*suspend fun <T : Any> respondDryRun(
     params: CreateAuthorParams,
     key: CommandToken,
     event: CreateAuthor,
@@ -158,11 +152,8 @@ suspend fun <T : Any> respondDryRun(
     }
 }
 
-data class ValidationResponse(
-    val fieldProblems: Map<String, String>,
-    val formProblems: List<String>,
-    val dryRunProblems: List<String>
-)
+ */
+
 
 private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean {
     return true

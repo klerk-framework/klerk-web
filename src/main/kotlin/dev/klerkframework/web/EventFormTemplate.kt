@@ -4,7 +4,9 @@ import com.google.gson.Gson
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelCollection
 import dev.klerkframework.klerk.collection.QueryOptions
+import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
+import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.misc.*
 import dev.klerkframework.klerk.read.Reader
@@ -61,31 +63,54 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         validate()
     }
 
-    public fun text(property: KProperty1<*, StringContainer?>): Unit { inputs.add(Pair(property.name, text)) }
+    public fun text(property: KProperty1<*, StringContainer?>): Unit {
+        inputs.add(Pair(property.name, text))
+    }
+
     private fun text(parameter: EventParameter) = inputs.add(Pair(parameter.name, text))
 
-    public fun email(property: KProperty1<*, StringContainer?>): Unit { inputs.add(Pair(property.name, email)) }
-    private fun email(parameter: EventParameter) = inputs.add(Pair(parameter.name, email)) // use <input type="text" inputmode="email"> instead?
+    public fun email(property: KProperty1<*, StringContainer?>): Unit {
+        inputs.add(Pair(property.name, email))
+    }
 
-    public fun password(property: KProperty1<*, StringContainer?>): Unit { inputs.add(Pair(property.name, password)) }
+    private fun email(parameter: EventParameter) =
+        inputs.add(Pair(parameter.name, email)) // use <input type="text" inputmode="email"> instead?
+
+    public fun password(property: KProperty1<*, StringContainer?>): Unit {
+        inputs.add(Pair(property.name, password))
+    }
+
     private fun password(parameter: EventParameter) = inputs.add(Pair(parameter.name, password))
 
-    public fun number(property: KProperty1<*, DataContainer<*>?>): Unit { inputs.add(Pair(property.name, number)) }
+    public fun number(property: KProperty1<*, DataContainer<*>?>): Unit {
+        inputs.add(Pair(property.name, number))
+    }
+
     private fun number(parameter: EventParameter) = inputs.add(Pair(parameter.name, number))
 
-    public fun checkbox(property: KProperty1<*, BooleanContainer?>): Unit { inputs.add(Pair(property.name, checkBox)) }
+    public fun checkbox(property: KProperty1<*, BooleanContainer?>): Unit {
+        inputs.add(Pair(property.name, checkBox))
+    }
+
     private fun checkbox(parameter: EventParameter) = inputs.add(Pair(parameter.name, checkBox))
 
-    public fun hidden(property: KProperty1<*, Any?>): Unit { inputs.add(Pair(property.name, hidden)) }
+    public fun hidden(property: KProperty1<*, Any?>): Unit {
+        inputs.add(Pair(property.name, hidden))
+    }
 
-    public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit { selectReferences.add(property.name) }
+    public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit {
+        selectReferences.add(property.name)
+    }
+
     private fun selectReference(parameter: EventParameter) = selectReferences.add(parameter.name)
 
-/*    fun selectEnum(property: KProperty1<*, EnumContainer<*>>) = selectEnums.add(property.name)
-    private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
- */
+    /*    fun selectEnum(property: KProperty1<*, EnumContainer<*>>) = selectEnums.add(property.name)
+        private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
+     */
 
-    public fun populatedAfterSubmit(property: KProperty1<*, Any?>): Unit { propsPopulatedAfterSubmit.add(property.name) }
+    public fun populatedAfterSubmit(property: KProperty1<*, Any?>): Unit {
+        propsPopulatedAfterSubmit.add(property.name)
+    }
 
     public fun remaining(inHtmlDetails: String? = null): Unit {
         htmlDetailsSummary = inHtmlDetails
@@ -148,7 +173,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
             csrfToken,
             inputs,
             populateMissingReferenceSelects(modelIDSelects, reader, inputs),
-          //  enumSelects,
+            //  enumSelects,
             propsPopulatedAfterSubmit,
             params,
             path ?: postPath,
@@ -250,7 +275,6 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         val allParams = callParams.plus(ParametersBuilder().apply {
             populatedAfterSubmit.forEach { p -> append(p.key.name, p.value.valueWithoutAuthorization.toString()) }
         }.build())
-
 
 
         // someday maybe: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#verifying-origin-with-standard-headers
@@ -470,8 +494,6 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
             }
         }
 
-        public suspend fun respondDryRun(call: ApplicationCall): Unit = call.respond(HttpStatusCode.OK)
-
         private fun createBody(invalidParametersProblems: Set<ValidationProblem>): String {
             val problems = mutableListOf<ValidationProblemResponse>()
             val fieldsMustBeNull =
@@ -508,7 +530,7 @@ public class EventForm<T : Any, C : KlerkContext>(
     private val csrfToken: String,
     private val inputs: List<Pair<String, InputType>>,
     private val referenceSelects: Set<ReferencePropertyWithOptions>,
- //   private val enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>?,
+    //   private val enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>?,
     private val propsPopulatedAfterSubmit: List<String>,
     private val params: T?,
     private val postPath: String?,
@@ -554,42 +576,42 @@ public class EventForm<T : Any, C : KlerkContext>(
             }
         }
     }
-/*
-    private fun renderEnumSelect(
-        property: KProperty1<*, EnumContainer<*>>,
-        options: Array<out Enum<*>>,
-        params: T
-    ): HtmlBlockTag.() -> Unit = {
-        val paramValue = getEnumValue(property.name, params)
-        label {
-            id = "label-${property.name}"
-            htmlFor = property.name
-            /*    if (!enabled) {
-                    style = "opacity: 0.5;"
-                }
-             */
-            +camelCaseToPretty(property.name)
-        }
-        select {
-            name = property.name
-            if (property.returnType.isMarkedNullable) {
-                option {
-                    value = ""
-                    +"(none)"
-                }
+    /*
+        private fun renderEnumSelect(
+            property: KProperty1<*, EnumContainer<*>>,
+            options: Array<out Enum<*>>,
+            params: T
+        ): HtmlBlockTag.() -> Unit = {
+            val paramValue = getEnumValue(property.name, params)
+            label {
+                id = "label-${property.name}"
+                htmlFor = property.name
+                /*    if (!enabled) {
+                        style = "opacity: 0.5;"
+                    }
+                 */
+                +camelCaseToPretty(property.name)
             }
-            optGroup() {
-                options.forEach {
+            select {
+                name = property.name
+                if (property.returnType.isMarkedNullable) {
                     option {
-                        value = it.name
-                        selected = paramValue == it.name
-                        +it.toString()
+                        value = ""
+                        +"(none)"
+                    }
+                }
+                optGroup() {
+                    options.forEach {
+                        option {
+                            value = it.name
+                            selected = paramValue == it.name
+                            +it.toString()
+                        }
                     }
                 }
             }
         }
-    }
- */
+     */
 
     private fun renderInput(
         propertyName: String,
@@ -804,11 +826,11 @@ public class EventForm<T : Any, C : KlerkContext>(
         return (prop.getter.call(params) as? ModelID<*>)?.toInt()
     }
 
-/*    private fun getEnumValue(propertyName: String, params: T): String {
-        val prop = params::class.memberProperties.single { it.name == propertyName }
-        return (prop.getter.call(params) as? EnumContainer<*>)?.value?.name ?: throw IllegalArgumentException()
-    }
- */
+    /*    private fun getEnumValue(propertyName: String, params: T): String {
+            val prop = params::class.memberProperties.single { it.name == propertyName }
+            return (prop.getter.call(params) as? EnumContainer<*>)?.value?.name ?: throw IllegalArgumentException()
+        }
+     */
 
     private fun getNewInstance(propertyName: String, eventParameters: EventParameters<*>): DataContainer<*> {
         val prop = eventParameters.all.single { it.name == propertyName }.raw
@@ -854,6 +876,17 @@ public class EventForm<T : Any, C : KlerkContext>(
         try {
             val path = getPath(postPath, queryParams)
             tag.script { unsafe { +generateValidationScript(path) } }
+            /* enable this if you are using a classless CSS and want to test validation visualisation
+            tag.style { +"""
+input:invalid {
+  background-color: ivory;
+  border: none;
+  outline: 2px solid red;
+  border-radius: 5px;
+}
+""" }
+             */
+
             tag.form(path, method = FormMethod.post) {
                 id = "eventForm"
                 onChange = "validate()"
@@ -873,13 +906,13 @@ public class EventForm<T : Any, C : KlerkContext>(
                     p { tag.apply(renderReferenceSelect(refSelect, params)) }
                 }
 
-/*                enumSelects?.forEach { enumSelect ->
-                    val definedInput = inputs.singleOrNull { it.first == enumSelect.key.name }
-                    if (definedInput != null && definedInput.second != InputType.hidden) { // not tested
-                        tag.apply(renderEnumSelect(enumSelect.key, enumSelect.value, requireNotNull(params)))
-                    }
-                }
- */
+                /*                enumSelects?.forEach { enumSelect ->
+                                    val definedInput = inputs.singleOrNull { it.first == enumSelect.key.name }
+                                    if (definedInput != null && definedInput.second != InputType.hidden) { // not tested
+                                        tag.apply(renderEnumSelect(enumSelect.key, enumSelect.value, requireNotNull(params)))
+                                    }
+                                }
+                 */
                 if (htmlDetailsContents.isNotEmpty()) {
                     details {
                         summary { +(htmlDetailsSummary ?: "Details") }
@@ -920,15 +953,22 @@ public class EventForm<T : Any, C : KlerkContext>(
         const FD = new FormData(form);
 
         XHR.addEventListener("load", (event) => {
+                        // clear all errors
+            document.querySelectorAll('input').forEach(input => {
+                console.log("clearing " + input.id);
+                input.setCustomValidity("");
+            });
+        
             document.getElementById("errormessages").replaceChildren();
             if (event.target.status == 200) {
                 return;
             }
             if (event.target.response) {
                 const response = JSON.parse(event.target.response);
-                logFieldProblems(response);
+                
+                handleFieldProblems(response);
                 //showHumanErrorMessage(response);
-                toggleNullableFields(response);
+                //toggleNullableFields(response);
             }
         });
 
@@ -951,9 +991,17 @@ public class EventForm<T : Any, C : KlerkContext>(
                     });
 }
 
-    function logFieldProblems(response) {
-                    const element = document.getElementById("errormessages");
-                console.log(response.fieldProblems);
+    function handleFieldProblems(response) {
+        if (response.fieldProblems.length == 0) {
+            return;
+        }
+        for (var key in response.fieldProblems) {
+            var value = response.fieldProblems[key];
+            console.log("setting custom validity for " + key + " to " + value);
+            document.getElementById(key).setCustomValidity(value);
+        }
+        const element = document.getElementById("errormessages");
+        //console.log(response.fieldProblems);
 }
 
 function toggleNullableFields(response) {
@@ -1005,9 +1053,45 @@ private fun createParamClassFromCallParameters(parameterClass: KClass<*>, callPa
     return constructors.first().callBy(parameters)
 }
 
-/*
-should we use https://developer.mozilla.org/en-US/docs/Web/CSS/:user-invalid ?
-input.setCustomValidity("Put the error here?"); reportValidity();
-https://adamsilver.io/blog/dont-use-the-maxlength-attribute-to-stop-users-from-exceeding-the-limit/
-Many people think it is not possible to get a good enough UX with the browsers validation API. Perhaps we could configure the template to include a js-form-validation-framework.
- */
+public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
+    params: P,
+    key: CommandToken,
+    event: VoidEventWithParameters<M, P>,
+    call: ApplicationCall,
+    klerk: Klerk<C, D>,
+    context: C,
+) {
+    val command = Command(
+        event = event,
+        params = params,
+        model = null,
+    )
+    when (val result = klerk.handle(command, context, ProcessingOptions(key, dryRun = true))) {
+        is CommandResult.Failure -> {
+            val fieldProblems = if (result.problem is InvalidPropertyProblem) {
+                val p = result.problem as InvalidPropertyProblem
+                mapOf(p.propertyName to (p.endUserTranslatedMessage ?: "?"))
+            } else emptyMap()
+
+            call.respondText(
+                contentType = ContentType.Application.Json,
+                status = HttpStatusCode.UnprocessableEntity,
+                text = Gson().toJson(
+                    ValidationResponse(
+                        fieldProblems = fieldProblems,
+                        formProblems = emptyList(),
+                        dryRunProblems = listOf(result.toString())
+                    )
+                )
+            )
+        }
+
+        is CommandResult.Success -> call.respond(HttpStatusCode.OK)
+    }
+}
+
+public data class ValidationResponse(
+    val fieldProblems: Map<String, String>,
+    val formProblems: List<String>,
+    val dryRunProblems: List<String>
+)
