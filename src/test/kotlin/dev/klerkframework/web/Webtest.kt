@@ -4,6 +4,7 @@ import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.datatypes.InstantContainer
 
 import dev.klerkframework.klerk.read.ModelModification.*
+import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
 import dev.klerkframework.web.config.*
 import io.ktor.server.application.*
@@ -29,8 +30,8 @@ fun main() {
     //File(dbFilePath).delete()
     val ds = SQLiteDataSource()
     ds.url = "jdbc:sqlite:$dbFilePath"
-    val persistence = SqlPersistence(ds)
-    //val persistence = RamStorage()
+    //val persistence = SqlPersistence(ds)
+    val persistence = RamStorage()
     val klerk = Klerk.create(createConfig(collections, persistence))
     runBlocking {
 

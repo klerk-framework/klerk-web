@@ -1,10 +1,6 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.AuthorizationConfig
-import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.KlerkPlugin
-import dev.klerkframework.klerk.ManagedModel
+import dev.klerkframework.klerk.*
 
 import dev.klerkframework.klerk.misc.AlgorithmDocumenter
 import dev.klerkframework.klerk.misc.EventParameters
@@ -28,6 +24,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     klerk: Klerk<C, V>,
     documentationPath: String
 ) {
+    val context = config.contextProvider(call)
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
 
     call.respondHtml {
@@ -39,7 +36,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
                 h1 { +"Documentation" }
-                apply(renderModels(klerk.config.managedModels, klerk, documentationPath))
+                apply(renderModels(klerk.config.managedModels, klerk, documentationPath, context.translation.klerk))
                 apply(renderAuthorizationRules(klerk.config.authorization))
                 apply(renderCollections(klerk.config.collections))
                 apply(renderPluginsDocumentation(klerk.config.plugins))
@@ -57,7 +54,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 h1 { +"Documentation for ${model.kClass.simpleName}" }
                 pre(classes = "mermaid") {
                     unsafe {
-                        +generateStateDiagram(model.stateMachine, showUpdateNotes)
+                        +generateStateDiagram(model.stateMachine, showUpdateNotes, context.translation.klerk)
                     }
                 }
                 if (!showUpdateNotes) {
@@ -88,24 +85,26 @@ private fun <C : KlerkContext, V> renderModels(
     models: Set<ManagedModel<*, *, C, V>>,
     klerk: Klerk<C, V>,
     documentationPath: String,
+    translation: KlerkTranslation,
 ): BODY.() -> Unit = {
     apply(addMermaidScript())
     h2 { +"Models" }
     models.forEach { model ->
         h3 { +(model.kClass.simpleName ?: "") }
         apply(renderModelProperties(model.kClass, documentationPath))
-        apply(renderStatemachine(model.stateMachine, klerk))
+        apply(renderStatemachine(model.stateMachine, klerk, translation))
     }
 }
 
 private fun <C : KlerkContext, V> renderStatemachine(
     stateMachine: StateMachine<out Any, out Enum<*>, C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
+    translation: KlerkTranslation,
 ): BODY.() -> Unit = {
     h4 { +"States, transitions and events" }
     pre(classes = "mermaid") {
         unsafe {
-            +generateStateDiagram(stateMachine, false)
+            +generateStateDiagram(stateMachine, false, translation)
         }
     }
     apply(renderEvents(stateMachine, klerk))

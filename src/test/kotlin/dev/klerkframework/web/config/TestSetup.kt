@@ -1,38 +1,11 @@
 package dev.klerkframework.web.config
 
-import dev.klerkframework.klerk.ActorIdentity
-import dev.klerkframework.klerk.ArgCommandContextReader
-import dev.klerkframework.klerk.ArgContextReader
-import dev.klerkframework.klerk.ArgForInstanceEvent
-import dev.klerkframework.klerk.ArgForInstanceNonEvent
-import dev.klerkframework.klerk.ArgForVoidEvent
-import dev.klerkframework.klerk.ArgModelContextReader
-import dev.klerkframework.klerk.ArgsForPropertyAuth
-import dev.klerkframework.klerk.AuthenticationIdentity
-import dev.klerkframework.klerk.Config
-import dev.klerkframework.klerk.ConfigBuilder
-import dev.klerkframework.klerk.DefaultTranslator
-import dev.klerkframework.klerk.EventReference
-import dev.klerkframework.klerk.HumanReadable
-import dev.klerkframework.klerk.InstanceEventNoParameters
-import dev.klerkframework.klerk.InstanceEventWithParameters
-import dev.klerkframework.klerk.InvalidParametersProblem
-import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.NegativeAuthorization
+import dev.klerkframework.klerk.*
+
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
-import dev.klerkframework.klerk.PositiveAuthorization
-import dev.klerkframework.klerk.Translator
-import dev.klerkframework.klerk.Unauthenticated
-import dev.klerkframework.klerk.Validatable
-import dev.klerkframework.klerk.Validity
 import dev.klerkframework.klerk.Validity.Invalid
 import dev.klerkframework.klerk.Validity.Valid
-import dev.klerkframework.klerk.VoidEventNoParameters
-import dev.klerkframework.klerk.VoidEventWithParameters
 import dev.klerkframework.klerk.actions.Job
 import dev.klerkframework.klerk.actions.JobContext
 import dev.klerkframework.klerk.actions.JobId
@@ -63,6 +36,7 @@ import dev.klerkframework.klerk.statemachine.stateMachine
 import dev.klerkframework.klerk.storage.Persistence
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
+import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -248,12 +222,12 @@ data class CreateAuthorParams(
     val age: EvenIntContainer = EvenIntContainer(68),
     //  val address: Address,
     val secretToken: SecretPasscode,
-    val favouriteColleague: ModelID<Author>? = null
+    val favouriteColleague: ModelID<Author>? = null,
+    val favouritePrimeNumber: PrimeNumber,
 ) : Validatable {
 
     override fun validators(): Set<() -> Validity> = setOf(::augustStrindbergCannotHaveCertainPhoneNumber)
 
-    @HumanReadable("Testar att namnge en funktion")
     private fun augustStrindbergCannotHaveCertainPhoneNumber(): Validity {
         return if (firstName.value == "August" && lastName.value == "Strindberg" && phone.value == "123456") Invalid() else Valid
     }
@@ -298,7 +272,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
 
         state(Amateur) {
             onEnter {
-                action(::onEnterAmateurStateAction)
+                unmanagedJob(::onEnterAmateurStateAction)
             }
 
             onEvent(UpdateAuthor) {
@@ -314,7 +288,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             }
 
             onEvent(ImproveAuthor) {
-                action(::showNotification)
+                unmanagedJob(::showNotification)
                 transitionTo(Improving)
             }
 
@@ -326,14 +300,14 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             after(30.seconds) {
                 transitionTo(Established)
                 update(::someUpdate)
-                action(::sayHello)
+                unmanagedJob(::sayHello)
             }
 
         }
 
         state(Improving) {
             onEnter {
-                action(::onEnterImprovingStateAction)
+                unmanagedJob(::onEnterImprovingStateAction)
                 transitionWhen(
                     linkedMapOf(
                         ::isAnImpostor to Amateur,
@@ -352,7 +326,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             }
 
             onEvent(ImproveAuthor) {
-                action(::sayCongratulations)
+                unmanagedJob(::sayCongratulations)
             }
 
             onEvent(DeleteAuthor) {
@@ -531,6 +505,7 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
                 phone = PhoneNumber("+46123456"),
                 secretToken = SecretPasscode(234234902359245345),
                 //       address = Address(Street("Storgatan"))
+                favouritePrimeNumber = PrimeNumber(31),
             ),
         ),
         Context.system(),
@@ -558,6 +533,7 @@ val createAstridParameters = CreateAuthorParams(
     lastName = LastName("Lindgren"),
     phone = PhoneNumber("+4699999"),
     secretToken = SecretPasscode(234123515123434),
+    favouritePrimeNumber = PrimeNumber(31),
 )
 
 suspend fun createBookHarryPotter1(klerk: Klerk<Context, MyCollections>, author: ModelID<Author>): ModelID<Book> {
@@ -617,11 +593,11 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
 
     override val validators = setOf(::mustBeEven)
 
-    fun mustBeEven(): InvalidParametersProblem? {
+    fun mustBeEven(translation: Translation): PropertyValidation {
         if (valueWithoutAuthorization % 2 == 0) {
-            return null
+            return PropertyValidation.Valid
         }
-        return InvalidParametersProblem("Must be even")
+        return PropertyValidation.Invalid("Must be even")
     }
 
 }
@@ -645,16 +621,16 @@ class BookTitle(value: String) : StringContainer(value) {
     override val regexPattern = ".*"
     override val validators = setOf(::`title must not contain 'alpha'`, ::`title must not start with 'beta'`)
 
-    private fun `title must not contain 'alpha'`(): InvalidParametersProblem? {
+    private fun `title must not contain 'alpha'`(translation: Translation): PropertyValidation {
         return if (valueWithoutAuthorization.contains("alpha")) {
-            InvalidParametersProblem("Sorry, the title must not contain 'alpha'")
-        } else null
+            PropertyValidation.Invalid()
+        } else PropertyValidation.Valid
     }
 
-    private fun `title must not start with 'beta'`(): InvalidParametersProblem? {
+    private fun `title must not start with 'beta'`(translation: Translation): PropertyValidation {
         return if (valueWithoutAuthorization.lowercase().startsWith("beta")) {
-            InvalidParametersProblem("'beta' must not be the first word")
-        } else null
+            PropertyValidation.Invalid("'beta' must not be the first word")
+        } else PropertyValidation.Valid
     }
 }
 
@@ -781,7 +757,7 @@ data class Context(
     override val actor: dev.klerkframework.klerk.ActorIdentity,
     override val auditExtra: String? = null,
     override val time: Instant = Clock.System.now(),
-    override val translator: Translator = DefaultTranslator(),
+    override val translation: Translation = DefaultTranslation,
     val user: Model<User>? = null,
     val purpose: String = "Pass the butter",
 ) : KlerkContext {
@@ -797,7 +773,7 @@ data class Context(
 
         fun system(): Context = Context(dev.klerkframework.klerk.SystemIdentity)
 
-        fun swedishUnauthenticated(): Context = Context(dev.klerkframework.klerk.Unauthenticated, translator = SwedishTranslation())
+        fun swedishUnauthenticated(): Context = Context(dev.klerkframework.klerk.Unauthenticated, translation = SwedishTranslation)
     }
 
 }
@@ -817,12 +793,18 @@ object MyJob : Job<Context, MyCollections> {
 
 }
 
-class SwedishTranslation : EnglishTranslation() {
+val english = EnglishKlerkTranslation(DefaultKlerkTranslation)
+
+object SwedishTranslation : Translation {
+    override val klerk: KlerkTranslation = SwedishKlerkTranslation(english)
+}
+
+class SwedishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation by default {
 
     override fun property(property: KProperty1<*, *>): String {
         return when (property) {
             CreateAuthorParams::firstName -> "Förnamn på den nya författaren"
-            else -> super.property(property)
+            else -> default.property(property)
         }
     }
 
@@ -830,19 +812,27 @@ class SwedishTranslation : EnglishTranslation() {
         return when (event) {
             PublishBook.id -> "Publicera bok"
             CreateAuthor.id -> "Ny författare"
-            else -> super.event(event)
+            else -> default.event(event)
         }
     }
 
+    override fun invalidProperty(propertyName: String, functionName: String, translationInfo: String?): String {
+        return when (functionName) {
+            PrimeNumber::mustBePrime.name -> "Måste vara ett primtal"
+            else -> default.invalidProperty(propertyName, functionName, translationInfo)
+        }
+
+
+    }
 }
 
 
-open class EnglishTranslation : DefaultTranslator() {
+open class EnglishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation by default {
     override fun property(property: KProperty1<*, *>): String {
         return when (property) {
             CreateAuthorParams::firstName -> "First name of the new writer"
             CreateAuthorParams::lastName -> "Last name of the new writer"
-            else -> super.property(property)
+            else -> default.property(property)
         }
     }
 }
@@ -907,6 +897,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     phone = PhoneNumber("+46123456"),
                     secretToken = SecretPasscode(23290409),
                     //address = Address(Street("Lugna gatan"))
+                    favouritePrimeNumber = PrimeNumber(31),
                 ),
             ),
             Context.system(),
@@ -1009,3 +1000,16 @@ fun setPublishTime(args: ArgForInstanceEvent<Book, Nothing?, Context, MyCollecti
     return args.model.props.copy(publishedAt = BookWrittenAt(args.context.time))
 }
 
+class PrimeNumber(value: Int) : IntContainer(value) {
+    override val min: Int = 1
+    override val max: Int = Int.MAX_VALUE
+
+    override val validators: Set<(translator: Translation) -> PropertyValidation> = setOf(::mustBePrime)
+
+    private val primeNumbers = setOf(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
+
+    fun mustBePrime(translation: Translation): PropertyValidation {
+        return if (primeNumbers.contains(valueWithoutAuthorization)) PropertyValidation.Valid else PropertyValidation.Invalid()
+    }
+
+}

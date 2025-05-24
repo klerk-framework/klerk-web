@@ -24,98 +24,102 @@ import kotlin.reflect.full.memberProperties
 
 fun main() {
 
+    System.setProperty("DEVELOPMENT_MODE", "true")
+    val bc = BookCollections()
+    val collections = MyCollections(bc, AuthorCollections(bc.all))
+    val klerk = Klerk.create(createConfig(collections))
     runBlocking {
-
-        System.setProperty("DEVELOPMENT_MODE", "true")
-        val bc = BookCollections()
-        val collections = MyCollections(bc, AuthorCollections(bc.all))
-        val klerk = Klerk.create(createConfig(collections))
         klerk.meta.start()
-        if (klerk.meta.modelsCount == 0) {
-            val rowling = createAuthorJKRowling(klerk)
-            createBookHarryPotter1(klerk, rowling)
+        val rowling = createAuthorJKRowling(klerk)
+        createBookHarryPotter1(klerk, rowling)
+    }
 
-            val formBuilder = EventFormTemplate(
-                EventWithParameters(
-                    CreateAuthor.id,
-                    EventParameters(CreateAuthorParams::class)
-                ), klerk, "/",
-            ) {
-                text(CreateAuthorParams::firstName)
-                text(CreateAuthorParams::lastName)
-                text(CreateAuthorParams::phone)
-                number(CreateAuthorParams::age)
-                populatedAfterSubmit(CreateAuthorParams::secretToken)
-            }
+    val formBuilder = EventFormTemplate(
+        EventWithParameters(
+            CreateAuthor.id,
+            EventParameters(CreateAuthorParams::class)
+        ),
+        klerk, "/",
+    ) {
+        text(CreateAuthorParams::firstName)
+        text(CreateAuthorParams::lastName)
+        text(CreateAuthorParams::phone)
+        number(CreateAuthorParams::age)
+        number(CreateAuthorParams::favouritePrimeNumber)
+        populatedAfterSubmit(CreateAuthorParams::secretToken)
+        //populatedAfterSubmit(CreateAuthorParams::favouriteColleague)
+        hidden(CreateAuthorParams::favouriteColleague)
+    }
 
-            formBuilder.validate()
+    formBuilder.validate()
 
-            embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-                routing {
-                    get("/") {
-                        val p = CreateAuthorParams(
-                            firstName = FirstName(""),
-                            lastName = LastName(""),
-                            phone = PhoneNumber("+46123456"),
-                            secretToken = SecretPasscode(99999),
-                            //address = Address(Street("Storgatan"))
-                        )
-                        authorizeAllDatatypes(p)
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+        routing {
+            get("/") {
+                val p = CreateAuthorParams(
+                    firstName = FirstName(""),
+                    lastName = LastName(""),
+                    phone = PhoneNumber("+46123456"),
+                    secretToken = SecretPasscode(99999),
+                    //address = Address(Street("Storgatan"))
+                    favouritePrimeNumber = PrimeNumber(31),
+                )
+                //authorizeAllDatatypes(p)
 
-                        val context = Context.system()
+                val context = Context.swedishUnauthenticated()
 
-                        val form2 = klerk.read(context) {
-                            formBuilder.build(call, p, this, translator = context.translator)
-                        }
+                val form2 = klerk.read(context) {
+                    formBuilder.build(call, p, this, translator = context.translation)
+                }
 
-                        call.respondHtml {
-                            head {
-                                styleLink("https://unpkg.com/sakura.css/css/sakura.css")
-                            }
-                            body {
-                                h1 { +"With server validation" }
-                                form2.render(this)
-                            }
-                        }
+                call.respondHtml {
+                    head {
+                        styleLink("https://unpkg.com/sakura.css/css/sakura.css")
                     }
-
-                    post("/") {
-                        when (val result = formBuilder.parse(
-                            call,
-                            mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
-                        )) {
-                            is Invalid -> EventFormTemplate.respondInvalid(result, call)
-                            is DryRun -> respondDryRun<Author>(
-                                result.params,
-                                result.key,
-                                CreateAuthor,
-                                null,
-                                call,
-                                klerk
-                            )
-
-                            is Parsed -> call.respondHtml {
-                                body {
-                                    h1 { +"Success" }
-                                    p { +result.params::class.qualifiedName.toString() }
-                                    result.params::class.memberProperties.forEach {
-                                        val value = it.getter.call(result.params) as DataContainer<*>
-                                        +"${it.name}: ${value.valueWithoutAuthorization}"
-                                        br
-                                    }
-                                }
-                            }
-                        }
-
+                    body {
+                        h1 { +"With server validation" }
+                        +"Language: ${context.translation}"
+                        form2.render(this)
                     }
                 }
-                //        configureSecurity()
-                //      configureHTTP()
-            }.start(wait = true)
+            }
+
+            post("/") {
+                when (val result = formBuilder.parse(
+                    call,
+                    mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
+                )) {
+                    is Invalid -> EventFormTemplate.respondInvalid(result, call)
+                    is DryRun -> respondDryRun<Author>(
+                        result.params,
+                        result.key,
+                        CreateAuthor,
+                        null,
+                        call,
+                        klerk
+                    )
+
+                    is Parsed -> call.respondHtml {
+                        body {
+                            h1 { +"Success" }
+                            p { +result.params::class.qualifiedName.toString() }
+                            result.params::class.memberProperties.forEach {
+                                val value = it.getter.call(result.params) as DataContainer<*>
+                                +"${it.name}: ${value.valueWithoutAuthorization}"
+                                br
+                            }
+                        }
+                    }
+                }
+
+            }
         }
-    }
+        //        configureSecurity()
+        //      configureHTTP()
+    }.start(wait = true)
 }
 
+detta borde väl flyttas från test?
 suspend fun <T : Any> respondDryRun(
     params: CreateAuthorParams,
     key: CommandToken,
@@ -130,14 +134,19 @@ suspend fun <T : Any> respondDryRun(
         model = id,
     )
     when (val result =
-        klerk.handle(re, Context.system(), ProcessingOptions(key, dryRun = true))) {
+        klerk.handle(re, Context.swedishUnauthenticated(), ProcessingOptions(key, dryRun = true))) {
         is CommandResult.Failure -> {
+            val fieldProblems = if (result.problem is InvalidPropertyProblem) {
+                val p = result.problem as InvalidPropertyProblem
+                mapOf(p.propertyName to (p.endUserTranslatedMessage ?: "?"))
+            } else emptyMap()
+
             call.respondText(
                 contentType = ContentType.Application.Json,
                 status = HttpStatusCode.UnprocessableEntity,
                 text = Gson().toJson(
                     ValidationResponse(
-                        fieldProblems = emptyMap(),
+                        fieldProblems = fieldProblems,
                         formProblems = emptyList(),
                         dryRunProblems = listOf(result.toString())
                     )

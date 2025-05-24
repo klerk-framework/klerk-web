@@ -7,6 +7,7 @@ import dev.klerkframework.klerk.datatypes.StringContainer
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
+import kotlinx.html.body
 import kotlin.reflect.KClass
 import kotlin.reflect.full.isSubtypeOf
 import kotlin.reflect.full.memberProperties
@@ -24,6 +25,7 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
     config: LowCodeConfig<C>,
     klerk: Klerk<C, V>
 ) {
+    val context = config.contextProvider(call)
     val requestParams = call.receiveParameters()
     val type = requestParams[FUNCTION_KIND] ?: throw IllegalArgumentException("No function-kind provided")
     if (type == DATA_CONTAINER_VALIDATION) {
@@ -34,25 +36,26 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
             .firstOrNull { it.returnType.toString() == property }
         if (prop == null) {
             call.respondHtml {
-                +"No property found with name $property"
+                body { +"No property found with name $property" }
             }
             return
         }
 
         if (prop.returnType.isSubtypeOf(StringContainer::class.starProjectedType)) {
             val container = (prop.returnType.classifier as KClass<*>).constructors.first().call(value) as DataContainer<*>
-            val problem = container.validate(name)
+            val problem = container.validate(name, context.translation)
             if (problem != null) {
                 call.respondHtml {
-                    +"Validation problem: $problem"
+                    body { +"Validation problem: $problem" }
                 }
                 return
             }
-            call.respondHtml { +"Validation successful" }
+            call.respondHtml {
+                body { +"Validation successful" } }
             return
         }
 
     }
-    call.respondHtml { +"Not implemented" }
+    call.respondHtml { body { +"Not implemented" } }
 
 }

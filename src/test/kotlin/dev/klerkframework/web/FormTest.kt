@@ -68,7 +68,8 @@ fun main() {
                             lastName = LastName("Svensson"),
                             phone = PhoneNumber("0987654321"),
                             age = EvenIntContainer(22),
-                            secretToken = SecretPasscode(234)
+                            secretToken = SecretPasscode(234),
+                            favouritePrimeNumber = PrimeNumber(31),
                         )
 
                         authorizeAllDatatypes(params)
@@ -81,7 +82,7 @@ fun main() {
                                     call,
                                     params,
                                     this,
-                                    translator = context.translator,
+                                    translator = context.translation,
                                     // referenceSelects = mapOf(TestParams::book to collections.books.all, TestParams::author to collections.authors.all),
                                     //enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
                                 )

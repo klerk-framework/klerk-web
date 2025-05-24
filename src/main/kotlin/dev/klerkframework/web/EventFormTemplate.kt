@@ -2,7 +2,6 @@ package dev.klerkframework.web
 
 import com.google.gson.Gson
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.InvalidParametersProblem
 import dev.klerkframework.klerk.collection.ModelCollection
 import dev.klerkframework.klerk.collection.QueryOptions
 import dev.klerkframework.klerk.command.CommandToken
@@ -122,7 +121,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         // enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>? = null,
         path: String? = null,
         queryParams: Map<String, String> = emptyMap(),
-        translator: Translator
+        translator: Translation
     ): EventForm<T, C> {
         val csrfToken = generateRandomString()
         try {
@@ -258,11 +257,6 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         try {
             @Suppress("UNCHECKED_CAST")
             val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
-            val propertyValidationProblems =
-                emptySet<InvalidParametersProblem>()
-            if (propertyValidationProblems.isNotEmpty()) {
-                return ParseResult.Invalid(propertyValidationProblems)
-            }
 
             if (call.request.queryParameters["dryRun"]?.equals("true") == true) {
                 return ParseResult.DryRun(paramsClass, key)
@@ -279,7 +273,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
        */
             return ParseResult.Parsed(paramsClass, key)
         } catch (e: Exception) {
-            return ParseResult.Invalid(setOf(InvalidParametersProblem(e)))
+            return ParseResult.Invalid(setOf(ValidationProblem(e.message)))
         }
     }
 
@@ -478,7 +472,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
 
         public suspend fun respondDryRun(call: ApplicationCall): Unit = call.respond(HttpStatusCode.OK)
 
-        private fun createBody(invalidParametersProblems: Set<InvalidParametersProblem>): String {
+        private fun createBody(invalidParametersProblems: Set<ValidationProblem>): String {
             val problems = mutableListOf<ValidationProblemResponse>()
             val fieldsMustBeNull =
                 invalidParametersProblems.filter { it.fieldsMustBeNull != null }
@@ -522,7 +516,7 @@ public class EventForm<T : Any, C : KlerkContext>(
     private val htmlDetailsSummary: String?,
     private val htmlDetailsContents: Set<String>,
     private val template: EventFormTemplate<T, C>,
-    private val translator: Translator
+    private val translator: Translation
 
 ) {
     private val log = KotlinLogging.logger {}
@@ -686,7 +680,7 @@ public class EventForm<T : Any, C : KlerkContext>(
             //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
 //            +translator.translateProperty(propertyName)
             val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
-            +translator.property(property)
+            +translator.klerk.property(property)
             //+camelCaseToPretty(propertyName)
         }
         br()
@@ -932,7 +926,8 @@ public class EventForm<T : Any, C : KlerkContext>(
             }
             if (event.target.response) {
                 const response = JSON.parse(event.target.response);
-                showHumanErrorMessage(response);
+                logFieldProblems(response);
+                //showHumanErrorMessage(response);
                 toggleNullableFields(response);
             }
         });
@@ -956,6 +951,11 @@ public class EventForm<T : Any, C : KlerkContext>(
                     });
 }
 
+    function logFieldProblems(response) {
+                    const element = document.getElementById("errormessages");
+                console.log(response.fieldProblems);
+}
+
 function toggleNullableFields(response) {
     response.fieldsMustBeNull.forEach(f => {
         document.getElementById(f).disabled = true;
@@ -972,7 +972,7 @@ function toggleNullableFields(response) {
 }
 
 public sealed class ParseResult<T> {
-    public data class Invalid<T>(val problems: Set<InvalidParametersProblem>) : ParseResult<T>()
+    public data class Invalid<T>(val problems: Set<ValidationProblem>) : ParseResult<T>()
     public data class DryRun<T>(val params: T, val key: CommandToken) : ParseResult<T>()
     public data class Parsed<T>(val params: T, val key: CommandToken) : ParseResult<T>()
 }

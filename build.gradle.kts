@@ -7,8 +7,8 @@ plugins {
     `maven-publish`
 }
 
-val ktorVersion = "3.1.2"
-val klerkVersion = "1.0.0-beta.3"
+val ktorVersion = "3.1.3"
+val klerkVersion = "1.0.0-beta.4"
 val gsonVersion = "2.9.0"
 val kotlinLoggingVersion = "2.1.21"
 val sqliteJdbcVersion = "3.44.1.0"
@@ -18,7 +18,8 @@ group = "dev.klerkframework"
 version = "1.0.0-alpha.2"
 
 dependencies {
-    compileOnly("com.github.klerk-framework:klerk:$klerkVersion")
+  //  compileOnly("com.github.klerk-framework:klerk:$klerkVersion") TODO
+    compileOnly("dev.klerkframework:klerk:$klerkVersion")
     compileOnly("io.ktor:ktor-server-html-builder:$ktorVersion")
     compileOnly("io.ktor:ktor-server-core-jvm:$ktorVersion")
     compileOnly("io.ktor:ktor-server-netty-jvm:$ktorVersion")
@@ -31,7 +32,8 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.xerial:sqlite-jdbc:$sqliteJdbcVersion")
     testImplementation("org.slf4j:slf4j-simple:$slf4jVersion")
-    testImplementation("com.github.klerk-framework:klerk:${klerkVersion}")
+    //testImplementation("com.github.klerk-framework:klerk:${klerkVersion}") TODO
+    testImplementation("dev.klerkframework:klerk:${klerkVersion}")
     testImplementation("io.ktor:ktor-server-html-builder:${ktorVersion}")
     testImplementation("io.ktor:ktor-server-core-jvm:${ktorVersion}")
     testImplementation("io.ktor:ktor-server-netty-jvm:${ktorVersion}")

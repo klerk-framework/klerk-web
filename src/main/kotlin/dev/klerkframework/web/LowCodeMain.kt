@@ -227,7 +227,7 @@ public class LowCodeMain<C : KlerkContext, V>(
     private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
         val context = config.contextProvider(call)
         if (!config.canSeeAdminUI(context)) {
-            call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { +"Not authorized" }
+            call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { body { +"Not authorized" } }
             return
         }
         block()

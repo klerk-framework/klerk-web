@@ -85,7 +85,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                     params = null,
                     reader = this,
                     queryParams = buttonTargets.toQueryParams().plus(modelIdQueryParams),
-                    translator = context.translator
+                    translator = context.translation
                 )
             }
 
@@ -228,11 +228,11 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             }
 
             if (parameters == null) {
-                form(action = url, method = FormMethod.post) { button { +context.translator.event(event) } }
+                form(action = url, method = FormMethod.post) { button { +context.translation.klerk.event(event) } }
             } else {
                 a(url) {
                     button() {
-                        +context.translator.event(event)
+                        +context.translation.klerk.event(event)
                     }
                 }
             }
