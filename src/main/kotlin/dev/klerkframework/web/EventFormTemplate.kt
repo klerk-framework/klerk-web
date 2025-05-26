@@ -21,9 +21,7 @@ import mu.KotlinLogging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
-import kotlin.reflect.KProperty1
+import kotlin.reflect.*
 import kotlin.reflect.full.*
 
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
@@ -36,14 +34,15 @@ public data class UIElementData(val propertyName: String, val dataContainer: Dat
  * Regarding CSRF protection: the 'Double Submit Pattern' with '__Host-' cookie-prefix is used.
  */
 public class EventFormTemplate<T : Any, C : KlerkContext>(
-    private val eventWithParameters: EventWithParameters<T>,
+    private val defaultValues: EventWithParameters<T>,
     internal val klerk: Klerk<C, *>,
     private val postPath: String? = null,
+    internal val classProvider: KFunction4<String, String?, String, String, String?>?,
     init: EventFormTemplate<T, C>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
 
-    internal val parameters: EventParameters<T> = eventWithParameters.parameters
+    internal val parameters: EventParameters<T> = defaultValues.parameters
 
     /*private val items = mutableListOf<Item<T>>()
     private val hidden = mutableMapOf<String, Any>()
@@ -194,7 +193,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         parameters.all
             .filter { it.raw.type.withNullability(false).isSubtypeOf(ModelID::class.starProjectedType) }
             .map { eventParameter ->
-                val ls = klerk.config.getValidationCollectionFor(eventWithParameters.eventReference, eventParameter)
+                val ls = klerk.config.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 val options = reader.query(ls, QueryOptions(maxItems = 300)).items
                 if (options.size >= 300) {
@@ -215,7 +214,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
     }
 
     internal fun validate() {
-        if (klerk.config.getParameters(eventWithParameters.eventReference) != eventWithParameters.parameters) {
+        if (klerk.config.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
         }
 
@@ -261,7 +260,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         val csrfHiddenInput = callParams[CSRF_TOKEN]
         if (csrfCookie == null || csrfHiddenInput == null || csrfCookie != csrfHiddenInput) {
             log.info { "CSRF check failed" }
-            throw SecurityException("CSRF check failed")
+            throw IllegalArgumentException("CSRF check failed")
         }
         val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) }
             ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
@@ -617,7 +616,9 @@ public class EventForm<T : Any, C : KlerkContext>(
         propertyName: String,
         type: InputType,
         parameters: EventParameters<T>,
-        params: T?
+        params: T?,
+        classProvider:
+        KFunction4<String, String?, String, String, String?>?,
     ): HtmlBlockTag.() -> Unit =
         {
             val value = if (params == null) null else getParamDatatype(propertyName, params)
@@ -627,7 +628,8 @@ public class EventForm<T : Any, C : KlerkContext>(
                         propertyName,
                         value,
                         text,
-                        getNewInstance(propertyName, parameters)  // since value can be null
+                        getNewInstance(propertyName, parameters),  // since value can be null
+                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
                     )
                 )
 
@@ -636,7 +638,8 @@ public class EventForm<T : Any, C : KlerkContext>(
                         propertyName,
                         value,
                         email,
-                        getNewInstance(propertyName, parameters)  // since value can be null
+                        getNewInstance(propertyName, parameters),  // since value can be null
+                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
                     )
                 )
 
@@ -645,7 +648,8 @@ public class EventForm<T : Any, C : KlerkContext>(
                         propertyName,
                         value,
                         password,
-                        getNewInstance(propertyName, parameters)  // since value can be null
+                        getNewInstance(propertyName, parameters),  // since value can be null
+                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
                     )
                 )
 
@@ -705,7 +709,16 @@ public class EventForm<T : Any, C : KlerkContext>(
             +translator.klerk.property(property)
             //+camelCaseToPretty(propertyName)
         }
-        br()
+     //   br()
+    }
+
+    private fun createErrorPlaceholder(propertyName: String): HtmlBlockTag.() -> Unit = {
+        span(classes = "input-error-message") {
+            style = "visibility: hidden; min-height: 1.2em; display: inline-block; padding-left: 10px;"
+            id = "error-$propertyName"
+            role = "alert"
+            +""
+        }
     }
 
     private fun renderHiddenInput(propertyName: String, theValue: String?): HtmlBlockTag.() -> Unit = {
@@ -746,11 +759,14 @@ public class EventForm<T : Any, C : KlerkContext>(
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
             id = propertyName
             name = propertyName
+            attributes["aria-invalid"] = "false"
+            attributes["aria-errormessage"] = "error-$propertyName"
             value = theValue?.toString() ?: ""
             // required = !property.returnType.isMarkedNullable
             newInstance.min?.apply { min = this.toString() }
             newInstance.max?.apply { max = this.toString() }
         }
+        apply(createErrorPlaceholder(propertyName))
     }
 
 
@@ -795,14 +811,17 @@ public class EventForm<T : Any, C : KlerkContext>(
         propertyName: String,
         theValue: DataContainer<*>?,
         type: InputType,
-        newInstance: DataContainer<*>
+        newInstance: DataContainer<*>,
+        classes: String?,
     ): HtmlBlockTag.() -> Unit = {
         apply(createLabel(propertyName, (theValue != null)))
         theValue as StringContainer?
         newInstance as StringContainer
-        input(type) {
+        input(type, classes = classes) {
             id = propertyName
             name = propertyName
+            attributes["aria-invalid"] = "false"
+            attributes["aria-errormessage"] = "error-$propertyName"
             value = theValue?.toString() ?: ""
             // disabled = theValue == null
             newInstance.minLength?.let {
@@ -814,6 +833,7 @@ public class EventForm<T : Any, C : KlerkContext>(
                 pattern = newInstance.regexPattern!!.toString()
             } // for some reason, the apply didn't work
         }
+        apply(createErrorPlaceholder(propertyName))
     }
 
     private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? {
@@ -876,17 +896,6 @@ public class EventForm<T : Any, C : KlerkContext>(
         try {
             val path = getPath(postPath, queryParams)
             tag.script { unsafe { +generateValidationScript(path) } }
-            /* enable this if you are using a classless CSS and want to test validation visualisation
-            tag.style { +"""
-input:invalid {
-  background-color: ivory;
-  border: none;
-  outline: 2px solid red;
-  border-radius: 5px;
-}
-""" }
-             */
-
             tag.form(path, method = FormMethod.post) {
                 id = "eventForm"
                 onChange = "validate()"
@@ -899,7 +908,7 @@ input:invalid {
                 hiddenInput(name = IDEMPOTENCE_KEY) { value = CommandToken.simple().toString() }
                 +System.lineSeparator()
                 inputs.filterNot { htmlDetailsContents.contains(it.first) }.forEach {
-                    p { tag.apply(renderInput(it.first, it.second, template.parameters, params)) }
+                    p { tag.apply(renderInput(it.first, it.second, template.parameters, params, template.classProvider)) }
                     +System.lineSeparator()
                 }
                 referenceSelects.forEach { refSelect ->
@@ -917,7 +926,13 @@ input:invalid {
                     details {
                         summary { +(htmlDetailsSummary ?: "Details") }
                         inputs.filter { htmlDetailsContents.contains(it.first) }.forEach {
-                            tag.apply(renderInput(it.first, it.second, template.parameters, params))
+                            tag.apply(renderInput(
+                                it.first,
+                                it.second,
+                                template.parameters,
+                                params,
+                                template.classProvider
+                            ))
                         }
                     }
                 }
@@ -955,8 +970,17 @@ input:invalid {
         XHR.addEventListener("load", (event) => {
                         // clear all errors
             document.querySelectorAll('input').forEach(input => {
-                console.log("clearing " + input.id);
                 input.setCustomValidity("");
+                input.setAttribute('aria-invalid', 'false');          
+                var errormessageId = input.getAttribute('aria-errormessage');
+                if (errormessageId !== null) {
+                    var errorSpan = document.getElementById(errormessageId);
+                    if (errorSpan == null) {
+                        } else {
+                        errorSpan.innerText = '';
+                        errorSpan.style.visibility = 'hidden';
+                    }
+                }
             });
         
             document.getElementById("errormessages").replaceChildren();
@@ -997,11 +1021,18 @@ input:invalid {
         }
         for (var key in response.fieldProblems) {
             var value = response.fieldProblems[key];
-            console.log("setting custom validity for " + key + " to " + value);
-            document.getElementById(key).setCustomValidity(value);
+            //console.log("setting custom validity for " + key + " to " + value);
+            var input = document.getElementById(key);
+            input.setCustomValidity(value);
+            input.setAttribute('aria-invalid', 'true');
+            input.style.visibility = 'visible';
+            var errorSpan = document.getElementById("error-" + key);
+            if (errorSpan !== null) {
+                    errorSpan.innerText = value;
+                    errorSpan.style.visibility = 'visible';
+            }
         }
         const element = document.getElementById("errormessages");
-        //console.log(response.fieldProblems);
 }
 
 function toggleNullableFields(response) {
@@ -1068,10 +1099,9 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
     )
     when (val result = klerk.handle(command, context, ProcessingOptions(key, dryRun = true))) {
         is CommandResult.Failure -> {
-            val fieldProblems = if (result.problem is InvalidPropertyProblem) {
-                val p = result.problem as InvalidPropertyProblem
-                mapOf(p.propertyName to (p.endUserTranslatedMessage ?: "?"))
-            } else emptyMap()
+            val fieldProblems = result.problems
+                .filterIsInstance<InvalidPropertyProblem>()
+                .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
 
             call.respondText(
                 contentType = ContentType.Application.Json,

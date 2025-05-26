@@ -30,9 +30,10 @@ fun main() {
     val formBuilder = EventFormTemplate(
         EventWithParameters(
             CreateAuthor.id,
-            EventParameters(CreateAuthorParams::class)
+            EventParameters(CreateAuthorParams::class),
         ),
         klerk, "/",
+        classProvider = ::myClassProvider,
     ) {
         text(CreateAuthorParams::firstName)
         text(CreateAuthorParams::lastName)
@@ -67,12 +68,30 @@ fun main() {
 
                 call.respondHtml {
                     head {
-                        styleLink("https://unpkg.com/sakura.css/css/sakura.css")
+                        styleLink("https://unpkg.com/sakura.css@1.5.0/css/sakura.css")
                     }
                     body {
+                        style {
+                            +"""
+                            input:invalid {
+                              background-color: ivory;
+                              border: none;
+                              outline: 2px solid red;
+                              border-radius: 5px;
+                            }
+                            input.testing {
+                                background-color: white;
+                            }
+                            span.input-error-message {
+                                color: red;
+                            }
+                            """.trimIndent()
+                        }
                         h1 { +"With server validation" }
                         +"Language: ${context.translation}"
-                        form2.render(this)
+                        p {
+                            form2.render(this)
+                        }
                     }
                 }
             }
@@ -111,7 +130,6 @@ fun main() {
         //      configureHTTP()
     }.start(wait = true)
 }
-
 
 
 /*suspend fun <T : Any> respondDryRun(
@@ -157,4 +175,11 @@ fun main() {
 
 private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean {
     return true
+}
+
+fun myClassProvider(elementKind: String, elementType: String?, propertyName: String, value: String): String? {
+    if (elementKind == "input" && elementType == "text" && propertyName == "firstName") {
+        return "testing"
+    }
+    return null
 }

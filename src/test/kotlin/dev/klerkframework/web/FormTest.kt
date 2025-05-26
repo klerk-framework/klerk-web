@@ -9,7 +9,6 @@ import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.misc.EventParameters
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
@@ -50,8 +49,9 @@ fun main() {
 
             val eventParams = EventParameters(CreateAuthorParams::class)
             val template = EventFormTemplate(
-                eventWithParameters = EventWithParameters(CreateAuthor.id, eventParams),
-                klerk, "/noklerkvalidation"
+                defaultValues = EventWithParameters(CreateAuthor.id, eventParams),
+                klerk, "/noklerkvalidation",
+                classProvider = null,
             ) {
                 text(CreateAuthorParams::phone)
                 remaining(inHtmlDetails = "Remaining stuff")

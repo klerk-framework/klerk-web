@@ -39,6 +39,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                 //eventWithParameters.parameters.raw,
                 klerk,
                 getUrl(),
+                classProvider = null,
             ) {
                 remaining()
             }
@@ -177,7 +178,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                         apply(lowCodeHtmlHead(config))
                         body {
                             h1 { +"Bad request" }
-                            val violatedRule = eventResult.problem.violatedRule
+                            val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
                             if (violatedRule != null) {
                                 div {
                                     +"$violatedRule (${violatedRule.type})"
