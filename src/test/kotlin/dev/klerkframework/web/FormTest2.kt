@@ -85,6 +85,9 @@ fun main() {
                             span.input-error-message {
                                 color: red;
                             }
+                            span.errormessages {
+                                color: red;
+                            }
                             """.trimIndent()
                         }
                         h1 { +"With server validation" }

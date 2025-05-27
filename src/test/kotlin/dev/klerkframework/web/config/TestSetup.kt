@@ -4,8 +4,7 @@ import dev.klerkframework.klerk.*
 
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
-import dev.klerkframework.klerk.Validity.Invalid
-import dev.klerkframework.klerk.Validity.Valid
+import dev.klerkframework.klerk.PropertyCollectionValidity.*
 import dev.klerkframework.klerk.actions.Job
 import dev.klerkframework.klerk.actions.JobContext
 import dev.klerkframework.klerk.actions.JobId
@@ -196,9 +195,9 @@ data class Book(
 }
 
 data class Author(val firstName: FirstName, val lastName: LastName, val address: Address) : Validatable {
-    override fun validators(): Set<() -> Validity> = setOf(::noAuthorCanBeNamedJamesClavell)
+    override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::noAuthorCanBeNamedJamesClavell)
 
-    private fun noAuthorCanBeNamedJamesClavell(): Validity {
+    private fun noAuthorCanBeNamedJamesClavell(): PropertyCollectionValidity {
         return if (firstName.value == "James" && lastName.value == "Clavell") Invalid() else Valid
     }
 
@@ -219,17 +218,21 @@ data class CreateAuthorParams(
     val firstName: FirstName,
     val lastName: LastName,
     val phone: PhoneNumber,
-    val age: EvenIntContainer = EvenIntContainer(68),
+    val age: EvenIntContainer = EvenIntContainer(8),
     //  val address: Address,
     val secretToken: SecretPasscode,
     val favouriteColleague: ModelID<Author>? = null,
     val favouritePrimeNumber: PrimeNumber,
 ) : Validatable {
 
-    override fun validators(): Set<() -> Validity> = setOf(::augustStrindbergCannotHaveCertainPhoneNumber)
+    override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::augustStrindbergCannotHaveCertainPhoneNumber, ::primeMustBeHigherThanAge)
 
-    private fun augustStrindbergCannotHaveCertainPhoneNumber(): Validity {
+    private fun augustStrindbergCannotHaveCertainPhoneNumber(): PropertyCollectionValidity {
         return if (firstName.value == "August" && lastName.value == "Strindberg" && phone.value == "123456") Invalid() else Valid
+    }
+
+    fun primeMustBeHigherThanAge(): PropertyCollectionValidity {
+        return if (favouritePrimeNumber.value <= age.value) Invalid() else Valid
     }
 }
 
@@ -440,23 +443,23 @@ fun updateAuthor(args: ArgForInstanceEvent<Author, Author, Context, MyCollection
 }
 
 
-fun onlyAuthenticationIdentityCanCreateDaniel(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): Validity {
+fun onlyAuthenticationIdentityCanCreateDaniel(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value == "Daniel" && args.context.actor != AuthenticationIdentity) Invalid() else Valid
 }
 
-fun cannotHaveAnAwfulName(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): Validity {
+fun cannotHaveAnAwfulName(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value == "Mike" && args.command.params.lastName.value == "Litoris") Invalid() else Valid
 }
 
-fun secretTokenShouldBeZeroIfNameStartsWithM(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): Validity {
+fun secretTokenShouldBeZeroIfNameStartsWithM(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value.startsWith("M") && args.command.params.secretToken.value != 0L) Invalid() else Valid
 }
 
-fun preventUnauthenticated(context: Context): Validity {
+fun preventUnauthenticated(context: Context): PropertyCollectionValidity {
     return if (context.actor == Unauthenticated) Invalid() else Valid
 }
 
-fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): Validity {
+fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     args.reader.apply {
         if (args.command.params.firstName.value != "Astrid") {
             return Valid
@@ -821,9 +824,16 @@ class SwedishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation 
             PrimeNumber::mustBePrime.name -> "Måste vara ett primtal"
             else -> default.invalidProperty(propertyName, functionName, translationInfo)
         }
-
-
     }
+
+    override fun function(f: Function<Any>): String {
+        return when (f) {
+            CreateAuthorParams::primeMustBeHigherThanAge -> "tea"
+            else -> default.function(f)
+        }
+    }
+
+    override fun mustBeAtLeast(value: Number): String = "Måste vara minst $value"
 }
 
 

@@ -296,7 +296,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
        */
             return ParseResult.Parsed(paramsClass, key)
         } catch (e: Exception) {
-            return ParseResult.Invalid(setOf(ValidationProblem(e.message)))
+            return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "Could not parse")))
         }
     }
 
@@ -493,25 +493,34 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
             }
         }
 
-        private fun createBody(invalidParametersProblems: Set<ValidationProblem>): String {
-            val problems = mutableListOf<ValidationProblemResponse>()
+        private fun createBody(problems: Set<Problem>): String {
+/*            val responses = mutableListOf<ValidationProblemResponse>()
             val fieldsMustBeNull =
-                invalidParametersProblems.filter { it.fieldsMustBeNull != null }
+                problems.filter { it.fieldsMustBeNull != null }
                     .flatMap { it.fieldsMustBeNull ?: emptySet() }
                     .map { it.name }.toSet()
-            val fieldsMustNotBeNull = invalidParametersProblems.filter { it.fieldsMustNotBeNull != null }
+            val fieldsMustNotBeNull = problems.filter { it.fieldsMustNotBeNull != null }
                 .flatMap { it.fieldsMustNotBeNull ?: emptySet() }.map { it.name }.toSet()
-            invalidParametersProblems.forEach {
+            problems.forEach {
                 if (it.fieldsMustNotBeNull == null && it.fieldsMustBeNull == null) {
                     // We can't do anything but show the problem to the user
-                    problems.add(ValidationProblemResponse(humanReadable = it.toString(), field = null))
+                    responses.add(ValidationProblemResponse(humanReadable = it.toString(), field = null))
                 }
             }
+
             val response = ValResponse(
-                problems = problems,
+                problems = responses,
                 fieldsMustBeNull = fieldsMustBeNull,
                 fieldsMustNotBeNull = fieldsMustNotBeNull
             )
+ */
+            val fieldProblems = problems
+                .filterIsInstance<InvalidPropertyProblem>()
+                .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
+                .map { ValidationProblemResponse(it.key, it.value) }
+
+            val response = ValResponse(fieldProblems, emptySet(), emptySet())
+
             return Gson().toJson(response)
         }
     }
@@ -936,10 +945,12 @@ public class EventForm<T : Any, C : KlerkContext>(
                         }
                     }
                 }
-                div {
-                    id = "errormessages"
-                    attributesMapOf(key = "aria-live", value = "assertive")
-                    style = "color:red;"
+                p {
+                    span(classes = "errormessages") {
+                        id = "errormessages"
+                        role = "alert"
+                        attributesMapOf(key = "aria-live", value = "assertive")
+                    }
                 }
 
                 submitInput { value = "Ok" }
@@ -990,8 +1001,8 @@ public class EventForm<T : Any, C : KlerkContext>(
             if (event.target.response) {
                 const response = JSON.parse(event.target.response);
                 
-                handleFieldProblems(response);
-                //showHumanErrorMessage(response);
+                handlePropertyProblems(response);
+                handlePropertyCollectionProblems(response);
                 //toggleNullableFields(response);
             }
         });
@@ -1003,25 +1014,14 @@ public class EventForm<T : Any, C : KlerkContext>(
         XHR.open("POST", "$postPath${if (postPath.contains("?")) "&" else "?"}dryRun=true&onlyErrors=true");
         XHR.send(FD);
     }
-    
-    function showHumanErrorMessage(response) {
-                    const element = document.getElementById("errormessages");
-                response.problems
-                    .map(p => p.humanReadable)
-                    .forEach(text => {
-                      const paragraph = document.createElement("p");
-                      paragraph.innerText = text;
-                          element.append(paragraph);
-                    });
-}
 
-    function handleFieldProblems(response) {
-        if (response.fieldProblems.length == 0) {
+
+    function handlePropertyProblems(response) {
+        if (response.propertyProblems.length == 0) {
             return;
         }
-        for (var key in response.fieldProblems) {
-            var value = response.fieldProblems[key];
-            //console.log("setting custom validity for " + key + " to " + value);
+        for (var key in response.propertyProblems) {
+            var value = response.propertyProblems[key];
             var input = document.getElementById(key);
             input.setCustomValidity(value);
             input.setAttribute('aria-invalid', 'true');
@@ -1032,8 +1032,17 @@ public class EventForm<T : Any, C : KlerkContext>(
                     errorSpan.style.visibility = 'visible';
             }
         }
-        const element = document.getElementById("errormessages");
 }
+
+    function handlePropertyCollectionProblems(response) {
+        if (response.propertyCollectionProblems.length == 0) {
+                return;
+        }
+        var span = document.getElementById("errormessages");
+        response.propertyCollectionProblems.forEach(collectionProblem => {
+            span.innerText = collectionProblem;
+        });
+    }
 
 function toggleNullableFields(response) {
     response.fieldsMustBeNull.forEach(f => {
@@ -1051,7 +1060,7 @@ function toggleNullableFields(response) {
 }
 
 public sealed class ParseResult<T> {
-    public data class Invalid<T>(val problems: Set<ValidationProblem>) : ParseResult<T>()
+    public data class Invalid<T>(val problems: Set<Problem>) : ParseResult<T>()
     public data class DryRun<T>(val params: T, val key: CommandToken) : ParseResult<T>()
     public data class Parsed<T>(val params: T, val key: CommandToken) : ParseResult<T>()
 }
@@ -1103,12 +1112,17 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
                 .filterIsInstance<InvalidPropertyProblem>()
                 .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
 
+            val propertyCollectionProblems = result.problems
+                .filterIsInstance<InvalidPropertyCollectionProblem>()
+                .map { it.endUserTranslatedMessage ?: "Unknown problem" }
+
             call.respondText(
                 contentType = ContentType.Application.Json,
                 status = HttpStatusCode.UnprocessableEntity,
                 text = Gson().toJson(
                     ValidationResponse(
-                        fieldProblems = fieldProblems,
+                        propertyProblems = fieldProblems,
+                        propertyCollectionProblems = propertyCollectionProblems,
                         formProblems = emptyList(),
                         dryRunProblems = listOf(result.toString())
                     )
@@ -1121,7 +1135,8 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
 }
 
 public data class ValidationResponse(
-    val fieldProblems: Map<String, String>,
+    val propertyProblems: Map<String, String>,
+    val propertyCollectionProblems: List<String>,
     val formProblems: List<String>,
     val dryRunProblems: List<String>
 )

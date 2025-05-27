@@ -1,13 +1,14 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.Validity.Valid
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.misc.EventParameters
+import dev.klerkframework.klerk.validation.PropertyValidation
+import dev.klerkframework.klerk.validation.PropertyValidation.*
 import io.ktor.http.*
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.html.*
@@ -183,17 +184,10 @@ data class TestParams(
     val aRemainingString: FirstName,
 ) {
 
-    fun phoneMustEndWith7(): Validity {
-        return if (aPhone.value.endsWith("7")) Valid else Validity.Invalid()
+    fun phoneMustEndWith7(): PropertyValidation {
+        return if (aPhone.value.endsWith("7")) Valid else Invalid()
     }
 
-    fun aNullableStringMustBeNull(): Validity {
-        return if (!aBoolean.value && aNullableString != null) Validity.Invalid(fieldMustBeNull = this::aNullableString) else Valid
-    }
-
-    fun aNullableStringMustNotBeNull(): Validity {
-        return if (aBoolean.value && aNullableString == null) Validity.Invalid(fieldMustNotBeNull = this::aNullableString) else Valid
-    }
 
 }
 
