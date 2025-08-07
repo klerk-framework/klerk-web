@@ -101,7 +101,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
 
     private fun renderProperties(props: Any): DIV.() -> Unit = {
         // should change to YAML or HOCON ?
-        val jsonPretty = Gson().newBuilder().setPrettyPrinting().serializeNulls().create().toJson(props)
+        val jsonPretty = klerk.config.toJson(props)
         textArea {
             disabled = true
             rows = jsonPretty.lines().size.toString()

@@ -28,6 +28,12 @@ dependencies {
     compileOnly("io.ktor:ktor-client-core:$ktorVersion")
     compileOnly("io.ktor:ktor-client-cio:$ktorVersion")
     compileOnly("com.google.code.gson:gson:$gsonVersion")
+
+    compileOnly("io.micrometer:micrometer-core:1.12.3") // TODO this should not be necessary? It seems to be required when copying a config (e.g. in a plugin). Do we really want all klerk-based application to require this?
+    testImplementation("io.micrometer:micrometer-core:1.12.3")
+
+    implementation("io.ktor:ktor-server-compression:${ktorVersion}") // TODO: remove?
+
     implementation("io.github.microutils:kotlin-logging-jvm:$kotlinLoggingVersion")
     testImplementation(kotlin("test"))
     testImplementation("org.xerial:sqlite-jdbc:$sqliteJdbcVersion")

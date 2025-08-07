@@ -4,18 +4,26 @@ import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.datatypes.InstantContainer
 
 import dev.klerkframework.klerk.read.ModelModification.*
-import dev.klerkframework.klerk.storage.RamStorage
+
 import dev.klerkframework.klerk.storage.SqlPersistence
+import dev.klerkframework.web.assets.CssAsset
+import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.config.*
+
 import io.ktor.server.application.*
 import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.compression.Compression
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
+import kotlinx.html.*
+
 import org.sqlite.SQLiteDataSource
+
 
 internal var lowCodeMain: LowCodeMain<Context, MyCollections>? = null
 
@@ -30,8 +38,8 @@ fun main() {
     //File(dbFilePath).delete()
     val ds = SQLiteDataSource()
     ds.url = "jdbc:sqlite:$dbFilePath"
-    //val persistence = SqlPersistence(ds)
-    val persistence = RamStorage()
+    val persistence = SqlPersistence(ds)
+    //val persistence = RamStorage()
     val klerk = Klerk.create(createConfig(collections, persistence))
     runBlocking {
 
@@ -70,6 +78,7 @@ fun main() {
             configureRouting(klerk)
             //        configureSecurity()
             //      configureHTTP()
+            install(Compression)
         }
 
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -98,12 +107,29 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
     return true
 }
 
+val myStyle = CssAsset("/assets/my-styles.css")
+val myScript = JsAsset("/assets/other/my-script.js")
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
 
     routing {
 
         get("/") { call.respondRedirect("/admin") }
+
+        get("/testassets") {
+            call.respondHtml {
+                head {
+                    title { +"Test assets" }
+                    styleLink(myStyle.getUrl())
+                }
+                body {
+                    h1 { +"Testing the assets. " }
+                    +"Did the css and js load? Correct encoding?"
+                    script(src = myScript.getUrl()) {}
+
+                }
+            }
+        }
 
         apply(lowCodeMain!!.registerRoutes())
     }

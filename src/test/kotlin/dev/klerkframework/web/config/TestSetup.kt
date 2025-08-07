@@ -36,6 +36,7 @@ import dev.klerkframework.klerk.storage.Persistence
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
 import dev.klerkframework.klerk.validation.PropertyValidation
+import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -50,6 +51,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import dev.klerkframework.web.config.AuthorStates.*
+import dev.klerkframework.web.myScript
+import dev.klerkframework.web.myStyle
 
 var onEnterAmateurStateActionCallback: (() -> Unit)? = null
 var onEnterImprovingStateActionCallback: (() -> Unit)? = null
@@ -96,7 +99,7 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
             }
         }
         contextProvider(::myContextProvider)
-    }
+    }.withPlugin(AssetsPlugin(setOf(myStyle, myScript)))
 }
 
 fun myContextProvider(actorIdentity: ActorIdentity): Context {
