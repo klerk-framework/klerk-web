@@ -46,7 +46,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                             tr {
                                 onClick = """window.location = '$jobsPath/${it.id}';"""
                                 td { +it.id.toString() }
-                                td { +it.name }
+                                td { +it.methodName }
                                 td { +it.status.name }
                                 td { +timeString }
                             }
@@ -65,7 +65,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
 ) {
     val actor = config.contextProvider(call)
     val idString = requireNotNull(call.parameters["id"])
-    val id = idString.toLong()
+    val id = idString.toInt()
     val job = data.jobs.getJob(id)
 
     val lastAttemptStartedString =
@@ -100,7 +100,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     }
                     tr {
                         td { +"Name" }
-                        td { +job.name }
+                        td { +job.methodName }
                     }
                     tr {
                         td { +"Status" }
@@ -123,8 +123,8 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                         td { +lastAttemptFinishedString }
                     }
                     tr {
-                        td { +"Data" }
-                        td { +job.data }
+                        td { +"State" }
+                        td { +job.state }
                     }
                 }
             }
@@ -134,8 +134,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     tbody {
                         job.log.forEach {
                             tr {
-                                td { +dateTimeFormatter.format(it.key.toLocalDateTime(TimeZone.currentSystemDefault())) }
-                                td { +it.value }
+                                td { +it }
                             }
                         }
                     }

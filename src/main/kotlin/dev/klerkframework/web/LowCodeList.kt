@@ -97,9 +97,9 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
 
     private fun getCollection(
         queryParameters: Parameters,
-        modelCollections: ModelCollections<T, C>
-    ): ModelCollection<T, C> {
-        val collectionId = queryParameters["collection"] ?: return modelCollections.all
+        ModelViews: ModelViews<T, C>
+    ): ModelView<T, C> {
+        val collectionId = queryParameters["collection"] ?: return ModelViews.all
         val decoded = CollectionId.from(URLDecoder.decode(collectionId, Charset.forName("utf-8")))
         return klerk.config.getView<T>(kClass).getCollections().single { it.getFullId() == decoded }
     }
@@ -140,7 +140,7 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         table: Table<T, C, V>,
         voidEventReferences: Set<EventReference>,
         call: ApplicationCall,
-        modelCollections: ModelCollections<T, C>,
+        ModelViews: ModelViews<T, C>,
         context: C
     ): DIV.() -> Unit = {
 
@@ -472,7 +472,7 @@ public open class DefaultTableTemplate<C : KlerkContext, V>(
     }
 
     public fun <T : Any> create(
-        source: ModelCollection<T, C>,
+        source: ModelView<T, C>,
         detailsPathProvider: (Model<T>) -> String,
         reader: Reader<C, V>,
         call: ApplicationCall,

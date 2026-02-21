@@ -178,7 +178,7 @@ private fun <C : KlerkContext, V> renderEvents(
 ): BODY.() -> Unit =
     {
         h5 { +"Events" }
-        stateMachine.getExternalEvents().forEach { externalEvent ->
+        stateMachine.getAllEvents().forEach { externalEvent ->
             val parameters = klerk.config.getParameters(externalEvent)
             h6 { +externalEvent.id() }
             ul {

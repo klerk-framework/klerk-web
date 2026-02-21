@@ -1,7 +1,7 @@
 package dev.klerkframework.web.assets
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.collection.ModelCollections
+import dev.klerkframework.klerk.collection.ModelViews
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -41,7 +41,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
             |If the 'brotli' command line tool is installed, it will be used to serve Brotli-compressed text assets.
             |It can work together with the Ktor Compression plugin.""".trimMargin()
 
-    private val textAssetCollections = ModelCollections<TextAsset, C>()
+    private val textAssetCollections = ModelViews<TextAsset, C>()
 
     override fun mergeConfig(previous: Config<C, V>): Config<C, V> {
         val managedModels = previous.managedModels.toMutableSet()
@@ -57,10 +57,12 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
 
     override suspend fun start(klerk: Klerk<C, V>) {
         _klerk = klerk
-        var context = klerk.config.contextProvider!!(SystemIdentity)
+        var context = klerk.config.systemContextProvider(SystemIdentity)
         textAssets = klerk.read(context) {
             list(textAssetCollections.all)
         }
+
+        val brotliAvailable = isBrotliAvailable()
 
         assets.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)
@@ -73,15 +75,18 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
             }
 
             Base64hash.from(resourceContent).let { base64hash ->
-                // TODO delete unused assets
+                asset.setHash(base64hash)
                 // TODO: move compression to a job
+                // at startup: should delete any existing future job
 
                 if (textAssets.none { ta -> ta.props.hash == base64hash }) {
-                    val brotli = compressBrotli(resourceContent.byteInputStream()) ?: return@let
-                    val brotliToken = klerk.keyValueStore.prepareBlob(brotli.inputStream())
-                    val brotliId = klerk.keyValueStore.put(brotliToken)
+                    val brotliId = if (brotliAvailable) {
+                        val brotli = compressBrotli(resourceContent.byteInputStream())
+                        val brotliToken = klerk.keyValueStore.prepareBlob(brotli.inputStream())
+                        klerk.keyValueStore.put(brotliToken)
+                    } else null
 
-                    context = klerk.config.contextProvider!!(SystemIdentity)
+                    context = klerk.config.systemContextProvider(SystemIdentity)
 
                     klerk.handle(
                         Command(
@@ -98,42 +103,65 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
                         ProcessingOptions(CommandToken.simple())
                     )
                 }
-                asset.setHash(base64hash)
             }
         }
+        deleteObsoleteTextAssets(assets, textAssets)
+
         textAssets = klerk.read(context) {
             list(textAssetCollections.all)
         }
     }
 
-    private fun compressBrotli(input: ByteArrayInputStream): ByteArray? {
+    private suspend fun deleteObsoleteTextAssets(assets: Set<KlerkAsset>, textAssets: List<Model<TextAsset>>) {
+        textAssets
+            .filter { ta -> assets.none { a -> a._hash == ta.props.hash } }
+            .forEach {
+                _klerk.handle(Command(
+                    event = DeleteTextAsset,
+                    model = it.id,
+                    params = null),
+                    context = _klerk.config.systemContextProvider(SystemIdentity),
+                    ProcessingOptions(CommandToken.simple()
+                ))
+            }
+    }
+
+    private fun isBrotliAvailable(): Boolean {
         try {
-            val process = ProcessBuilder("brotli", "-Z", "--stdout")  // Compress to stdout
+            val process = ProcessBuilder("brotli", "-V")
                 .redirectError(ProcessBuilder.Redirect.INHERIT)
                 .start()
-
-            // Thread to write to brotli's stdin
-            val writerThread = Thread {
-                input.copyTo(process.outputStream)
-                process.outputStream.close()
-            }
-            writerThread.start()
-
-            // Read compressed output from brotli's stdout
-            val compressedOutput = ByteArrayOutputStream()
-            process.inputStream.copyTo(compressedOutput)
-
-            // Wait for writing thread and brotli process to finish
-            writerThread.join()
             val exitCode = process.waitFor()
-            if (exitCode != 0) {
-                throw RuntimeException("brotli process failed with exit code $exitCode")
-            }
-            return compressedOutput.toByteArray()
+            return exitCode == 0
         } catch (e: Exception) {
-            log.warn(e) { "Failed to compress with brotli (is it installed?)" }
-            return null
+            log.warn { "Brotli is not available" }
+            return false
         }
+    }
+
+    private fun compressBrotli(input: ByteArrayInputStream): ByteArray {
+        val process = ProcessBuilder("brotli", "-Z", "--stdout")  // Compress to stdout
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+            .start()
+
+        // Thread to write to brotli's stdin
+        val writerThread = Thread {
+            input.copyTo(process.outputStream)
+            process.outputStream.close()
+        }
+        writerThread.start()
+
+        // Read compressed output from brotli's stdout
+        val compressedOutput = ByteArrayOutputStream()
+        process.inputStream.copyTo(compressedOutput)
+
+        // Wait for writing thread and brotli process to finish
+        writerThread.join()
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            throw RuntimeException("brotli process failed with exit code $exitCode")
+        }
+        return compressedOutput.toByteArray()
     }
 
     override val page: PluginPage<C, V> = Page(textAssetCollections)
@@ -189,7 +217,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
 
     private suspend fun serveBrotli(call: RoutingCall, id: BinaryKeyValueID, contentType: ContentType) {
         call.response.headers.append(ContentEncoding, contentEncodingBrotli)
-        val ctx = _klerk.config.contextProvider!!(SystemIdentity)
+        val ctx = _klerk.config.systemContextProvider(SystemIdentity)
         val inputStream = _klerk.keyValueStore.get(id, ctx)
         setCacheControl(call)
         call.suppressCompression()
@@ -203,7 +231,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
 
 }
 
-public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelCollections<TextAsset, C>) :
+public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelViews<TextAsset, C>) :
     PluginPage<C, V> {
     override val buttonText: String = "Assets"
 
@@ -253,7 +281,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelCo
 
 
 public abstract class KlerkAsset(public val resourcePath: String) {
-    private var _hash: Base64hash? = null
+    internal var _hash: Base64hash? = null
 
     init {
         require(resourcePath.startsWith("/")) { "Resource path must start with '/'" }
@@ -276,7 +304,9 @@ public abstract class KlerkAsset(public val resourcePath: String) {
 }
 
 public class CssAsset(resourcePath: String) : KlerkAsset(resourcePath)
-public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath)
+
+public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath) // TODO: Subresource Integrity? nonce?
+
 
 private object ResourceReader {
     fun readResource(path: String): String? =

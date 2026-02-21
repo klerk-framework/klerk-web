@@ -2,7 +2,7 @@ package dev.klerkframework.web
 
 import com.google.gson.Gson
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.collection.ModelCollection
+import dev.klerkframework.klerk.collection.ModelView
 import dev.klerkframework.klerk.collection.QueryOptions
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
@@ -141,7 +141,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         call: ApplicationCall,
         params: T?,
         reader: Reader<C, *>,
-        modelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelCollection<out Any, C>> = emptyMap(),
+        modelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>> = emptyMap(),
         // enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>? = null,
         path: String? = null,
         queryParams: Map<String, String> = emptyMap(),
@@ -185,7 +185,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
     }
 
     private fun populateMissingReferenceSelects(
-        developerProvidedModelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelCollection<out Any, C>>,
+        developerProvidedModelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>>,
         reader: Reader<C, *>,
         inputs: List<Pair<String, InputType>>
     ): Set<ReferencePropertyWithOptions> {

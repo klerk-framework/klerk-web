@@ -1,18 +1,16 @@
 package dev.klerkframework.web.config
 
 import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.EventVisibility.EXTERNAL
 
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
 import dev.klerkframework.klerk.PropertyCollectionValidity.*
-import dev.klerkframework.klerk.actions.Job
-import dev.klerkframework.klerk.actions.JobContext
-import dev.klerkframework.klerk.actions.JobId
-import dev.klerkframework.klerk.actions.JobResult
-import dev.klerkframework.klerk.collection.AllModelCollection
-import dev.klerkframework.klerk.collection.FilteredModelCollection
-import dev.klerkframework.klerk.collection.ModelCollection
-import dev.klerkframework.klerk.collection.ModelCollections
+import dev.klerkframework.klerk.job.JobResult
+import dev.klerkframework.klerk.collection.AllModelView
+import dev.klerkframework.klerk.collection.FilteredModelView
+import dev.klerkframework.klerk.collection.ModelView
+import dev.klerkframework.klerk.collection.ModelViews
 import dev.klerkframework.klerk.collection.QueryListCursor
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
@@ -26,6 +24,8 @@ import dev.klerkframework.klerk.datatypes.InstantContainer
 import dev.klerkframework.klerk.datatypes.IntContainer
 import dev.klerkframework.klerk.datatypes.LongContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
+import dev.klerkframework.klerk.job.JobMetadata
+import dev.klerkframework.klerk.job.RunnableJob
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
@@ -38,8 +38,6 @@ import dev.klerkframework.klerk.storage.SqlPersistence
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -53,6 +51,8 @@ import kotlin.time.Duration.Companion.seconds
 import dev.klerkframework.web.config.AuthorStates.*
 import dev.klerkframework.web.myScript
 import dev.klerkframework.web.myStyle
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 var onEnterAmateurStateActionCallback: (() -> Unit)? = null
 var onEnterImprovingStateActionCallback: (() -> Unit)? = null
@@ -98,15 +98,12 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
                 negative {}
             }
         }
-        contextProvider(::myContextProvider)
+        systemContextProvider(::myContextProvider)
     }.withPlugin(AssetsPlugin(setOf(myStyle, myScript)))
 }
 
-fun myContextProvider(actorIdentity: ActorIdentity): Context {
-    return Context(
-        actor = actorIdentity,
-
-        )
+fun myContextProvider(systemIdentity: SystemIdentity): Context {
+    return Context(systemIdentity)
 }
 
 fun cannotReadAstrid(args: ArgsForPropertyAuth<Context, MyCollections>): NegativeAuthorization {
@@ -151,14 +148,14 @@ fun pelleCannotReadOnMornings(
     return Pass
 }
 
-class BookCollections : ModelCollections<Book, Context>() {
+class BookCollections : ModelViews<Book, Context>() {
 
     fun childrensBooks(): List<ModelID<Book>> {
         return emptyList()
     }
 }
 
-class AuthorCollections<V>(val allBooks: AllModelCollection<Book, Context>) : ModelCollections<Author, Context>() {
+class AuthorCollections<V>(val allBooks: AllModelView<Book, Context>) : ModelViews<Author, Context>() {
 
     private val greatAuthorNames = setOf("Linus", "Bertil")
 
@@ -343,7 +340,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
     }
 
 fun sayCongratulations(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCollections>) {
-    println("Congrattulations")
+    println("Congratulations")
 }
 
 fun someUpdate(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Author {
@@ -365,8 +362,8 @@ fun later(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Instant
 fun hasTalent(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = true
 fun isAnImpostor(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = false
 
-fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<Job<Context, MyCollections>> {
-    return listOf(MyJob)
+fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<RunnableJob<Context, MyCollections>> {
+    return listOf(MyJob())
 }
 
 
@@ -388,16 +385,7 @@ fun onEnterAmateurStateAction(args: ArgForInstanceNonEvent<Author, Context, MyCo
 }
 
 
-fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<Job<Context, MyCollections>> {
-    class MyJob : Job<Context, MyCollections> {
-        override val id = 123L
-
-        override suspend fun run(jobContext: JobContext<Context, MyCollections>): JobResult {
-            println("Job started")
-            return JobResult.Success
-        }
-    }
-
+fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<RunnableJob<Context, MyCollections>> {
     return listOf(MyJob())
 }
 
@@ -467,7 +455,7 @@ fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: ArgForVoidEvent<Author, Cr
         if (args.command.params.firstName.value != "Astrid") {
             return Valid
         }
-        val rowling = firstOrNull(data.authors.all) { it.props.firstName.value == "Rowling" }
+        val rowling = firstOrNull(views.authors.all) { it.props.firstName.value == "Rowling" }
         return if (rowling == null) Valid else Invalid()
     }
 }
@@ -719,19 +707,19 @@ object SQLiteInMemory {
 }
 
 object CreateAuthor :
-    VoidEventWithParameters<Author, CreateAuthorParams>(Author::class, true, CreateAuthorParams::class)
+    VoidEventWithParameters<Author, CreateAuthorParams>(Author::class, EXTERNAL, CreateAuthorParams::class)
 
-object UpdateAuthor : InstanceEventWithParameters<Author, Author>(Author::class, true, Author::class) {
+object UpdateAuthor : InstanceEventWithParameters<Author, Author>(Author::class, EXTERNAL, Author::class) {
 
 }
 
-object DeleteAuthor : InstanceEventNoParameters<Author>(Author::class, true)
+object DeleteAuthor : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
 
-object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, true)
+object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
 
-object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, true)
+object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
 
-object ChangeName : InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, true, ChangeNameParams::class)
+object ChangeName : InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, EXTERNAL, ChangeNameParams::class)
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
@@ -786,16 +774,20 @@ data class Context(
 
 data class User(val name: FirstName)
 
-object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, true)
+object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, EXTERNAL)
 
-object MyJob : Job<Context, MyCollections> {
-    override val id: JobId
-        get() = 999
+class MyJob : RunnableJob<Context, MyCollections>() {
+    override val parameters: String = "No parameters"
+    override fun getRunFunction(): suspend (metadata: JobMetadata, klerk: Klerk<Context, MyCollections>) -> JobResult = Companion::run
 
-    override suspend fun run(jobContext: JobContext<Context, MyCollections>): JobResult {
-        println("Did MyJob")
-        return JobResult.Success
+    companion object {
+        suspend fun run(meta: JobMetadata, klerk: Klerk<Context, MyCollections>): JobResult {
+            println("Did MyJob")
+            return JobResult.Success()
+        }
     }
+
+
 
 }
 
@@ -851,11 +843,11 @@ open class EnglishKlerkTranslation(val default: KlerkTranslation) : KlerkTransla
 }
 
 
-object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(Book::class, true, CreateBookParams::class)
+object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(Book::class, EXTERNAL, CreateBookParams::class)
 
-object PublishBook : InstanceEventNoParameters<Book>(Book::class, true)
+object PublishBook : InstanceEventNoParameters<Book>(Book::class, EXTERNAL)
 
-object DeleteBook : InstanceEventNoParameters<Book>(Book::class, true)
+object DeleteBook : InstanceEventNoParameters<Book>(Book::class, EXTERNAL)
 
 data class CreateBookParams(
     val title: BookTitle,
@@ -872,12 +864,12 @@ class AverageScore(value: Float) : FloatContainer(value) {
 }
 
 class AuthorsWithAtLeastTwoBooks<V>(
-    private val authors: ModelCollection<Author, Context>,
-    private val books: AllModelCollection<Book, Context>,
-) : ModelCollection<Author, Context>(authors) {
+    private val authors: ModelView<Author, Context>,
+    private val books: AllModelView<Book, Context>,
+) : ModelView<Author, Context>(authors) {
 
-    override fun filter(filter: ((Model<Author>) -> Boolean)?): ModelCollection<Author, Context> {
-        return if (filter == null) this else FilteredModelCollection(this, filter)
+    override fun filter(filter: ((Model<Author>) -> Boolean)?): ModelView<Author, Context> {
+        return if (filter == null) this else FilteredModelView(this, filter)
     }
 
     override fun <V> withReader(reader: Reader<Context, V>, cursor: QueryListCursor?): Sequence<Model<Author>> {
@@ -894,7 +886,7 @@ class AuthorsWithAtLeastTwoBooks<V>(
 
 suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk: Klerk<Context, MyCollections>) {
 
-    val startTime = kotlinx.datetime.Clock.System.now()
+    val startTime = Clock.System.now()
     val firstNames = setOf("Anna", "Bertil", "Janne", "Filip")
     val lastNames = setOf("Andersson", "Svensson", "Törnkrantz")
     val cities = setOf("Malmö, Göteborg, Falun", "Stockholm")
@@ -955,7 +947,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
             )
         }
     }
-    val seconds = startTime.minus(kotlinx.datetime.Clock.System.now()).inWholeSeconds
+    val seconds = startTime.minus(Clock.System.now()).inWholeSeconds
     val eventsPerSecond = if (seconds > 0) (numberOfAuthors * (booksPerAuthor + 1)) / seconds else "?"
 }
 
@@ -965,7 +957,7 @@ enum class BookStates {
     Published,
 }
 
-fun bookStateMachine(allAuthors: ModelCollection<Author, Context>, collections: MyCollections): StateMachine<Book, BookStates, Context, MyCollections> =
+fun bookStateMachine(allAuthors: ModelView<Author, Context>, collections: MyCollections): StateMachine<Book, BookStates, Context, MyCollections> =
     stateMachine {
 
         event(CreateBook) {

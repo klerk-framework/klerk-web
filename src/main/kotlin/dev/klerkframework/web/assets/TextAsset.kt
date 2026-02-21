@@ -2,6 +2,8 @@ package dev.klerkframework.web.assets
 
 import dev.klerkframework.klerk.ArgForVoidEvent
 import dev.klerkframework.klerk.BinaryKeyValueID
+import dev.klerkframework.klerk.EventVisibility
+import dev.klerkframework.klerk.InstanceEventNoParameters
 import dev.klerkframework.klerk.KeyValueID
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.VoidEventWithParameters
@@ -28,6 +30,8 @@ internal fun <C: KlerkContext, V> createTextResourceStatemachine(): StateMachine
     stateMachine {
         event(CreateTextAsset) {
         }
+        event(DeleteTextAsset) {
+        }
 
         voidState {
             onEvent(CreateTextAsset) {
@@ -36,11 +40,15 @@ internal fun <C: KlerkContext, V> createTextResourceStatemachine(): StateMachine
         }
 
         state(Updatable) {
+            onEvent(DeleteTextAsset) {
+                delete()
+            }
         }
 
     }
 
-public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(TextAsset::class, true, CreateTextAssetParams::class)
+public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(TextAsset::class, EventVisibility.CODE, CreateTextAssetParams::class)
+public object DeleteTextAsset : InstanceEventNoParameters<TextAsset>(TextAsset::class, EventVisibility.CODE)
 
 public data class CreateTextAssetParams(
     val path: AssetPath,

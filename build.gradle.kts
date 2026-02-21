@@ -2,23 +2,25 @@ import org.gradle.kotlin.dsl.invoke
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 
 plugins {
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.3.10"
     `java-library`
     `maven-publish`
 }
 
 val ktorVersion = "3.1.3"
-val klerkVersion = "1.0.0-beta.4"
+val klerkVersion = "1.0.0-beta.5"
 val gsonVersion = "2.9.0"
 val kotlinLoggingVersion = "2.1.21"
 val sqliteJdbcVersion = "3.44.1.0"
 val slf4jVersion = "2.0.3"
+val datetimeVersion = "0.7.1"
 
 group = "dev.klerkframework"
-version = "1.0.0-alpha.2"
+version = "1.0.0-alpha.3"
 
 dependencies {
   //  compileOnly("com.github.klerk-framework:klerk:$klerkVersion") TODO
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:${datetimeVersion}")
     compileOnly("dev.klerkframework:klerk:$klerkVersion")
     compileOnly("io.ktor:ktor-server-html-builder:$ktorVersion")
     compileOnly("io.ktor:ktor-server-core-jvm:$ktorVersion")
