@@ -38,7 +38,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 h1 { +"Documentation" }
                 apply(renderModels(klerk.config.managedModels, klerk, documentationPath, context.translation.klerk))
                 apply(renderAuthorizationRules(klerk.config.authorization))
-                apply(renderCollections(klerk.config.collections))
+                apply(renderCollections(klerk.config.views))
                 apply(renderPluginsDocumentation(klerk.config.plugins))
                 hr()
                 ul {
@@ -126,7 +126,7 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                     td { +if (prop.isNullable) "yes" else "no" }
                 }
                 tr {
-                    td { +"Primitive type" }
+                    td { +"Type" }
                     td { +prop.type.toString() }
                 }
                 tr {
@@ -204,7 +204,7 @@ private fun <C : KlerkContext, V> renderEvents(
                                                 td { +if (parameter.isNullable) "yes" else "no" }
                                             }
                                             tr {
-                                                td { +"Primitive type" }
+                                                td { +"Type" }
                                                 td { +parameter.type.toString() }
                                             }
                                             tr {

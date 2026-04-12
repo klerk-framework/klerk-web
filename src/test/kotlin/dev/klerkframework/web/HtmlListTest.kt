@@ -30,7 +30,7 @@ fun main() {
 
                     val table = klerk.read(Context.system()) {
                         DefaultTableTemplate(5, klerk, Author::class).create(
-                            klerk.config.collections.authors.all,
+                            klerk.config.views.authors.all,
                             ::detailsPashProvider,
                             this,
                             call

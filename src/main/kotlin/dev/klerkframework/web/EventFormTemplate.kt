@@ -296,7 +296,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
        */
             return ParseResult.Parsed(paramsClass, key)
         } catch (e: Exception) {
-            return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "Could not parse")))
+            return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "Could not parse", KlerkErrorCode.Internal)))
         }
     }
 
