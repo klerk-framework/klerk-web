@@ -16,7 +16,7 @@ val slf4jVersion = "2.0.3"
 val datetimeVersion = "0.7.1"
 
 group = "dev.klerkframework"
-version = "1.0.0-alpha.2"
+version = "1.0.0-alpha.2-SNAPSHOT"
 
 dependencies {
     implementation("dev.klerkframework:klerk:$klerkVersion")

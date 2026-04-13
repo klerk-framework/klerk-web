@@ -180,9 +180,9 @@ private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdenti
     return true
 }
 
-fun myClassProvider(elementKind: String, elementType: String?, propertyName: String, value: String): String? {
+fun myClassProvider(elementKind: String, elementType: String?, propertyName: String, value: String?): Set<String> {
     if (elementKind == "input" && elementType == "text" && propertyName == "firstName") {
-        return "testing"
+        return setOf("testing")
     }
-    return null
+    return emptySet()
 }

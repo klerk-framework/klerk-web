@@ -43,7 +43,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
     private val defaultValues: EventWithParameters<T>,
     internal val klerk: Klerk<C, *>,
     private val postPath: String? = null,
-    internal val classProvider: KFunction4<String, String?, String, String, String?>?,
+    internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
     init: EventFormTemplate<T, C>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
@@ -639,8 +639,7 @@ public class EventForm<T : Any, C : KlerkContext>(
         type: InputType,
         parameters: EventParameters<T>,
         params: T?,
-        classProvider:
-        KFunction4<String, String?, String, String, String?>?,
+        classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)?,
     ): HtmlBlockTag.() -> Unit =
         {
             val value = if (params == null) null else getParamDatatype(propertyName, params)
@@ -651,12 +650,14 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         text,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call(
-                            "input",
-                            type.name,
-                            propertyName,
-                            value?.valueWithoutAuthorization.toString()
-                        )
+                        classProvider?.let { cp ->
+                            cp(
+                                "input",
+                                type.name,
+                                propertyName,
+                                value?.valueWithoutAuthorization.toString()
+                            ).joinToString(" ").takeIf { it.isNotEmpty() }
+                        }
                     )
                 )
 
@@ -666,12 +667,13 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         email,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call(
-                            "input",
-                            type.name,
-                            propertyName,
-                            value?.valueWithoutAuthorization.toString()
-                        )
+                        classProvider?.let { cp ->
+                            cp("input",
+                                type.name,
+                                propertyName,
+                                value?.valueWithoutAuthorization.toString()
+                            ).joinToString(" ").takeIf { it.isNotEmpty() }
+                        }
                     )
                 )
 
@@ -681,12 +683,14 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         password,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call(
-                            "input",
-                            type.name,
-                            propertyName,
-                            value?.valueWithoutAuthorization.toString()
-                        )
+                        classProvider?.let { cp ->
+                            cp(
+                                "input",
+                                type.name,
+                                propertyName,
+                                value?.valueWithoutAuthorization.toString()
+                            ).joinToString(" ").takeIf { it.isNotEmpty() }
+                        }
                     )
                 )
 
