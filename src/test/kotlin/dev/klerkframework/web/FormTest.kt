@@ -11,7 +11,6 @@ import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.klerk.validation.PropertyValidation
-import dev.klerkframework.klerk.validation.PropertyValidation.Invalid
 import dev.klerkframework.klerk.validation.PropertyValidation.Valid
 import dev.klerkframework.web.ParseResult.DryRun
 import dev.klerkframework.web.ParseResult.Invalid
@@ -189,7 +188,7 @@ data class TestParams(
 ) {
 
     fun phoneMustEndWith7(): PropertyValidation {
-        return if (aPhone.value.endsWith("7")) Valid else Invalid()
+        return if (aPhone.value.endsWith("7")) Valid else PropertyValidation.Invalid()
     }
 
 
