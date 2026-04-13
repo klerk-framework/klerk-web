@@ -65,7 +65,7 @@ fun main() {
             klerk,
             LowCodeConfig(
                 "/admin",
-                ::anyUser,
+                ApplicationCall::ctx,
                 // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
                 cssPath = "https://unpkg.com/almond.css@latest/dist/almond.min.css",
                 showOptionalParameters = ::showOptionalParameters,
@@ -103,6 +103,8 @@ fun main() {
 
 }
 
+suspend fun ApplicationCall.ctx(klerk: Klerk<Context, MyCollections>): Context = Context.swedishUnauthenticated()
+
 suspend fun canSeeAdminUI(context: Context): Boolean {
     return true
 }
@@ -139,9 +141,6 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
 fun showOptionalParameters(eventReference: EventReference): Boolean {
     return false
 }
-
-suspend fun anyUser(call: ApplicationCall): Context = Context.swedishUnauthenticated()
-
 
 fun authorizeAllDatatypes(instance: Any) {
     TODO()

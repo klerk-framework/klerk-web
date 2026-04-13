@@ -27,7 +27,7 @@ internal const val NON_BREAKING_HYPHEN = "&#8209;"
 
 internal class LowCodeList<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
-    private val config: LowCodeConfig<C>,
+    private val config: LowCodeConfig<C, V>,
     private val createCommandPages: List<LowCodeCreateEvent<C, V>>,
     private val modelPathPart: String,
     val pathToList: String,
@@ -56,8 +56,8 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
 
     // ------------ List ------------------------------------------------------
 
-    private suspend fun renderModelList(call: ApplicationCall, config: LowCodeConfig<C>) {
-        val context = config.contextProvider(call)
+    private suspend fun renderModelList(call: ApplicationCall, config: LowCodeConfig<C, V>) {
+        val context = config.contextProvider(call, klerk)
         val modelView = klerk.config.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
 

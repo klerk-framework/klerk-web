@@ -237,10 +237,10 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
 
     override suspend fun render(
         call: ApplicationCall,
-        config: LowCodeConfig<C>,
+        config: LowCodeConfig<C, V>,
         klerk: Klerk<C, V>
     ) {
-        val context = config.contextProvider(call)
+        val context = config.contextProvider(call, klerk)
         val textAssets = klerk.read(context) {
             list(textAssetCollections.all)
         }

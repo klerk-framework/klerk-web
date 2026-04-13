@@ -10,11 +10,11 @@ import kotlin.reflect.KClass
 
 internal suspend fun <T : Any, V, C:KlerkContext> renderListAnalysis(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     klerk: Klerk<C, V>,
     kClass: KClass<out Any>
 ) {
-    val context = config.contextProvider(call)
+    val context = config.contextProvider(call, klerk)
     val modelView = klerk.config.getView<T>(kClass)
 
     klerk.readSuspend(context) {

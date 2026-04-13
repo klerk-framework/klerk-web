@@ -11,13 +11,13 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderJobs(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     jobsPath: String,
-    data: Klerk<C, V>
+    klerk: Klerk<C, V>
 ) {
 
 
-    val actor = config.contextProvider(call)
+    val actor = config.contextProvider(call, klerk)
     call.respondHtml {
         apply(lowCodeHtmlHead(config))
         body {
@@ -36,7 +36,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                         }
                     }
                     tbody {
-                        data.jobs.getAllJobs().forEach {
+                        klerk.jobs.getAllJobs().forEach {
                             val timeString =
                                 if (it.lastAttemptFinished == null) "" else dateTimeFormatter.format(
                                     it.lastAttemptFinished!!.toLocalDateTime(
@@ -60,13 +60,13 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
 
 internal suspend fun <C : KlerkContext, V> renderJobDetails(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
-    data: Klerk<C, V>
+    config: LowCodeConfig<C, V>,
+    klerk: Klerk<C, V>
 ) {
-    val actor = config.contextProvider(call)
+    val actor = config.contextProvider(call, klerk)
     val idString = requireNotNull(call.parameters["id"])
     val id = idString.toInt()
-    val job = data.jobs.getJob(id)
+    val job = klerk.jobs.getJob(id)
 
     val lastAttemptStartedString =
         if (job.lastAttemptStarted == null) "" else dateTimeFormatter.format(

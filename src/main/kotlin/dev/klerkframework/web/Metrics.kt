@@ -8,11 +8,11 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderMetrics(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     jobsPath: String,
-    data: Klerk<C, V>
+    klerk: Klerk<C, V>
 ) {
-    val actor = config.contextProvider(call)
+    val actor = config.contextProvider(call, klerk)
     call.respondHtml {
         apply(lowCodeHtmlHead(config))
         body {

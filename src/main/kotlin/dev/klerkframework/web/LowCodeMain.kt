@@ -11,9 +11,9 @@ import java.util.*
 import kotlin.reflect.KClass
 import kotlin.reflect.KSuspendFunction1
 
-public data class LowCodeConfig<C : KlerkContext>(
+public data class LowCodeConfig<C : KlerkContext, V>(
     val basePath: String,
-    val contextProvider: KSuspendFunction1<ApplicationCall, C>,
+    val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
     val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
     val showOptionalParameters: (EventReference) -> Boolean,
     val cssPath: String,
@@ -26,7 +26,7 @@ public data class LowCodeConfig<C : KlerkContext>(
 }
 
 public class LowCodeMain<C : KlerkContext, V>(
-    private val klerk: Klerk<C, V>, private val config: LowCodeConfig<C>
+    private val klerk: Klerk<C, V>, private val config: LowCodeConfig<C, V>
 ) {
     private val listViews: List<LowCodeList<out Any, C, V>>
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
@@ -160,7 +160,7 @@ public class LowCodeMain<C : KlerkContext, V>(
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
-        val actor = config.contextProvider(call)
+        val actor = config.contextProvider(call, klerk)
         call.respondHtml {
             apply(lowCodeHtmlHead(config))
             body {
@@ -225,7 +225,7 @@ public class LowCodeMain<C : KlerkContext, V>(
     }
 
     private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
-        val context = config.contextProvider(call)
+        val context = config.contextProvider(call, klerk)
         if (!config.canSeeAdminUI(context)) {
             call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { body { +"Not authorized" } }
             return
@@ -246,7 +246,7 @@ public interface PluginPage<C : KlerkContext, V> {
     public val buttonText: String
     public suspend fun render(
         call: ApplicationCall,
-        config: LowCodeConfig<C>,
+        config: LowCodeConfig<C, V>,
         klerk: Klerk<C, V>
     ): Unit
 

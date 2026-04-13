@@ -11,11 +11,11 @@ import kotlinx.html.*
 
 internal suspend fun <C:KlerkContext, V> renderAudit(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     basePath: String,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call)
+    val context = config.contextProvider(call, klerk)
 
     val forModel = call.request.queryParameters["model"]
     val id = forModel?.let { ModelID.from<Any>(it) }
@@ -59,11 +59,11 @@ internal suspend fun <C:KlerkContext, V> renderAudit(
     }
 }
 
-internal suspend fun <C:KlerkContext, V> renderAuditDetails(call: ApplicationCall, config: LowCodeConfig<C>, data: Klerk<C, V>) {
-    val context = config.contextProvider(call)
+internal suspend fun <C:KlerkContext, V> renderAuditDetails(call: ApplicationCall, config: LowCodeConfig<C, V>, klerk: Klerk<C, V>) {
+    val context = config.contextProvider(call, klerk)
     val instantString = requireNotNull(call.parameters["id"])
     val time = decode64bitMicroseconds(instantString.toLong())
-    val event = data.events.getEventsInAuditLog(context, after = time, before = time).single()
+    val event = klerk.events.getEventsInAuditLog(context, after = time, before = time).single()
 
     call.respondHtml {
         apply(lowCodeHtmlHead(config))

@@ -13,7 +13,7 @@ import kotlin.reflect.KClass
 
 internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
-    private val config: LowCodeConfig<C>,
+    private val config: LowCodeConfig<C, V>,
     private val modelPathPart: String,
     private val humanName: String,
     private val klerk: Klerk<C, V>,
@@ -111,7 +111,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
 
 
     private suspend fun renderModel(call: ApplicationCall) {
-        val context = config.contextProvider(call)
+        val context = config.contextProvider(call, klerk)
         val id = ModelID.from<Any>(call.parameters["id"]!!)
         val (reflectedModelPopulated, model) = klerk.read(context) {
             val model = get(id)

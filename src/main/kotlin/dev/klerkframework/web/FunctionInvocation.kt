@@ -22,10 +22,10 @@ internal const val DATA_CONTAINER_CLASS = "data-container-class"
  */
 internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call)
+    val context = config.contextProvider(call, klerk)
     val requestParams = call.receiveParameters()
     val type = requestParams[FUNCTION_KIND] ?: throw IllegalArgumentException("No function-kind provided")
     if (type == DATA_CONTAINER_VALIDATION) {

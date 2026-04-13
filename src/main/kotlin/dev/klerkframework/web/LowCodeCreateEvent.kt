@@ -24,7 +24,7 @@ private val logger = KotlinLogging.logger {}
 
 public class LowCodeCreateEvent<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
-    private val config: LowCodeConfig<C>,
+    private val config: LowCodeConfig<C, V>,
     internal val eventReference: EventReference,
     internal val modelClass: KClass<out Any>
 ) {
@@ -61,9 +61,9 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
-            config: LowCodeConfig<C>
+            config: LowCodeConfig<C, V>
         ) {
-            val context = config.contextProvider(call)
+            val context = config.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             val buttonTargets = ButtonTargets.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID.from<Any>(it) }
@@ -110,9 +110,9 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
-            config: LowCodeConfig<C>
+            config: LowCodeConfig<C, V>
         ) {
-            val context = config.contextProvider(call)
+            val context = config.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
@@ -160,7 +160,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             klerk: Klerk<C, V>,
             context: C,
             call: ApplicationCall,
-            config: LowCodeConfig<C>,
+            config: LowCodeConfig<C, V>,
             key: CommandToken,
             params: Any?
         ) {
@@ -213,7 +213,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             event: EventReference,
             klerk: Klerk<C, V>,
             modelId: ModelID<*>?,
-            config: LowCodeConfig<C>,
+            config: LowCodeConfig<C, V>,
             buttonTargets: ButtonTargets,
             context: C
         ): HtmlBlockTag.() -> Unit = {

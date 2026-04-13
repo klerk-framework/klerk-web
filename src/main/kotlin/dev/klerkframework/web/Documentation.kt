@@ -20,11 +20,11 @@ import kotlin.reflect.KClass
 
 internal suspend fun <C : KlerkContext, V> renderDocumentation(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     klerk: Klerk<C, V>,
     documentationPath: String
 ) {
-    val context = config.contextProvider(call)
+    val context = config.contextProvider(call, klerk)
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
 
     call.respondHtml {
@@ -303,7 +303,7 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): BO
 
 internal suspend fun <C : KlerkContext, V> renderAlgorithm(
     call: ApplicationCall,
-    config: LowCodeConfig<C>,
+    config: LowCodeConfig<C, V>,
     klerk: Klerk<*, V>
 ) {
     val algorithmName =
