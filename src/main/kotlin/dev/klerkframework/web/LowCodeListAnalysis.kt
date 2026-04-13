@@ -1,14 +1,13 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.Klerk
-
+import dev.klerkframework.klerk.KlerkContext
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import kotlinx.html.*
 import kotlin.reflect.KClass
 
-internal suspend fun <T : Any, V, C:KlerkContext> renderListAnalysis(
+internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     call: ApplicationCall,
     config: LowCodeConfig<C, V>,
     klerk: Klerk<C, V>,

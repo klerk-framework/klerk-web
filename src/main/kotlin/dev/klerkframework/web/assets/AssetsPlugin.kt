@@ -12,17 +12,10 @@ import io.ktor.http.*
 import io.ktor.http.HttpHeaders.ContentEncoding
 import io.ktor.server.application.*
 import io.ktor.server.html.*
-import io.ktor.server.http.content.suppressCompression
+import io.ktor.server.http.content.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.head
-import kotlinx.html.styleLink
-import kotlinx.html.table
-import kotlinx.html.td
-import kotlinx.html.th
-import kotlinx.html.tr
+import kotlinx.html.*
 import kotlinx.io.asSource
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
@@ -116,13 +109,17 @@ public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsse
         textAssets
             .filter { ta -> assets.none { a -> a._hash == ta.props.hash } }
             .forEach {
-                _klerk.handle(Command(
-                    event = DeleteTextAsset,
-                    model = it.id,
-                    params = null),
+                _klerk.handle(
+                    Command(
+                        event = DeleteTextAsset,
+                        model = it.id,
+                        params = null
+                    ),
                     context = _klerk.config.systemContextProvider(SystemIdentity),
-                    ProcessingOptions(CommandToken.simple()
-                ))
+                    ProcessingOptions(
+                        CommandToken.simple()
+                    )
+                )
             }
     }
 

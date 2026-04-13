@@ -1,12 +1,11 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
-
 import dev.klerkframework.klerk.misc.AlgorithmDocumenter
 import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.extractNameFromFunction
-import dev.klerkframework.klerk.statemachine.*
+import dev.klerkframework.klerk.statemachine.StateMachine
 import generateFlowChart
 import generateStateDiagram
 import io.ktor.server.application.*

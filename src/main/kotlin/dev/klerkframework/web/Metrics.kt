@@ -43,36 +43,36 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                 }
                 h1 { +"Metrics" }
                 +"Not implemented"  // TODO
-/*                table {
-                    thead {
-                        tr {
-                            th { +"Name" }
-                            th { +"Value" }
-                            th { +"Base unit" }
-                            th { +"Description" }
-                            // th { +"Tags" }
-                        }
-                    }
-                    tbody {
-                        data.config.meterRegistry.meters.sortedBy { it.id.name }.forEach {
-                            tr {
-                                td { +it.id.name }
-                                td {
-                                    unsafe {
-                                        it.measure().forEach {
-                                            +"${it.statistic.name}:$NON_BREAKING_SPACE${it.value}"
-                                            +"<br>"
+                /*                table {
+                                    thead {
+                                        tr {
+                                            th { +"Name" }
+                                            th { +"Value" }
+                                            th { +"Base unit" }
+                                            th { +"Description" }
+                                            // th { +"Tags" }
+                                        }
+                                    }
+                                    tbody {
+                                        data.config.meterRegistry.meters.sortedBy { it.id.name }.forEach {
+                                            tr {
+                                                td { +it.id.name }
+                                                td {
+                                                    unsafe {
+                                                        it.measure().forEach {
+                                                            +"${it.statistic.name}:$NON_BREAKING_SPACE${it.value}"
+                                                            +"<br>"
+                                                        }
+                                                    }
+                                                }
+                                                td { +(it.id.baseUnit ?: "") }
+                                                td { +(it.id.description ?: "") }
+                                                //td { +it.id.tags.joinToString(", ") }
+                                            }
                                         }
                                     }
                                 }
-                                td { +(it.id.baseUnit ?: "") }
-                                td { +(it.id.description ?: "") }
-                                //td { +it.id.tags.joinToString(", ") }
-                            }
-                        }
-                    }
-                }
- */
+                 */
             }
         }
     }

@@ -1,10 +1,8 @@
 package dev.klerkframework.web
 
-import com.google.gson.Gson
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.misc.ReflectedModel
 import io.ktor.http.*
-
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.routing.*
@@ -65,7 +63,18 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         eventReferences.forEach { event ->
             val buttonTargets =
                 ButtonTargets(back = "/", model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
-            p { apply(LowCodeCreateEvent.renderButton(event, klerk, reflectedModel.id, config, buttonTargets, context)) }
+            p {
+                apply(
+                    LowCodeCreateEvent.renderButton(
+                        event,
+                        klerk,
+                        reflectedModel.id,
+                        config,
+                        buttonTargets,
+                        context
+                    )
+                )
+            }
         }
 
         if (config.customAfterEventButtonsOnDetailView != null) {

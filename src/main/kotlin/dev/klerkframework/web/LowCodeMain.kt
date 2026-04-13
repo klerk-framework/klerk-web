@@ -9,7 +9,6 @@ import io.ktor.server.routing.*
 import kotlinx.html.*
 import java.util.*
 import kotlin.reflect.KClass
-import kotlin.reflect.KSuspendFunction1
 
 public data class LowCodeConfig<C : KlerkContext, V>(
     val basePath: String,

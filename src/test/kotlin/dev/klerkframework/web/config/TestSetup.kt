@@ -2,29 +2,17 @@ package dev.klerkframework.web.config
 
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.EventVisibility.EXTERNAL
-
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
-import dev.klerkframework.klerk.PropertyCollectionValidity.*
-import dev.klerkframework.klerk.job.JobResult
-import dev.klerkframework.klerk.collection.AllModelView
-import dev.klerkframework.klerk.collection.FilteredModelView
-import dev.klerkframework.klerk.collection.ModelView
-import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.collection.QueryListCursor
+import dev.klerkframework.klerk.PropertyCollectionValidity.Invalid
+import dev.klerkframework.klerk.PropertyCollectionValidity.Valid
+import dev.klerkframework.klerk.collection.*
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.datatypes.BooleanContainer
-import dev.klerkframework.klerk.datatypes.DurationContainer
-import dev.klerkframework.klerk.datatypes.FloatContainer
-import dev.klerkframework.klerk.datatypes.GeoPosition
-import dev.klerkframework.klerk.datatypes.GeoPositionContainer
-import dev.klerkframework.klerk.datatypes.InstantContainer
-import dev.klerkframework.klerk.datatypes.IntContainer
-import dev.klerkframework.klerk.datatypes.LongContainer
-import dev.klerkframework.klerk.datatypes.StringContainer
+import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.job.JobMetadata
+import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.RunnableJob
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
@@ -38,6 +26,9 @@ import dev.klerkframework.klerk.storage.SqlPersistence
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
+import dev.klerkframework.web.config.AuthorStates.*
+import dev.klerkframework.web.myScript
+import dev.klerkframework.web.myStyle
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -45,13 +36,10 @@ import org.sqlite.SQLiteDataSource
 import java.sql.Connection
 import java.sql.DriverManager
 import kotlin.reflect.KProperty1
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
-import dev.klerkframework.web.config.AuthorStates.*
-import dev.klerkframework.web.myScript
-import dev.klerkframework.web.myStyle
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 var onEnterAmateurStateActionCallback: (() -> Unit)? = null
@@ -194,7 +182,12 @@ data class Book(
     override fun toString() = title.value
 }
 
-data class Author(val firstName: FirstName, val lastName: LastName, val address: Address) : Validatable {
+data class Author(
+    val firstName: FirstName,
+    val lastName: LastName,
+    val address: Address,
+    val darkThemePreference: DarkThemePreference,
+) : Validatable {
     override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::noAuthorCanBeNamedJamesClavell)
 
     private fun noAuthorCanBeNamedJamesClavell(): PropertyCollectionValidity {
@@ -225,7 +218,8 @@ data class CreateAuthorParams(
     val favouritePrimeNumber: PrimeNumber,
 ) : Validatable {
 
-    override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::augustStrindbergCannotHaveCertainPhoneNumber, ::primeMustBeHigherThanAge)
+    override fun validators(): Set<() -> PropertyCollectionValidity> =
+        setOf(::augustStrindbergCannotHaveCertainPhoneNumber, ::primeMustBeHigherThanAge)
 
     private fun augustStrindbergCannotHaveCertainPhoneNumber(): PropertyCollectionValidity {
         return if (firstName.value == "August" && lastName.value == "Strindberg" && phone.value == "123456") Invalid() else Valid
@@ -420,12 +414,13 @@ fun newAuthor(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyColle
     return Author(
         firstName = params.firstName,
         lastName = params.lastName,
-        address = Address(Street("kjh"))
+        address = Address(Street("kjh")),
+        darkThemePreference = DarkThemePreference(true)
     )
 }
 
 fun newAuthor2(args: ArgForVoidEvent<Author, Nothing?, Context, MyCollections>): Author {
-    return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")))
+    return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")), DarkThemePreference(false))
 }
 
 
@@ -473,7 +468,7 @@ fun newBook(args: ArgForVoidEvent<Book, CreateBookParams, Context, MyCollections
         writtenAt = BookWrittenAt(Instant.fromEpochSeconds(100000)),
         readingTime = ReadingTime(23.hours),
         publishedAt = null,
-      //  releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456))
+        //  releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456))
     )
 }
 
@@ -655,6 +650,8 @@ class ReadingTime(value: Duration) : DurationContainer(value)
 
 data class Address(val street: Street)
 
+class DarkThemePreference(value: Boolean) : BooleanContainer(value)
+
 class Street(value: String) : StringContainer(value) {
     override val minLength: Int = 1
     override val maxLength: Int = 100
@@ -719,7 +716,8 @@ object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, E
 
 object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
 
-object ChangeName : InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, EXTERNAL, ChangeNameParams::class)
+object ChangeName :
+    InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, EXTERNAL, ChangeNameParams::class)
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
@@ -767,7 +765,8 @@ data class Context(
 
         fun system(): Context = Context(dev.klerkframework.klerk.SystemIdentity)
 
-        fun swedishUnauthenticated(): Context = Context(dev.klerkframework.klerk.Unauthenticated, translation = SwedishTranslation)
+        fun swedishUnauthenticated(): Context =
+            Context(dev.klerkframework.klerk.Unauthenticated, translation = SwedishTranslation)
     }
 
 }
@@ -778,7 +777,8 @@ object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, E
 
 class MyJob : RunnableJob<Context, MyCollections>() {
     override val parameters: String = "No parameters"
-    override fun getRunFunction(): suspend (metadata: JobMetadata, klerk: Klerk<Context, MyCollections>) -> JobResult = Companion::run
+    override fun getRunFunction(): suspend (metadata: JobMetadata, klerk: Klerk<Context, MyCollections>) -> JobResult =
+        Companion::run
 
     companion object {
         suspend fun run(meta: JobMetadata, klerk: Klerk<Context, MyCollections>): JobResult {
@@ -786,7 +786,6 @@ class MyJob : RunnableJob<Context, MyCollections>() {
             return JobResult.Success()
         }
     }
-
 
 
 }
@@ -957,7 +956,10 @@ enum class BookStates {
     Published,
 }
 
-fun bookStateMachine(allAuthors: ModelView<Author, Context>, collections: MyCollections): StateMachine<Book, BookStates, Context, MyCollections> =
+fun bookStateMachine(
+    allAuthors: ModelView<Author, Context>,
+    collections: MyCollections
+): StateMachine<Book, BookStates, Context, MyCollections> =
     stateMachine {
 
         event(CreateBook) {

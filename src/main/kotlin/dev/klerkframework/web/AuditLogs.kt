@@ -9,7 +9,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 
-internal suspend fun <C:KlerkContext, V> renderAudit(
+internal suspend fun <C : KlerkContext, V> renderAudit(
     call: ApplicationCall,
     config: LowCodeConfig<C, V>,
     basePath: String,
@@ -59,7 +59,11 @@ internal suspend fun <C:KlerkContext, V> renderAudit(
     }
 }
 
-internal suspend fun <C:KlerkContext, V> renderAuditDetails(call: ApplicationCall, config: LowCodeConfig<C, V>, klerk: Klerk<C, V>) {
+internal suspend fun <C : KlerkContext, V> renderAuditDetails(
+    call: ApplicationCall,
+    config: LowCodeConfig<C, V>,
+    klerk: Klerk<C, V>
+) {
     val context = config.contextProvider(call, klerk)
     val instantString = requireNotNull(call.parameters["id"])
     val time = decode64bitMicroseconds(instantString.toLong())
@@ -100,7 +104,7 @@ internal suspend fun <C:KlerkContext, V> renderAuditDetails(call: ApplicationCal
             val gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
             val jsonPretty = gson.toJson(JsonParser.parseString(event.params))
             textArea {
-                disabled=true
+                disabled = true
                 rows = jsonPretty.lines().size.toString()
                 +jsonPretty
             }

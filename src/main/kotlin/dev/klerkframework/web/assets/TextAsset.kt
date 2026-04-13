@@ -1,19 +1,12 @@
 package dev.klerkframework.web.assets
 
-import dev.klerkframework.klerk.ArgForVoidEvent
-import dev.klerkframework.klerk.BinaryKeyValueID
-import dev.klerkframework.klerk.EventVisibility
-import dev.klerkframework.klerk.InstanceEventNoParameters
-import dev.klerkframework.klerk.KeyValueID
-import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.VoidEventWithParameters
+import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
 import dev.klerkframework.web.assets.TextAssetStates.Updatable
-import java.io.InputStream
 import java.security.MessageDigest
-import java.util.Base64
+import java.util.*
 
 public data class TextAsset(
     val path: AssetPath,
@@ -26,7 +19,7 @@ public enum class TextAssetStates {
     Updatable,
 }
 
-internal fun <C: KlerkContext, V> createTextResourceStatemachine(): StateMachine<TextAsset, Enum<*>, C, V> =
+internal fun <C : KlerkContext, V> createTextResourceStatemachine(): StateMachine<TextAsset, Enum<*>, C, V> =
     stateMachine {
         event(CreateTextAsset) {
         }
@@ -47,7 +40,12 @@ internal fun <C: KlerkContext, V> createTextResourceStatemachine(): StateMachine
 
     }
 
-public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(TextAsset::class, EventVisibility.CODE, CreateTextAssetParams::class)
+public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(
+    TextAsset::class,
+    EventVisibility.CODE,
+    CreateTextAssetParams::class
+)
+
 public object DeleteTextAsset : InstanceEventNoParameters<TextAsset>(TextAsset::class, EventVisibility.CODE)
 
 public data class CreateTextAssetParams(
@@ -57,7 +55,7 @@ public data class CreateTextAssetParams(
     val brotli: BinaryKeyValueID?
 )
 
-private fun <C: KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
+private fun <C : KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
     val params = args.command.params
     return TextAsset(params.path, params.contentType, params.hash, params.brotli)
 }

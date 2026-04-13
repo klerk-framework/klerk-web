@@ -8,7 +8,10 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
-import dev.klerkframework.klerk.misc.*
+import dev.klerkframework.klerk.misc.EventParameter
+import dev.klerkframework.klerk.misc.EventParameters
+import dev.klerkframework.klerk.misc.PropertyType
+import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.Reader
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -21,7 +24,10 @@ import mu.KotlinLogging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.reflect.*
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction4
+import kotlin.reflect.KParameter
+import kotlin.reflect.KProperty1
 import kotlin.reflect.full.*
 
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
@@ -296,7 +302,14 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
        */
             return ParseResult.Parsed(paramsClass, key)
         } catch (e: Exception) {
-            return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "Could not parse", KlerkErrorCode.Internal)))
+            return ParseResult.Invalid(
+                setOf(
+                    BadRequestProblem(
+                        e.message ?: "Could not parse",
+                        KlerkErrorCode.Internal
+                    )
+                )
+            )
         }
     }
 
@@ -494,26 +507,26 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         }
 
         private fun createBody(problems: Set<Problem>): String {
-/*            val responses = mutableListOf<ValidationProblemResponse>()
-            val fieldsMustBeNull =
-                problems.filter { it.fieldsMustBeNull != null }
-                    .flatMap { it.fieldsMustBeNull ?: emptySet() }
-                    .map { it.name }.toSet()
-            val fieldsMustNotBeNull = problems.filter { it.fieldsMustNotBeNull != null }
-                .flatMap { it.fieldsMustNotBeNull ?: emptySet() }.map { it.name }.toSet()
-            problems.forEach {
-                if (it.fieldsMustNotBeNull == null && it.fieldsMustBeNull == null) {
-                    // We can't do anything but show the problem to the user
-                    responses.add(ValidationProblemResponse(humanReadable = it.toString(), field = null))
-                }
-            }
+            /*            val responses = mutableListOf<ValidationProblemResponse>()
+                        val fieldsMustBeNull =
+                            problems.filter { it.fieldsMustBeNull != null }
+                                .flatMap { it.fieldsMustBeNull ?: emptySet() }
+                                .map { it.name }.toSet()
+                        val fieldsMustNotBeNull = problems.filter { it.fieldsMustNotBeNull != null }
+                            .flatMap { it.fieldsMustNotBeNull ?: emptySet() }.map { it.name }.toSet()
+                        problems.forEach {
+                            if (it.fieldsMustNotBeNull == null && it.fieldsMustBeNull == null) {
+                                // We can't do anything but show the problem to the user
+                                responses.add(ValidationProblemResponse(humanReadable = it.toString(), field = null))
+                            }
+                        }
 
-            val response = ValResponse(
-                problems = responses,
-                fieldsMustBeNull = fieldsMustBeNull,
-                fieldsMustNotBeNull = fieldsMustNotBeNull
-            )
- */
+                        val response = ValResponse(
+                            problems = responses,
+                            fieldsMustBeNull = fieldsMustBeNull,
+                            fieldsMustNotBeNull = fieldsMustNotBeNull
+                        )
+             */
             val fieldProblems = problems
                 .filterIsInstance<InvalidPropertyProblem>()
                 .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
@@ -638,7 +651,12 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         text,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
+                        classProvider?.call(
+                            "input",
+                            type.name,
+                            propertyName,
+                            value?.valueWithoutAuthorization.toString()
+                        )
                     )
                 )
 
@@ -648,7 +666,12 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         email,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
+                        classProvider?.call(
+                            "input",
+                            type.name,
+                            propertyName,
+                            value?.valueWithoutAuthorization.toString()
+                        )
                     )
                 )
 
@@ -658,7 +681,12 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value,
                         password,
                         getNewInstance(propertyName, parameters),  // since value can be null
-                        classProvider?.call("input", type.name, propertyName, value?.valueWithoutAuthorization.toString())
+                        classProvider?.call(
+                            "input",
+                            type.name,
+                            propertyName,
+                            value?.valueWithoutAuthorization.toString()
+                        )
                     )
                 )
 
@@ -718,7 +746,7 @@ public class EventForm<T : Any, C : KlerkContext>(
             +translator.klerk.property(property)
             //+camelCaseToPretty(propertyName)
         }
-     //   br()
+        //   br()
     }
 
     private fun createErrorPlaceholder(propertyName: String): HtmlBlockTag.() -> Unit = {
@@ -917,7 +945,17 @@ public class EventForm<T : Any, C : KlerkContext>(
                 hiddenInput(name = IDEMPOTENCE_KEY) { value = CommandToken.simple().toString() }
                 +System.lineSeparator()
                 inputs.filterNot { htmlDetailsContents.contains(it.first) }.forEach {
-                    p { tag.apply(renderInput(it.first, it.second, template.parameters, params, template.classProvider)) }
+                    p {
+                        tag.apply(
+                            renderInput(
+                                it.first,
+                                it.second,
+                                template.parameters,
+                                params,
+                                template.classProvider
+                            )
+                        )
+                    }
                     +System.lineSeparator()
                 }
                 referenceSelects.forEach { refSelect ->
@@ -935,13 +973,15 @@ public class EventForm<T : Any, C : KlerkContext>(
                     details {
                         summary { +(htmlDetailsSummary ?: "Details") }
                         inputs.filter { htmlDetailsContents.contains(it.first) }.forEach {
-                            tag.apply(renderInput(
-                                it.first,
-                                it.second,
-                                template.parameters,
-                                params,
-                                template.classProvider
-                            ))
+                            tag.apply(
+                                renderInput(
+                                    it.first,
+                                    it.second,
+                                    template.parameters,
+                                    params,
+                                    template.classProvider
+                                )
+                            )
                         }
                     }
                 }
