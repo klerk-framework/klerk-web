@@ -216,6 +216,7 @@ data class CreateAuthorParams(
     val secretToken: SecretPasscode,
     val favouriteColleague: ModelID<Author>? = null,
     val favouritePrimeNumber: PrimeNumber,
+    val isLikedByMyDaughter: IsLikedByMyDaughter,
 ) : Validatable {
 
     override fun validators(): Set<() -> PropertyCollectionValidity> =
@@ -495,6 +496,7 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
                 secretToken = SecretPasscode(234234902359245345),
                 //       address = Address(Street("Storgatan"))
                 favouritePrimeNumber = PrimeNumber(31),
+                isLikedByMyDaughter = IsLikedByMyDaughter(false)
             ),
         ),
         Context.system(),
@@ -523,6 +525,7 @@ val createAstridParameters = CreateAuthorParams(
     phone = PhoneNumber("+4699999"),
     secretToken = SecretPasscode(234123515123434),
     favouritePrimeNumber = PrimeNumber(31),
+    isLikedByMyDaughter = IsLikedByMyDaughter(true)
 )
 
 suspend fun createBookHarryPotter1(klerk: Klerk<Context, MyCollections>, author: ModelID<Author>): ModelID<Book> {
@@ -902,6 +905,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     secretToken = SecretPasscode(23290409),
                     //address = Address(Street("Lugna gatan"))
                     favouritePrimeNumber = PrimeNumber(31),
+                    isLikedByMyDaughter = IsLikedByMyDaughter(true)
                 ),
             ),
             Context.system(),
@@ -1020,3 +1024,5 @@ class PrimeNumber(value: Int) : IntContainer(value) {
     }
 
 }
+
+class IsLikedByMyDaughter(value: Boolean) : BooleanContainer(value)

@@ -15,4 +15,4 @@ implementation("dev.klerkframework:klerk")
 implementation("dev.klerkframework:klerk-web")
 ```
 
-See the [documentation](/docs/Introduction.md) for details on how to use the plugin.
+See the [documentation](/docs/introduction.md) for details on how to use the plugin.

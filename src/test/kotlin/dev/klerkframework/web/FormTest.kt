@@ -74,6 +74,7 @@ fun main() {
                             age = EvenIntContainer(22),
                             secretToken = SecretPasscode(234),
                             favouritePrimeNumber = PrimeNumber(31),
+                            isLikedByMyDaughter = IsLikedByMyDaughter(false),
                         )
 
                         authorizeAllDatatypes(params)
