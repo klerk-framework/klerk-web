@@ -24,11 +24,11 @@ fun main() {
     val klerk = Klerk.create(createConfig(collections))
     runBlocking {
         klerk.meta.start()
-        val rowling = createAuthorJKRowling(klerk)
-        createBookHarryPotter1(klerk, rowling)
+        //val rowling = createAuthorJKRowling(klerk)
+        //createBookHarryPotter1(klerk, rowling)
     }
 
-    val template = EventFormTemplate(
+/*    val template = EventFormTemplate(
         EventWithParameters(
             CreateAuthor.id,
             EventParameters(CreateAuthorParams::class),
@@ -47,12 +47,22 @@ fun main() {
         remaining()
     }
 
+ */
+
+    val template = EventFormTemplate(
+        EventWithParameters(CreateBook.id, EventParameters(CreateBookParams::class)),
+        klerk, "/",
+        classProvider = ::myClassProvider,
+    ) {
+        remaining()
+    }
+
     template.validate()
 
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         routing {
             get("/") {
-                val p = CreateAuthorParams(
+               val p = CreateAuthorParams(
                     firstName = FirstName(""),
                     lastName = LastName(""),
                     phone = PhoneNumber("+46123456"),
@@ -62,9 +72,11 @@ fun main() {
                     isLikedByMyDaughter = IsLikedByMyDaughter(false),
                     nullableFirstName = null,
                 )
+
+
                 //authorizeAllDatatypes(p)
 
-                renderForm(call, klerk, template, p)
+                renderForm(call, klerk, template, null)
             }
 
             post("/") {
@@ -76,7 +88,7 @@ fun main() {
                     is DryRun -> respondDryRun(
                         result.params,
                         result.key,
-                        CreateAuthor,
+                        CreateBook, // TODO
                         call,
                         klerk,
                         Context.swedishUnauthenticated(),
@@ -148,12 +160,12 @@ fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {
     link(rel = "icon", href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83C\uDFAF</text></svg>")
 }
 
-suspend fun renderForm(
+suspend fun <T:Any> renderForm(
     call: ApplicationCall,
     klerk: Klerk<Context, MyCollections>,
-    template: EventFormTemplate<CreateAuthorParams, Context>,
-    params: CreateAuthorParams,
-    parseResult: Parsed<CreateAuthorParams>? = null
+    template: EventFormTemplate<T, Context>,
+    params: T?,
+    parseResult: Parsed<T>? = null
 ) {
     val context = Context.swedishUnauthenticated()
     val form2 = klerk.read(context) {

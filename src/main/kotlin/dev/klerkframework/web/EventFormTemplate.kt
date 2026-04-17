@@ -40,7 +40,7 @@ public data class UIElementData(val propertyName: String, val dataContainer: Dat
  * Regarding CSRF protection: the 'Double Submit Pattern' with '__Host-' cookie-prefix is used.
  */
 public class EventFormTemplate<T : Any, C : KlerkContext>(
-    private val defaultValues: EventWithParameters<T>,
+    internal val defaultValues: EventWithParameters<T>,
     internal val klerk: Klerk<C, *>,
     private val postPath: String? = null,
     internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
@@ -958,6 +958,13 @@ public class EventForm<T : Any, C : KlerkContext>(
      * Note that only one form may be rendered per page (otherwise you will get a CSRF-token problem).
      */
     public fun render(tag: HtmlBlockTag, postPath: String? = null): Unit {
+        val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
+        if (emptyNonNullableReferenceSelects.isNotEmpty()) {
+            tag.p {
+                +"${template.defaultValues.eventReference.eventName} is not possible since there are no options available for the required field(s): ${emptyNonNullableReferenceSelects.joinToString(", ") { it.propertyName }}"
+            }
+            return
+        }
         try {
             val path = getPath(postPath, queryParams)
             tag.script { unsafe { +generateValidationScript(path) } }
