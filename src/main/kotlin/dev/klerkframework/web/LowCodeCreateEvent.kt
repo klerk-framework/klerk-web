@@ -245,12 +245,22 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
 internal class AuthenticationException(message: String? = null) : RuntimeException(message)
 
 internal fun valueWithCorrectType(value: String?, type: KType): Any? {
-    if (value == null) {
-        if (type.isSubtypeOf(BooleanContainer::class.starProjectedType)) {
-            // a form containing an unchecked checkbox will appear as null here.
-            return if (!type.isMarkedNullable) return type.jvmErasure.constructors.first()
-                .call(false) else throw RuntimeException("but how do we know if it was null or false here? Perhaps send hidden? Urk!")
+    if (type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(true)) ||
+        type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(false))
+    ) {
+        if (value == null) {
+            return if (!type.isMarkedNullable) {
+                type.jvmErasure.constructors.first().call(false)
+            } else {
+                null
+            }
         }
+        // If multiple values are sent (checkbox + hidden), Ktor's callParams[name] returns the first one.
+        // If checkbox is checked, it's "true". If unchecked, only "false" (from hidden) is present.
+        return type.jvmErasure.constructors.first().call(value.toBoolean())
+    }
+
+    if (value == null) {
         return null
     }
 
@@ -290,12 +300,6 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(true))
     ) {
         return type.jvmErasure.constructors.first().call(value.toFloat())
-    }
-
-    if (type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return type.jvmErasure.constructors.first().call(value.toBoolean())
     }
 
     /*    if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||

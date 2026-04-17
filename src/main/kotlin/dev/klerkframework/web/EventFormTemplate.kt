@@ -414,8 +414,13 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
             tag.input(type) {
                 id = property.name
                 name = property.name
+                value = "true"
                 checked = datatypeValue.boolean
                 //  required = !property.returnType.isMarkedNullable
+            }
+            tag.input(InputType.hidden) {
+                name = property.name
+                value = "false"
             }
         }
 
@@ -782,9 +787,13 @@ public class EventForm<T : Any, C : KlerkContext>(
         input(checkBox) {
             id = propertyName
             name = propertyName
-            value = theValue?.toString() ?: ""
+            value = "true"
             checked = theValue?.boolean ?: false
             //  disabled = theValue == null
+        }
+        input(InputType.hidden) {
+            name = propertyName
+            value = "false"
         }
         // required = !property.returnType.isMarkedNullable
     }

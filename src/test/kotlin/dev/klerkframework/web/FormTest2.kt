@@ -60,6 +60,7 @@ fun main() {
                     //address = Address(Street("Storgatan"))
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(false),
+                    nullableFirstName = null,
                 )
                 //authorizeAllDatatypes(p)
 

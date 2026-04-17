@@ -75,6 +75,7 @@ fun main() {
                             secretToken = SecretPasscode(234),
                             favouritePrimeNumber = PrimeNumber(31),
                             isLikedByMyDaughter = IsLikedByMyDaughter(false),
+                            nullableFirstName = null,
                         )
 
                         authorizeAllDatatypes(params)
