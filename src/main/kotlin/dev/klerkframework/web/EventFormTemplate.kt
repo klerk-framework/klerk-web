@@ -225,9 +225,6 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
         }
 
         parameters.all.forEach {
-            if (it.isNullable && it.type == PropertyType.Boolean) {
-                throw IllegalArgumentException("Nullable Booleans are not supported yet")  // how do we know if a field is false or null?
-            }
             it.validate()
         }
 
@@ -272,7 +269,7 @@ public class EventFormTemplate<T : Any, C : KlerkContext>(
             ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         callParams.forEach { name, _ ->
-            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name }) {
+            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && !name.startsWith("null-toggle-")) {
                 throw IllegalArgumentException("Parameter $name is not expected to be present in request")
             }
         }
@@ -647,6 +644,7 @@ public class EventForm<T : Any, C : KlerkContext>(
         classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)?,
     ): HtmlBlockTag.() -> Unit =
         {
+            val isNullable = parameters.all.single { it.name == propertyName }.isNullable
             val value = if (params == null) null else getParamDatatype(propertyName, params)
             when (type) {
                 text -> this.apply(
@@ -726,6 +724,9 @@ public class EventForm<T : Any, C : KlerkContext>(
 
                 else -> TODO(type.name)
             }
+            if (isNullable && type != InputType.hidden) {
+                apply(renderNullableToggle(propertyName, value))
+            }
         }
 
     private fun getModelId(propertyName: String, params: T): ModelID<*>? {
@@ -764,6 +765,20 @@ public class EventForm<T : Any, C : KlerkContext>(
             id = "error-$propertyName"
             role = "alert"
             +""
+        }
+    }
+
+    private fun renderNullableToggle(
+        propertyName: String,
+        currentValue: DataContainer<*>?,
+    ): HtmlBlockTag.() -> Unit = {
+        val checkboxId = "null-toggle-$propertyName"
+        input(checkBox) {
+            id = checkboxId
+            name = checkboxId
+            value = "on"
+            checked = (currentValue != null)
+            attributes["onchange"] = "document.getElementById('$propertyName').disabled = !this.checked;"
         }
     }
 
@@ -1124,24 +1139,29 @@ public data class ReferencePropertyWithOptions(
     val options: List<Model<out Any>>
 )
 
-private fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {
+internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {
     val constructors = parameterClass.constructors
     val parameters = mutableMapOf<KParameter, Any?>()
 
     constructors.first().parameters
         .forEach {
-            val value = valueWithCorrectType(callParams[it.name!!], it.type)
-            if (value != null) {
-                parameters[it] = value
-                //    log.debug { "set ${it.name} to $value}" }
+            val nullToggleKey = "null-toggle-${it.name!!}"
+            val isNullToggled = callParams[nullToggleKey] != "on"
+            if (isNullToggled && it.type.isMarkedNullable) {
+                parameters[it] = null
             } else {
-                if (it.type.isMarkedNullable) {
+                val value = valueWithCorrectType(callParams[it.name!!], it.type)
+                if (value != null) {
                     parameters[it] = value
+                    //    log.debug { "set ${it.name} to $value}" }
                 } else {
-                    // throw IllegalArgumentException("${it.name} is null but it is not nullable and it is not optional")
+                    if (it.type.isMarkedNullable) {
+                        parameters[it] = value
+                    } else {
+                        // throw IllegalArgumentException("${it.name} is null but it is not nullable and it is not optional")
+                    }
                 }
             }
-
         }
     return constructors.first().callBy(parameters)
 }

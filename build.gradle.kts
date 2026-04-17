@@ -44,6 +44,9 @@ dependencies {
     testImplementation("io.ktor:ktor-server-sessions-jvm:${ktorVersion}")
     testImplementation("io.ktor:ktor-client-core:${ktorVersion}")
     testImplementation("io.ktor:ktor-client-cio:${ktorVersion}")
+    //testImplementation("org.jetbrains.kotlin:kotlin-test")
+    //testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+
     testImplementation("com.google.code.gson:gson:${gsonVersion}")
 }
 

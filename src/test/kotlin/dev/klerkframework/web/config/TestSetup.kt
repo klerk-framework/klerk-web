@@ -216,8 +216,9 @@ data class CreateAuthorParams(
     val secretToken: SecretPasscode,
     val favouriteColleague: ModelID<Author>? = null,
     val favouritePrimeNumber: PrimeNumber,
-    val isLikedByMyDaughter: IsLikedByMyDaughter,
+    val isLikedByMyDaughter: IsLikedByMyDaughter?,
     val nullableFirstName: FirstName?,
+    val nullableAge: EvenIntContainer? = null,
 ) : Validatable {
 
     override fun validators(): Set<() -> PropertyCollectionValidity> =
