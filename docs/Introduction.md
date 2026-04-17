@@ -1,7 +1,9 @@
 # Introduction
 
-Klerk-web is a set of tools that helps you build a server-side rendered (SSR) web application with
-[Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io).
+Klerk-web is a collection of tools that help you build SSR (server-side rendered) web applications using [Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io). 
+You don't have to use all tools, e.g. if you want to use client-side rendering for the users but an SSR admin-UI, you can use Klerk-web for
+only that part.
+
 
 ## Installation
 
@@ -15,7 +17,16 @@ implementation("dev.klerkframework:klerk")
 implementation("dev.klerkframework:klerk-web")
 ```
 
-## Building with Klerk
+# Context
+Interactions with Klerk almost always require a context. We therefore need a way to create a context
+from a Ktor call. The recommended way is to create an extension function that returns a context:
+```kotlin
+suspend fun ApplicationCall.ctx(klerk: Klerk<Ctx, Views>): Ctx {
+    // your code here
+}
+```
+
+# Building with Klerk
 
 Assuming you already have a Klerk configuration, the tools and building blocks in klerk-web can be used to quickly
 turn the configuration into a fully functional web application.
@@ -25,7 +36,7 @@ at some point will replace some or all parts with custom code to better fit your
 
 It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) to produce the HTML.
 
-### Ask Klerk
+## Ask Klerk
 
 One feature of Klerk is that it is easy to ask for the configuration of the application. This can be used to
 keep the UI in sync with the configuration. These methods are available when you read:
@@ -37,7 +48,7 @@ An even more powerful approach is to combine these methods with other building b
 follows the configuration. So if the Klerk configuration changes, your UI will automatically update. Example:
 
 ```kotlin
-klerk.readSuspend(context) {
+klerk.readSuspend(call::ctx) {
     call.respondHtml {
         body {
             h1 { +"Actions for ${model.props.name}" }
@@ -49,7 +60,7 @@ klerk.readSuspend(context) {
 }
 ```
 
-### Appearance
+## Appearance
 
 It is recommended to start with a classless CSS. When you are ready to add some styling, you can provide your own
 class provider function to customize the CSS classes applied to form elements.

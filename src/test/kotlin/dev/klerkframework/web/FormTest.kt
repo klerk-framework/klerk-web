@@ -108,7 +108,7 @@ fun main() {
                             call,
                             mapOf(TestParams::populatedLater to PhoneNumber("After post")),
                         )) {
-                            is Invalid -> EventFormTemplate.Companion.respondInvalid(result, call)
+                            is Invalid -> EventFormTemplate.respondInvalid(result, call)
                             is DryRun -> call.respond(HttpStatusCode.OK)
                             is Parsed -> {
                                 call.respondHtml {
