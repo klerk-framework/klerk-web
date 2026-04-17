@@ -1021,7 +1021,10 @@ public class EventForm<T : Any, C : KlerkContext>(
                     }
                 }
 
-                submitInput { value = "Ok" }
+                submitInput {
+                    value = "Ok"
+                    id = "submitButton"
+                }
             }
         } catch (e: Exception) {
             log.error(e) { "Could not render template" }
@@ -1063,7 +1066,9 @@ public class EventForm<T : Any, C : KlerkContext>(
             });
         
             document.getElementById("errormessages").replaceChildren();
+            const submitButton = document.getElementById("submitButton");
             if (event.target.status == 200) {
+                submitButton.disabled = false;
                 return;
             }
             if (event.target.response) {
@@ -1072,6 +1077,8 @@ public class EventForm<T : Any, C : KlerkContext>(
                 handlePropertyProblems(response);
                 handlePropertyCollectionProblems(response);
                 //toggleNullableFields(response);
+                const hasErrors = Object.keys(response.propertyProblems).length > 0 || response.propertyCollectionProblems.length > 0 || response.formProblems.length > 0 || response.dryRunProblems.length > 0;
+                submitButton.disabled = hasErrors;
             }
         });
 
