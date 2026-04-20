@@ -36,6 +36,15 @@ at some point will replace some or all parts with custom code to better fit your
 
 It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) to produce the HTML.
 
+## Building blocks
+Klerk-web provides a set of building blocks that can be used to build a UI for Klerk:
+* renderTable: Display a ModelView.
+* renderModel: Display a Model.
+* FormTemplate: Generate forms and parse submitted data.
+* AutoButton: Generate a button for an event. When the button is clicked, a form is generated. When the form is 
+submitted, the data is parsed and a Klerk command is issued. 
+* Admin UI: Manage your application.
+
 ## Ask Klerk
 
 One feature of Klerk is that it is easy to ask for the configuration of the application. This can be used to
@@ -53,7 +62,7 @@ klerk.readSuspend(call::ctx) {
         body {
             h1 { +"Actions for ${model.props.name}" }
             getPossibleEvents(model.id).forEach {
-                apply(LowCodeCreateEvent.renderButton(it, klerk, model.id, lowCodeConfig, buttonTargets, context))
+                apply(LowCodeCreateEvent.renderButton(it, klerk, model.id, LowCodeMain, buttonTargets, context))
             }
         }
     }

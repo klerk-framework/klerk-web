@@ -25,7 +25,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction4
 import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.*
@@ -39,12 +38,12 @@ public data class UIElementData(val propertyName: String, val dataContainer: Dat
 /**
  * Regarding CSRF protection: the 'Double Submit Pattern' with '__Host-' cookie-prefix is used.
  */
-public class EventFormTemplate<T : Any, C : KlerkContext>(
+public class FormTemplate<T : Any, C : KlerkContext>(
     internal val defaultValues: EventWithParameters<T>,
     internal val klerk: Klerk<C, *>,
     private val postPath: String? = null,
     internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
-    init: EventFormTemplate<T, C>.() -> Unit
+    init: FormTemplate<T, C>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -560,7 +559,7 @@ public class EventForm<T : Any, C : KlerkContext>(
     private val queryParams: Map<String, String>,
     private val htmlDetailsSummary: String?,
     private val htmlDetailsContents: Set<String>,
-    private val template: EventFormTemplate<T, C>,
+    private val template: FormTemplate<T, C>,
     private val translator: Translation
 
 ) {

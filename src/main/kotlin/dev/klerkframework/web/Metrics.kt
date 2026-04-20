@@ -8,7 +8,7 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderMetrics(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {

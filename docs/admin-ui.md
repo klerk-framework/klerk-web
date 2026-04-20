@@ -6,9 +6,9 @@
 ### Admin-UI
 
 The Admin-UI provides a web-interface to manage your system. To use it, you first need to create
-a `LowCodeConfig`:
+a `LowCodeMain`:
 ```kotlin
-val lowCodeConfig = LowCodeConfig(
+val LowCodeMain = LowCodeMain(
     basePath = "/admin",
     contextProvider = ApplicationCall::ctx,
     showOptionalParameters = { eventReference -> false },
@@ -19,7 +19,7 @@ val lowCodeConfig = LowCodeConfig(
 Then you use the config to register the routes:
 ```kotlin
     routing {
-        apply(LowCodeMain(klerk, lowCodeConfig).registerRoutes())
+        apply(LowCodeMain(klerk, LowCodeMain).registerRoutes())
         // other routes
     }
 ```

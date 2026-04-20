@@ -19,7 +19,7 @@ import kotlin.reflect.KClass
 
 internal suspend fun <C : KlerkContext, V> renderDocumentation(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>,
     documentationPath: String
 ) {
@@ -27,7 +27,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config))
+        apply(lowCodeHtmlHead(config.cssPath))
         body {
             header {
                 nav { div { a(href = config.basePath) { +"Home" } } }
@@ -302,7 +302,7 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): BO
 
 internal suspend fun <C : KlerkContext, V> renderAlgorithm(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<*, V>
 ) {
     val algorithmName =

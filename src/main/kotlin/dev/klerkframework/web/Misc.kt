@@ -12,10 +12,13 @@ import kotlin.reflect.KType
 internal val secureRandom = SecureRandom.getInstanceStrong()
 
 
-internal fun <C : KlerkContext, V> lowCodeHtmlHead(config: LowCodeConfig<C, V>): HTML.() -> Unit = {
+internal fun <C : KlerkContext, V> lowCodeHtmlHead(config: AdminUI<C, V>): HTML.() -> Unit =
+    lowCodeHtmlHead(config.cssPath)
+
+internal fun lowCodeHtmlHead(cssPath: String): HTML.() -> Unit = {
     head {
         meta(name = "viewport", content = "width=device-width, initial-scale=1")
-        styleLink(config.cssPath)
+        styleLink(cssPath)
     }
 }
 

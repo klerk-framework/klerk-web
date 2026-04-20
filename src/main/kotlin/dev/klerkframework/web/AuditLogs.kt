@@ -11,7 +11,7 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderAudit(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     basePath: String,
     klerk: Klerk<C, V>
 ) {
@@ -24,7 +24,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
     val events = klerk.events.getEventsInAuditLog(context, id)
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config))
+        apply(lowCodeHtmlHead(config.cssPath))
         body {
             header {
                 nav { div { a(href = config.basePath) { +"Home" } } }
@@ -61,7 +61,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
 
 internal suspend fun <C : KlerkContext, V> renderAuditDetails(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>
 ) {
     val context = config.contextProvider(call, klerk)
@@ -70,7 +70,7 @@ internal suspend fun <C : KlerkContext, V> renderAuditDetails(
     val event = klerk.events.getEventsInAuditLog(context, after = time, before = time).single()
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config))
+        apply(lowCodeHtmlHead(config.cssPath))
         body {
             header {
                 nav {

@@ -10,38 +10,35 @@ import kotlinx.html.*
 import java.util.*
 import kotlin.reflect.KClass
 
-public data class LowCodeConfig<C : KlerkContext, V>(
-    val basePath: String,
-    val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-    val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
-    val showOptionalParameters: (EventReference) -> Boolean,
-    val cssPath: String,
-    val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
-    val createCommandPath: String = "/_createevent",
-    val canSeeAdminUI: suspend (C) -> Boolean,
-) {
-    val fullCreateEventPath: String
-        get() = "${basePath}${createCommandPath}"
-}
+public class AdminUI<C : KlerkContext, V>(
+    private val klerk: Klerk<C, V>,
+    internal val basePath: String,
+    internal val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+    internal val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
+    internal val showOptionalParameters: (EventReference) -> Boolean,
+    internal val cssPath: String,
+    internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
+    internal val createCommandPath: String = "/_createevent",
+    internal val canSeeAdminUI: suspend (C) -> Boolean,
+    internal val autoButtons: AutoButtons<C, V>
 
-public class LowCodeMain<C : KlerkContext, V>(
-    private val klerk: Klerk<C, V>, private val config: LowCodeConfig<C, V>
 ) {
     private val listViews: List<LowCodeList<out Any, C, V>>
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>>
 
-    private val auditPath = "${config.basePath}/_audit"
-    private val jobsPath = "${config.basePath}/_jobs"
-    private val metricsPath = "${config.basePath}/_metrics"
-    private val pluginsPath = "${config.basePath}/_plugins"
-    private val logPath = "${config.basePath}/_log"
-    private val documentationPath = "${config.basePath}/_documentation"
+    private val auditPath = "${basePath}/_audit"
+    private val jobsPath = "${basePath}/_jobs"
+    private val metricsPath = "${basePath}/_metrics"
+    private val pluginsPath = "${basePath}/_plugins"
+    private val logPath = "${basePath}/_log"
+    private val documentationPath = "${basePath}/_documentation"
 
     init {
+        // TODO: remove and use autobuttons instead
         createCommandsWithParams = klerk.config.managedModels.flatMap { managed ->
             managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-                LowCodeCreateEvent(klerk, config, event, managed.kClass)
+                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass)
             }
         }
 
@@ -49,37 +46,29 @@ public class LowCodeMain<C : KlerkContext, V>(
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             val modelPathPart = managedClass.simpleName!!
-            val pathToList = "${config.basePath}/$modelPathPart"
+            val pathToList = "${basePath}/$modelPathPart"
 
             val listView = LowCodeList<Any, C, V>(
-                managedClass, config, createCommandsWithParams, modelPathPart, pathToList, humanName, klerk
+                managedClass, this, createCommandsWithParams, modelPathPart, pathToList, humanName, klerk
             )
             val detailView = LowCodeItemDetails<Any, C, V>(
-                managedClass, config, modelPathPart, humanName, klerk, auditPath
+                managedClass, this, modelPathPart, humanName, klerk, auditPath
             )
             Pair(listView, detailView)
         }
         listViews = pairs.map { it.first }
         detailViews = pairs.map { it.second }
-        listViews.forEach { it.initView(config.basePath) }
-        detailViews.forEach { it.initView(config.basePath) }
+        listViews.forEach { it.initView(basePath) }
+        detailViews.forEach { it.initView(basePath) }
 
-        AlgorithmDocumenter.setKnownAlgorithms(config.knownAlgorithms)
+        AlgorithmDocumenter.setKnownAlgorithms(knownAlgorithms)
     }
 
     public fun registerRoutes(): Routing.() -> Unit = {
         listViews.forEach { apply(it.registerRoutes()) }
         detailViews.forEach { apply(it.registerRoutes()) }
 
-        get(config.fullCreateEventPath) {
-            LowCodeCreateEvent.renderCreateEventPage(call, createCommandsWithParams, klerk, config)
-        }
-
-        post(config.fullCreateEventPath) {
-            LowCodeCreateEvent.renderExecuteEvent(call, createCommandsWithParams, klerk, config)
-        }
-
-        get(config.basePath) {
+        get(basePath) {
             requireAdmin(call) {
                 renderMain(call)
             }
@@ -87,71 +76,71 @@ public class LowCodeMain<C : KlerkContext, V>(
 
         get(auditPath) {
             requireAdmin(call) {
-                renderAudit(call, config, config.basePath, klerk)
+                renderAudit(call, this@AdminUI, basePath, klerk)
             }
         }
 
         get("$auditPath/{id}") {
             requireAdmin(call) {
-                renderAuditDetails(call, config, klerk)
+                renderAuditDetails(call, this@AdminUI, klerk)
             }
         }
 
         get(jobsPath) {
             requireAdmin(call) {
-                renderJobs(call, config, jobsPath, klerk)
+                renderJobs(call, this@AdminUI, jobsPath, klerk)
             }
         }
 
         get("${jobsPath}/{id}") {
             requireAdmin(call) {
-                renderJobDetails(call, config, klerk)
+                renderJobDetails(call, this@AdminUI, klerk)
             }
         }
 
         get(metricsPath) {
             requireAdmin(call) {
-                renderMetrics(call, config, metricsPath, klerk)
+                renderMetrics(call, this@AdminUI, metricsPath, klerk)
             }
         }
 
         get(documentationPath) {
             requireAdmin(call) {
-                renderDocumentation(call, config, klerk, documentationPath)
+                renderDocumentation(call, this@AdminUI, klerk, documentationPath)
             }
         }
 
         post("$documentationPath/functionInvocation") {
             requireAdmin(call) {
-                renderFunctionInvocation(call, config, klerk)
+                renderFunctionInvocation(call, this@AdminUI, klerk)
             }
         }
 
         get("$documentationPath/algorithms/{name}") {
             requireAdmin(call) {
-                renderAlgorithm(call, config, klerk)
+                renderAlgorithm(call, this@AdminUI, klerk)
             }
         }
 
         get(pluginsPath) {
             requireAdmin(call) {
-                renderPlugins(call, config, klerk)
+                renderPlugins(call, this@AdminUI, klerk)
             }
         }
 
-        get("${config.basePath}/plugin") {
+        get("${basePath}/plugin") {
             requireAdmin(call) {
-                renderPluginPage(call, config, klerk)
+                renderPluginPage(call, this@AdminUI, klerk)
             }
         }
 
         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
-            plugin.registerExtraRoutes(this, config.basePath)
+            plugin.registerExtraRoutes(this, basePath)
         }
 
         get(logPath) {
             requireAdmin(call) {
-                renderLog(call, config, klerk)
+                renderLog(call, this@AdminUI, klerk)
             }
         }
 
@@ -159,9 +148,9 @@ public class LowCodeMain<C : KlerkContext, V>(
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
-        val actor = config.contextProvider(call, klerk)
+        val actor = contextProvider(call, klerk)
         call.respondHtml {
-            apply(lowCodeHtmlHead(config))
+            apply(lowCodeHtmlHead(cssPath))
             body {
                 header {
                     h1 { +"Klerk Admin" }
@@ -200,7 +189,7 @@ public class LowCodeMain<C : KlerkContext, V>(
                         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
                             span {
                                 style = "margin: 10px;"
-                                a(href = "${config.basePath}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                                a(href = "${basePath}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
                             }
 
                         }
@@ -224,8 +213,8 @@ public class LowCodeMain<C : KlerkContext, V>(
     }
 
     private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
-        val context = config.contextProvider(call, klerk)
-        if (!config.canSeeAdminUI(context)) {
+        val context = contextProvider(call, klerk)
+        if (!canSeeAdminUI(context)) {
             call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { body { +"Not authorized" } }
             return
         }
@@ -245,7 +234,7 @@ public interface PluginPage<C : KlerkContext, V> {
     public val buttonText: String
     public suspend fun render(
         call: ApplicationCall,
-        config: LowCodeConfig<C, V>,
+        config: AdminUI<C, V>,
         klerk: Klerk<C, V>
     ): Unit
 

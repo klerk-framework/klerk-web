@@ -52,7 +52,7 @@ fun main() {
             generateSampleData(50, 3, klerk)
 
             val eventParams = EventParameters(CreateAuthorParams::class)
-            val template = EventFormTemplate(
+            val template = FormTemplate(
                 defaultValues = EventWithParameters(CreateAuthor.id, eventParams),
                 klerk, "/noklerkvalidation",
                 classProvider = null,
@@ -110,7 +110,7 @@ fun main() {
                             call,
                             mapOf(TestParams::populatedLater to PhoneNumber("After post")),
                         )) {
-                            is Invalid -> EventFormTemplate.respondInvalid(result, call)
+                            is Invalid -> FormTemplate.respondInvalid(result, call)
                             is DryRun -> call.respond(HttpStatusCode.OK)
                             is Parsed -> {
                                 call.respondHtml {

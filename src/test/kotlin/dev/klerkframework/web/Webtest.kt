@@ -4,7 +4,6 @@ import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.datatypes.InstantContainer
-import dev.klerkframework.klerk.misc.ReflectedModel
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelModification.*
 import dev.klerkframework.klerk.storage.RamStorage
@@ -16,6 +15,7 @@ import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.compression.*
+import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Instant
@@ -23,9 +23,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 import org.sqlite.SQLiteDataSource
-import kotlin.reflect.full.memberProperties
 
-internal var lowCodeMain: LowCodeMain<Context, MyCollections>? = null
+internal var adminUI: AdminUI<Context, MyCollections>? = null
+lateinit var autoButtons: AutoButtons<Context, MyCollections>
 
 data class AuthorAndRecentPucl(val author: Author, val recentBooks: List<Book>)
 
@@ -53,17 +53,18 @@ fun main() {
             //data.makeSnapshot()
         }
 
-        lowCodeMain = LowCodeMain(
+        autoButtons = AutoButtons(klerk, "_autobuttons", ApplicationCall::ctx, myStyle.getUrl())
+
+        adminUI = AdminUI(
             klerk,
-            LowCodeConfig(
-                "/admin",
-                ApplicationCall::ctx,
-                // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
-                cssPath = myStyle.getUrl(),
-                showOptionalParameters = { eventReference -> false },
-                knownAlgorithms = setOf(),
-                canSeeAdminUI = ::canSeeAdminUI,
-            )
+            "/admin",
+            ApplicationCall::ctx,
+            // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
+            cssPath = myStyle.getUrl(),
+            showOptionalParameters = { eventReference -> false },
+            knownAlgorithms = setOf(),
+            canSeeAdminUI = ::canSeeAdminUI,
+            autoButtons = autoButtons
         )
 
         val embeddedServer = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
@@ -127,7 +128,8 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
             }
         }
 
-        apply(lowCodeMain!!.registerRoutes())
+        apply(autoButtons.registerRoutes())
+        apply(adminUI!!.registerRoutes())
     }
 }
 
@@ -142,7 +144,7 @@ private fun renderIndex(): suspend RoutingContext.() -> Unit = {
             p { +"This is a example how to use klerk-web to build a web frontend." }
             h2 { +"Admin UI" }
             p {
-                +"Klerk-web can generate an"
+                +"Klerk-web can generate an "
                 a(href = "/admin") { +"admin UI" }
                 +" for your application."
             }
@@ -176,9 +178,11 @@ private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend Routing
 
 private fun renderAuthorDetails(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     val id = ModelID<Author>(requireNotNull(call.parameters["id"]).toInt())
-    val (author, events) = klerk.read(call::ctx) {
+    val context = call.ctx(klerk)
+    val (author, events) = klerk.read(context) {
         Pair(get(id), getPossibleEvents(id))
     }
+    val completionPaths = CompletionPaths(call.request.uri, call.request.uri, call.request.uri)
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
@@ -190,7 +194,7 @@ private fun renderAuthorDetails(klerk: Klerk<Context, MyCollections>): suspend R
             h2 { +"Actions" }
             p {
                 events.forEach { event ->
-
+                    apply(autoButtons.render(event, klerk, id, completionPaths, context))
                 }
             }
         }

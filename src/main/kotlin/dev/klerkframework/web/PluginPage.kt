@@ -6,7 +6,7 @@ import io.ktor.server.application.*
 
 internal suspend fun <C : KlerkContext, V> renderPluginPage(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>
 ) {
     val pluginName = requireNotNull(call.request.queryParameters["name"])

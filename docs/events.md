@@ -5,7 +5,7 @@ rendered and the user submits the form, the event is triggered.
 
 ```kotlin
 getPossibleEvents(model.id).forEach {
-    apply(LowCodeCreateEvent.renderButton(it, klerk, model.id, lowCodeConfig, buttonTargets, ctx))
+    apply(LowCodeCreateEvent.renderButton(it, klerk, model.id, LowCodeMain, buttonTargets, ctx))
 }
 ```
 

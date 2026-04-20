@@ -6,7 +6,7 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
-import dev.klerkframework.web.LowCodeConfig
+import dev.klerkframework.web.AdminUI
 import dev.klerkframework.web.PluginPage
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders.ContentEncoding
@@ -234,7 +234,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
 
     override suspend fun render(
         call: ApplicationCall,
-        config: LowCodeConfig<C, V>,
+        config: AdminUI<C, V>,
         klerk: Klerk<C, V>
     ) {
         val context = config.contextProvider(call, klerk)

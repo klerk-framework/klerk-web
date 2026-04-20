@@ -28,7 +28,7 @@ fun main() {
         createBookHarryPotter1(klerk, rowling)
     }
 
-    val template = EventFormTemplate(
+    val template = FormTemplate(
         EventWithParameters(
             CreateAuthor.id,
             EventParameters(CreateAuthorParams::class),
@@ -74,7 +74,7 @@ fun main() {
                     call,
                     mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
                 )) {
-                    is Invalid -> EventFormTemplate.respondInvalid(result, call)
+                    is Invalid -> FormTemplate.respondInvalid(result, call)
                     is DryRun -> respondDryRun(
                         result.params,
                         result.key,
@@ -153,7 +153,7 @@ fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {
 suspend fun <T:Any> renderForm(
     call: ApplicationCall,
     klerk: Klerk<Context, MyCollections>,
-    template: EventFormTemplate<T, Context>,
+    template: FormTemplate<T, Context>,
     params: T?,
     parseResult: Parsed<T>? = null
 ) {

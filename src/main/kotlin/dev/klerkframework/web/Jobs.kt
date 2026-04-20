@@ -11,7 +11,7 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderJobs(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
@@ -60,7 +60,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
 
 internal suspend fun <C : KlerkContext, V> renderJobDetails(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>
 ) {
     val actor = config.contextProvider(call, klerk)

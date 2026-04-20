@@ -11,7 +11,7 @@ import kotlin.reflect.KClass
 
 internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
-    private val config: LowCodeConfig<C, V>,
+    private val config: AdminUI<C, V>,
     private val modelPathPart: String,
     private val humanName: String,
     private val klerk: Klerk<C, V>,
@@ -61,16 +61,15 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         h3 { +"Commands" }
 
         eventReferences.forEach { event ->
-            val buttonTargets =
-                ButtonTargets(back = "/", model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
+            val completionPaths =
+                CompletionPaths(cancel = "/", model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
             p {
                 apply(
-                    LowCodeCreateEvent.renderButton(
+                    config.autoButtons.render(
                         event,
                         klerk,
                         reflectedModel.id,
-                        config,
-                        buttonTargets,
+                        completionPaths,
                         context
                     )
                 )
@@ -113,7 +112,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         val jsonPretty = klerk.config.toJson(props)
         textArea {
             disabled = true
-            rows = jsonPretty.lines().size.toString()
+            rows = "10" // jsonPretty.lines().size.toString()
             +jsonPretty
         }
     }

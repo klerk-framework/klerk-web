@@ -9,7 +9,7 @@ import kotlin.reflect.KClass
 
 internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>,
     kClass: KClass<out Any>
 ) {

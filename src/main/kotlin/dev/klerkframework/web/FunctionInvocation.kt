@@ -22,7 +22,7 @@ internal const val DATA_CONTAINER_CLASS = "data-container-class"
  */
 internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
     call: ApplicationCall,
-    config: LowCodeConfig<C, V>,
+    config: AdminUI<C, V>,
     klerk: Klerk<C, V>
 ) {
     val context = config.contextProvider(call, klerk)

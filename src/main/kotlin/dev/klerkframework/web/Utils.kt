@@ -108,36 +108,6 @@ public fun <M : Any> renderModel(
     }
 }
 
-public fun <C : KlerkContext, V> renderSimpleEventButton(
-    event: EventReference,
-    klerk: Klerk<C, V>,
-    modelId: ModelID<*>?,
-    config: LowCodeConfig<C, V>,
-    buttonTargets: ButtonTargets,
-    context: C
-): HtmlBlockTag.() -> Unit = {
-    //val buttonTargets = """${LowCodeCreateEvent.ButtonTarget.error}=${config.basePath}&${LowCodeCreateEvent.ButtonTarget.model}=${config.}basePath/$modelPathPart/items/$modelId&${LowCodeCreateEvent.ButtonTarget.back}=$basePath/$modelPathPart"""
-
-    val parameters = klerk.config.getParameters(event)
-    var url =
-        "${config.fullCreateEventPath}?eventId=${event.urlEncode()}&_showOptionalParameters=${
-            config.showOptionalParameters(event)
-        }${buttonTargets.toQueryParamsString()}"
-    if (modelId != null) {
-        url = url.plus("&modelId=${modelId}")
-    }
-
-    if (parameters == null) {
-        form(action = url, method = FormMethod.post) { button { +context.translation.klerk.event(event) } }
-    } else {
-        a(url) {        // TODO: should POST
-            button {
-                +context.translation.klerk.event(event)
-            }
-        }
-    }
-}
-
 
 /**
  * Functions that return a set of CSS classes. Used to adapt the HTML output to your CSS.

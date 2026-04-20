@@ -27,7 +27,7 @@ internal const val NON_BREAKING_HYPHEN = "&#8209;"
 
 internal class LowCodeList<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
-    private val config: LowCodeConfig<C, V>,
+    private val config: AdminUI<C, V>,
     private val createCommandPages: List<LowCodeCreateEvent<C, V>>,
     private val modelPathPart: String,
     val pathToList: String,
@@ -56,7 +56,7 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
 
     // ------------ List ------------------------------------------------------
 
-    private suspend fun renderModelList(call: ApplicationCall, config: LowCodeConfig<C, V>) {
+    private suspend fun renderModelList(call: ApplicationCall, config: AdminUI<C, V>) {
         val context = config.contextProvider(call, klerk)
         val modelView = klerk.config.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
@@ -69,7 +69,7 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         }
 
         call.respondHtml {
-            apply(lowCodeHtmlHead(config))
+            apply(lowCodeHtmlHead(config.cssPath))
             body {
                 apply(navMenu(basePath, modelPathPart, humanName))
                 h2 { +humanName }
@@ -147,10 +147,10 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         apply(table.render())
 
         h3 { +"Events" }
-        val buttonTargets =
-            ButtonTargets(back = call.request.uri, model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
+        val completionPaths =
+            CompletionPaths(cancel = call.request.uri, model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
         voidEventReferences.forEach { event ->
-            p { apply(LowCodeCreateEvent.renderButton(event, klerk, null, config, buttonTargets, context)) }
+            p { apply(config.autoButtons.render(event, klerk, null, completionPaths, context)) }
         }
 
         a(href = "$basePath/$modelPathPart/analysis") { +"(More details about the list)" }

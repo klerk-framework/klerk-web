@@ -9,7 +9,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderLog(
-    call: ApplicationCall, config: LowCodeConfig<C, V>, klerk: Klerk<C, V>
+    call: ApplicationCall, config: AdminUI<C, V>, klerk: Klerk<C, V>
 ) {
     val context = config.contextProvider.invoke(call, klerk)
     call.respondHtml {

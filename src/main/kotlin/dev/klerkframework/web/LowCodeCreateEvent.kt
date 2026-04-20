@@ -22,19 +22,19 @@ import kotlin.reflect.jvm.jvmErasure
 
 private val logger = KotlinLogging.logger {}
 
-public class LowCodeCreateEvent<C : KlerkContext, V>(
+internal class LowCodeCreateEvent<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
-    private val config: LowCodeConfig<C, V>,
+    private val path: String,
     internal val eventReference: EventReference,
     internal val modelClass: KClass<out Any>
 ) {
     private val logger = KotlinLogging.logger {}
-    private var template: EventFormTemplate<out Any, C>? = null
+    private var template: FormTemplate<out Any, C>? = null
 
     init {
         val parameters = requireNotNull(klerk.config.getParameters(eventReference))
         try {
-            template = EventFormTemplate(
+            template = FormTemplate(
                 EventWithParameters(eventReference, parameters),
                 //eventWithParameters.parameters.raw,
                 klerk,
@@ -53,19 +53,20 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
     internal fun hasTemplate() = template != null
 
     internal fun getUrl(): String {
-        return "${config.fullCreateEventPath}?eventId=${eventReference.id().encodeURLPathPart()}"
+        return "$path?eventId=${eventReference.id().encodeURLPathPart()}"
     }
 
-    public companion object {
-        public suspend fun <C : KlerkContext, V> renderCreateEventPage(
+    internal companion object {
+        internal suspend fun <C : KlerkContext, V> renderCreateEventPage(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
-            config: LowCodeConfig<C, V>
+            contextProvider: suspend (call: io.ktor.server.application.ApplicationCall, Klerk<C, V>) -> C,
+            cssPath: String,
         ) {
-            val context = config.contextProvider(call, klerk)
+            val context = contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
-            val buttonTargets = ButtonTargets.parse(call, null)
+            val completionPaths = CompletionPaths.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
             val eventWithParameters =
@@ -85,7 +86,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                     call,
                     params = null,
                     reader = this,
-                    queryParams = buttonTargets.toQueryParams().plus(modelIdQueryParams),
+                    queryParams = completionPaths.toQueryParams().plus(modelIdQueryParams),
                     translator = context.translation
                 )
             }
@@ -96,7 +97,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                 if (eventName.lowercase().contains(modelName.lowercase())) eventName else "$eventName ($modelName)"
 
             call.respondHtml {
-                apply(lowCodeHtmlHead(config))
+                apply(lowCodeHtmlHead(cssPath))
                 body {
                     main {
                         h1 { +heading }
@@ -106,13 +107,14 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             }
         }
 
-        public suspend fun <C : KlerkContext, V> renderExecuteEvent(
+        internal suspend fun <C : KlerkContext, V> renderExecuteEvent(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
-            config: LowCodeConfig<C, V>
+            contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+            cssPath: String,
         ) {
-            val context = config.contextProvider(call, klerk)
+            val context = contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
@@ -130,13 +132,13 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                     klerk,
                     context,
                     call,
-                    config,
+                    cssPath,
                     CommandToken.simple(),
                     null
                 )
             } else {
                 when (val parseResult = template.parse(call)) {
-                    is ParseResult.Invalid -> EventFormTemplate.respondInvalid(parseResult, call)
+                    is ParseResult.Invalid -> FormTemplate.respondInvalid(parseResult, call)
                     is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
                     is ParseResult.Parsed -> {
                         executeEvent(
@@ -145,7 +147,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                             klerk,
                             context,
                             call,
-                            config,
+                            cssPath,
                             parseResult.key,
                             parseResult.params
                         )
@@ -160,7 +162,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             klerk: Klerk<C, V>,
             context: C,
             call: ApplicationCall,
-            config: LowCodeConfig<C, V>,
+            cssPath: String,
             key: CommandToken,
             params: Any?
         ) {
@@ -175,7 +177,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             when (val eventResult = klerk.handle(command, context, options)) {
                 is CommandResult.Failure -> {
                     call.respondHtml {
-                        apply(lowCodeHtmlHead(config))
+                        apply(lowCodeHtmlHead(cssPath))
                         body {
                             h1 { +"Bad request" }
                             val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
@@ -184,7 +186,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                                     +"$violatedRule (${violatedRule.type})"
                                 }
                             } else {
-                                div { +eventResult.toString() }
+                                div { +(eventResult.problems.firstOrNull()?.endUserTranslatedMessage ?: "Unknown error") }
                             }
                         }
                     }
@@ -193,14 +195,14 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                 is CommandResult.Success -> {
                     val modelId = id ?: eventResult.createdModels.firstOrNull()
                     val modelWasDeleted = eventResult.deletedModels.contains(modelId)
-                    val buttonTargets = ButtonTargets.parse(call, modelId)
+                    val completionPaths = CompletionPaths.parse(call, modelId)
                     call.respondHtml {
-                        apply(lowCodeHtmlHead(config))
+                        apply(lowCodeHtmlHead(cssPath))
                         body {
                             h3 { +"Event was executed" }
                             apply(renderSuccess(eventResult))
                             br
-                            a(href = if (modelId == null || modelWasDeleted) buttonTargets.back else buttonTargets.model) {
+                            a(href = if (modelId == null || modelWasDeleted) completionPaths.cancel else completionPaths.model) {
                                 button { +"Ok" }
                             }
                         }
@@ -343,26 +345,31 @@ private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): BODY.()
     result.jobs.forEach { p { +"Job (id: $it) was created" } }
 }
 
-
-public data class ButtonTargets(public val back: String, public val model: String?, public val error: String) {
+/**
+ * @param cancel The path to redirect to when the user clicks the cancel button. Also used when the command was
+ * executed successfully but there is no relevant model (e.g. it was deleted).
+ * @param model The path to redirect to when the command was executed successfully and the model exists.
+ * @param error The path to redirect to when an error occurs.
+ */
+public data class CompletionPaths(internal val cancel: String, internal val model: String?, internal val error: String) {
 
     internal fun toQueryParams(): Map<String, String> {
         if (model == null) {
-            return mapOf("bt_back" to back, "bt_error" to error)
+            return mapOf("bt_cancel" to cancel, "bt_error" to error)
         }
-        return mapOf("bt_back" to back, "bt_model" to model, "bt_error" to error)
+        return mapOf("bt_cancel" to cancel, "bt_model" to model, "bt_error" to error)
     }
 
     internal fun toQueryParamsString(): String = toQueryParams().map { "${it.key}=${it.value}" }.joinToString("&")
 
     internal companion object {
-        fun parse(call: ApplicationCall, id: ModelID<out Any>?): ButtonTargets {
+        fun parse(call: ApplicationCall, id: ModelID<out Any>?): CompletionPaths {
             var parsedModelPath = call.request.queryParameters["bt_model"] ?: "/"
             if (id != null) {
                 parsedModelPath = parsedModelPath.replace("{id}", id.toString())
             }
-            return ButtonTargets(
-                back = call.request.queryParameters["bt_back"] ?: "/",
+            return CompletionPaths(
+                cancel = call.request.queryParameters["bt_cancel"] ?: "/",
                 model = parsedModelPath,
                 error = call.request.queryParameters["bt_error"] ?: "/",
             )
