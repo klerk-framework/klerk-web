@@ -121,7 +121,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
 
     private suspend fun renderModel(call: ApplicationCall) {
         val context = config.contextProvider(call, klerk)
-        val id = ModelID.from<Any>(call.parameters["id"]!!)
+        val id = ModelID<Any>(call.parameters["id"]!!.toInt())
         val (reflectedModelPopulated, model) = klerk.read(context) {
             val model = get(id)
             val reflectedModel = ReflectedModel(model)

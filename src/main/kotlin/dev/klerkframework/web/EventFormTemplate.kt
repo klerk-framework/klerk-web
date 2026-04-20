@@ -591,7 +591,7 @@ public class EventForm<T : Any, C : KlerkContext>(
                         value = option.id.toString()
                         params?.let {
                             val paramValue = getModelIdValue(prop.propertyName, params)
-                            selected = paramValue == option.id.toInt()
+                            selected = paramValue == option.id.value
                         }
                         +option.toString()
                     }
@@ -908,7 +908,7 @@ public class EventForm<T : Any, C : KlerkContext>(
 
     private fun getModelIdValue(propertyName: String, params: T): Int? {
         val prop = params::class.memberProperties.single { it.name == propertyName }
-        return (prop.getter.call(params) as? ModelID<*>)?.toInt()
+        return (prop.getter.call(params) as? ModelID<*>)?.value
     }
 
     /*    private fun getEnumValue(propertyName: String, params: T): String {

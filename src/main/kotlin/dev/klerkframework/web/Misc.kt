@@ -37,11 +37,11 @@ internal fun navMenu(basePath: String, modelPathPart: String, humanName: String)
 private val allAllowed = "abcdefghijklmnopqrstuvwxyzABCDEFGJKLMNPRSTUVWXYZ0123456789".toCharArray()
 
 internal fun generateRandomString(): String {
-    val password = StringBuilder()
+    val builder = StringBuilder()
     for (i in 0 until 20) {
-        password.append(allAllowed[secureRandom.nextInt(allAllowed.size)])
+        builder.append(allAllowed[secureRandom.nextInt(allAllowed.size)])
     }
-    return password.toString()
+    return builder.toString()
 }
 
 public fun isDevelopmentMode(): Boolean {

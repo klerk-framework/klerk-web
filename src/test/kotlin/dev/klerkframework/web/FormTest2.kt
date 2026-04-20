@@ -24,11 +24,11 @@ fun main() {
     val klerk = Klerk.create(createConfig(collections))
     runBlocking {
         klerk.meta.start()
-        //val rowling = createAuthorJKRowling(klerk)
-        //createBookHarryPotter1(klerk, rowling)
+        val rowling = createAuthorJKRowling(klerk)
+        createBookHarryPotter1(klerk, rowling)
     }
 
-/*    val template = EventFormTemplate(
+    val template = EventFormTemplate(
         EventWithParameters(
             CreateAuthor.id,
             EventParameters(CreateAuthorParams::class),
@@ -44,16 +44,6 @@ fun main() {
         populatedAfterSubmit(CreateAuthorParams::secretToken)
         //populatedAfterSubmit(CreateAuthorParams::favouriteColleague)
         hidden(CreateAuthorParams::favouriteColleague)
-        remaining()
-    }
-
- */
-
-    val template = EventFormTemplate(
-        EventWithParameters(CreateBook.id, EventParameters(CreateBookParams::class)),
-        klerk, "/",
-        classProvider = ::myClassProvider,
-    ) {
         remaining()
     }
 
@@ -88,7 +78,7 @@ fun main() {
                     is DryRun -> respondDryRun(
                         result.params,
                         result.key,
-                        CreateBook, // TODO
+                        CreateAuthor,
                         call,
                         klerk,
                         Context.swedishUnauthenticated(),

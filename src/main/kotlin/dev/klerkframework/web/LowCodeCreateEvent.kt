@@ -66,7 +66,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             val context = config.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             val buttonTargets = ButtonTargets.parse(call, null)
-            val id = queryParameters["modelId"]?.let { ModelID.from<Any>(it) }
+            val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
             val eventWithParameters =
                 EventWithParameters(eventReference, requireNotNull(klerk.config.getParameters(eventReference)))
@@ -116,7 +116,7 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
             val queryParameters = call.request.queryParameters
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
-            val id = queryParameters["modelId"]?.let { ModelID.from<Any>(it) }
+            val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.config.getParameters(eventReference)))
             val parameters = klerk.config.getParameters(eventReference)
             val event = klerk.config.getEvent(eventReference)
@@ -208,38 +208,8 @@ public class LowCodeCreateEvent<C : KlerkContext, V>(
                 }
             }
         }
-
-        public fun <C : KlerkContext, V> renderButton(
-            event: EventReference,
-            klerk: Klerk<C, V>,
-            modelId: ModelID<*>?,
-            config: LowCodeConfig<C, V>,
-            buttonTargets: ButtonTargets,
-            context: C
-        ): HtmlBlockTag.() -> Unit = {
-            //val buttonTargets = """${LowCodeCreateEvent.ButtonTarget.error}=${config.basePath}&${LowCodeCreateEvent.ButtonTarget.model}=${config.}basePath/$modelPathPart/items/$modelId&${LowCodeCreateEvent.ButtonTarget.back}=$basePath/$modelPathPart"""
-
-            val parameters = klerk.config.getParameters(event)
-            var url =
-                "${config.fullCreateEventPath}?eventId=${event.urlEncode()}&_showOptionalParameters=${
-                    config.showOptionalParameters(event)
-                }${buttonTargets.toQueryParamsString()}"
-            if (modelId != null) {
-                url = url.plus("&modelId=${modelId}")
-            }
-
-            if (parameters == null) {
-                form(action = url, method = FormMethod.post) { button { +context.translation.klerk.event(event) } }
-            } else {
-                a(url) {
-                    button() {
-                        +context.translation.klerk.event(event)
-                    }
-                }
-            }
-        }
-
     }
+
 }
 
 internal class AuthenticationException(message: String? = null) : RuntimeException(message)
@@ -265,10 +235,10 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     }
 
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false))) {
-        return ModelID.from<Any>(value)
+        return ModelID<Any>(value.toInt())
     }
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))) {
-        return if (value.isEmpty()) null else ModelID.from<Any>(value)
+        return if (value.isEmpty()) null else ModelID<Any>(value.toInt())
     }
     if (type.isSubtypeOf(Enum::class.starProjectedType)) {
         @Suppress("UNCHECKED_CAST")
@@ -314,7 +284,7 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.first().call(ModelID.from<Any>(value))
+        return type.jvmErasure.constructors.first().call(ModelID<Any>(value.toInt()))
     }
 
     try {

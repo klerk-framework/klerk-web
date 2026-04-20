@@ -165,58 +165,58 @@ public class LowCodeMain<C : KlerkContext, V>(
             body {
                 header {
                     h1 { +"Klerk Admin" }
-                }
-                nav {
-                    span {
-                        style = "margin: 10px;"
-                        a(href = logPath) { button { +"Log" } }
-                    }
 
-                    span {
-                        style = "margin: 10px;"
-                        a(href = jobsPath) { button { +"Jobs" } }
-                    }
-
-                    span {
-                        style = "margin: 10px;"
-                        a(href = documentationPath) { button { +"Documentation" } }
-                    }
-
-                    span {
-                        style = "margin: 10px;"
-                        a(href = auditPath) { button { +"Audit Log" } }
-                    }
-
-                    span {
-                        style = "margin: 10px;"
-                        a(href = metricsPath) { button { +"Metrics" } }
-                    }
-
-                    span {
-                        style = "margin: 10px;"
-                        a(href = pluginsPath) { button { +"Plugins" } }
-                    }
-
-                    klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+                    nav {
                         span {
                             style = "margin: 10px;"
-                            a(href = "${config.basePath}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                            a(href = logPath) { button { +"Log" } }
                         }
 
-                    }
+                        span {
+                            style = "margin: 10px;"
+                            a(href = jobsPath) { button { +"Jobs" } }
+                        }
 
-                    h3 { +"Data" }
-                    table {
-                        listViews.forEach { view ->
-                            tr {
-                                td {
-                                    a(href = view.pathToList) {
-                                        +view.humanName
-                                    }
+                        span {
+                            style = "margin: 10px;"
+                            a(href = documentationPath) { button { +"Documentation" } }
+                        }
+
+                        span {
+                            style = "margin: 10px;"
+                            a(href = auditPath) { button { +"Audit Log" } }
+                        }
+
+                        span {
+                            style = "margin: 10px;"
+                            a(href = metricsPath) { button { +"Metrics" } }
+                        }
+
+                        span {
+                            style = "margin: 10px;"
+                            a(href = pluginsPath) { button { +"Plugins" } }
+                        }
+
+                        klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+                            span {
+                                style = "margin: 10px;"
+                                a(href = "${config.basePath}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                            }
+
+                        }
+                    }
+                }
+
+                h2 { +"Data" }
+                table {
+                    listViews.forEach { view ->
+                        tr {
+                            td {
+                                a(href = view.pathToList) {
+                                    +view.humanName
                                 }
                             }
                         }
-
                     }
                 }
             }

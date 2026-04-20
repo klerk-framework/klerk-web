@@ -18,7 +18,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
     val context = config.contextProvider(call, klerk)
 
     val forModel = call.request.queryParameters["model"]
-    val id = forModel?.let { ModelID.from<Any>(it) }
+    val id = forModel?.let { ModelID<Any>(it.toInt()) }
     val modelSummary = if (id == null) "" else klerk.read(context) { get(id).toString() }
 
     val events = klerk.events.getEventsInAuditLog(context, id)
