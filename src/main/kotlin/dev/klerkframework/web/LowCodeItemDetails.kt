@@ -61,16 +61,15 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         h3 { +"Commands" }
 
         eventReferences.forEach { event ->
-            val completionPaths =
-                CompletionPaths(cancel = "/", model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
             p {
                 apply(
                     config.autoButtons.render(
                         event,
-                        klerk,
                         reflectedModel.id,
-                        completionPaths,
-                        context
+                        context,
+                        onCancelPath = "/",
+                        onSuccessAndModelExistPath = "${config.basePath}/$modelPathPart/items/{id}",
+                        onErrorPath = "/"
                     )
                 )
             }

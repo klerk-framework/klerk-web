@@ -61,7 +61,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
-            contextProvider: suspend (call: io.ktor.server.application.ApplicationCall, Klerk<C, V>) -> C,
+            contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
             cssPath: String,
         ) {
             val context = contextProvider(call, klerk)
@@ -102,6 +102,11 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     main {
                         h1 { +heading }
                         form.render(this)
+                        a(completionPaths.cancel) {
+                            button {
+                                +"Cancel"
+                            }
+                        }
                     }
                 }
             }

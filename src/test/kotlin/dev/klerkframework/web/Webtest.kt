@@ -112,6 +112,8 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         get("/", renderIndex())
         get("/authors", renderAuthors(klerk))
         get("/authors/{id}", renderAuthorDetails(klerk))
+        get("/books", renderBooks(klerk))
+        get("/books/{id}", renderBookDetails(klerk))
 
         get("/testassets") {
             call.respondHtml {
@@ -159,42 +161,85 @@ private fun renderIndex(): suspend RoutingContext.() -> Unit = {
     }
 }
 
+@OptIn(ExperimentalUnsignedTypes::class)
 private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
-    val queryResponse = klerk.read(call::ctx) {
-        query(views.authors.all)
-    }
-    call.respondHtml {
-        head {
-            title { +"Klerk Web Test" }
-            styleLink(myStyle.getUrl())
+    val context = call.ctx(klerk)
+    klerk.readSuspend(context) {
+        call.respondHtml {
+            head {
+                title { +"Klerk Web Test" }
+                styleLink(myStyle.getUrl())
+            }
+            body {
+                h1 { +"Here are the authors" }
+                apply(renderTable(query(views.authors.all), authorsTableConfig))
+                getPossibleVoidEvents(Author::class).forEach {
+                    apply(autoButtons.render(it, null, context, onCancelPath = call.request.uri))
+                }
+            }
         }
-        body {
-            h1 { +"Here are the authors" }
-            apply(renderTable(queryResponse, authorsTableConfig))
-        }
     }
-
 }
 
 private fun renderAuthorDetails(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     val id = ModelID<Author>(requireNotNull(call.parameters["id"]).toInt())
     val context = call.ctx(klerk)
-    val (author, events) = klerk.read(context) {
-        Pair(get(id), getPossibleEvents(id))
+    klerk.readSuspend(context) {
+        val author = get(id)
+        call.respondHtml {
+            head {
+                title { +"Klerk Web Test" }
+                styleLink(myStyle.getUrl())
+            }
+            body {
+                h1 { +"About ${author.props.firstName.value} ${author.props.lastName.value}" }
+                apply(renderModel(author, includeMetadata = false))
+                h2 { +"Actions" }
+                p {
+                    getPossibleEvents(id).forEach { event ->
+                        apply(autoButtons.render(event, id, context, onCancelPath = call.request.uri))
+                    }
+                }
+            }
+        }
     }
-    val completionPaths = CompletionPaths(call.request.uri, call.request.uri, call.request.uri)
+}
+
+private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
+    val queryResponse = klerk.read(call::ctx) {
+        query(views.books.all)
+    }
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
             styleLink(myStyle.getUrl())
         }
         body {
-            h1 { +"About ${author.props.firstName.value} ${author.props.lastName.value}" }
-            apply(renderModel(author, includeMetadata = false))
+            h1 { +"Here are the books" }
+            apply(renderTable(queryResponse, booksTableConfig))
+        }
+    }
+
+}
+
+private fun renderBookDetails(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
+    val id = ModelID<Book>(requireNotNull(call.parameters["id"]).toInt())
+    val context = call.ctx(klerk)
+    val (book, events) = klerk.read(context) {
+        get(id) to getPossibleEvents(id)
+    }
+    call.respondHtml {
+        head {
+            title { +"Klerk Web Test" }
+            styleLink(myStyle.getUrl())
+        }
+        body {
+            h1 { +"About ${book.props.title.value}" }
+            apply(renderModel(book, includeMetadata = false))
             h2 { +"Actions" }
             p {
                 events.forEach { event ->
-                    apply(autoButtons.render(event, klerk, id, completionPaths, context))
+                    apply(autoButtons.render(event, id, context, onCancelPath = call.request.uri))
                 }
             }
         }
@@ -232,3 +277,23 @@ val authorsTableConfig = TableConfig<Author>(
     },
     pathProvider = { "/authors/${it.id}" }
 )
+
+val booksTableConfig = TableConfig<Book>(
+    caption = "Books",
+    columns = listOf(
+        camelCaseToPretty(Book::title.name) to { m -> m.props.title.value },
+        "Created" to { m -> dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
+        "State" to { m -> m.state },
+    ),
+    classProvider = MyClassProvider,
+    pathProvider = { "/books/${it.id}" }
+)
+
+object MyClassProvider : CssClassProvider {
+    override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
+        return when (element) {
+            "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
+            else -> setOf()
+        }
+    }
+}

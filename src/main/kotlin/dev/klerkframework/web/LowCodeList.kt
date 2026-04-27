@@ -147,10 +147,11 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         apply(table.render())
 
         h3 { +"Events" }
-        val completionPaths =
-            CompletionPaths(cancel = call.request.uri, model = "${config.basePath}/$modelPathPart/items/{id}", error = "/")
         voidEventReferences.forEach { event ->
-            p { apply(config.autoButtons.render(event, klerk, null, completionPaths, context)) }
+            p { apply(config.autoButtons.render(event, null, context,
+                onCancelPath = call.request.uri,
+                onSuccessAndModelExistPath = "${config.basePath}/$modelPathPart/items/{id}",
+                onErrorPath = "/")) }
         }
 
         a(href = "$basePath/$modelPathPart/analysis") { +"(More details about the list)" }

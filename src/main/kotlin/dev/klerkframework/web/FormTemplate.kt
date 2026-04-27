@@ -12,6 +12,7 @@ import dev.klerkframework.klerk.misc.EventParameter
 import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -28,6 +29,8 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.*
+import kotlin.reflect.jvm.ExperimentalReflectionOnLambdas
+import kotlin.reflect.jvm.reflect
 
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
 private val IDEMPOTENCE_KEY = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
@@ -268,7 +271,9 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         callParams.forEach { name, _ ->
-            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && !name.startsWith("null-toggle-")) {
+            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && !name.startsWith(
+                    "null-toggle-"
+                )) {
                 throw IllegalArgumentException("Parameter $name is not expected to be present in request")
             }
         }
@@ -283,19 +288,23 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             @Suppress("UNCHECKED_CAST")
             val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
 
+            val validationProblems: Set<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
+                paramsClass.validators()
+                    .mapNotNull {
+                         val result = it.invoke()
+                         return@mapNotNull if (result is PropertyCollectionValidity.Invalid) {
+                             if (result.endUserTranslatedMessage != null) result else PropertyCollectionValidity.Invalid(extractNameFromFunction(it))
+                         } else {
+                             null
+                         }
+                    }.toSet()
+            } else emptySet()
+            if (validationProblems.isNotEmpty()) {
+                return ParseResult.Invalid(validationProblems.map { it.toProblem() }.toSet())
+            }
             if (call.request.queryParameters["dryRun"]?.equals("true") == true) {
                 return ParseResult.DryRun(paramsClass, key)
             }
-            /*  val validationProblems = paramsClass.validate()
-        if (call.request.queryParameters["dry-run"]?.equals("true") == true) {
-            return Validation(validationProblems)
-        }
-        if (validationProblems.isEmpty()) {
-            return ParseSuccess(paramsClass)
-        }
-        return Invalid(validationProblems)
-
-       */
             return ParseResult.Parsed(paramsClass, key)
         } catch (e: Exception) {
             return ParseResult.Invalid(
@@ -530,10 +539,14 @@ public class FormTemplate<T : Any, C : KlerkContext>(
              */
             val fieldProblems = problems
                 .filterIsInstance<InvalidPropertyProblem>()
-                .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
+                .associate { p -> Pair(p.propertyName, p.endUserTranslatedMessage) }
                 .map { ValidationProblemResponse(it.key, it.value) }
 
-            val response = ValResponse(fieldProblems, emptySet(), emptySet())
+            val collectionProblems = problems
+                .filterIsInstance<InvalidPropertyCollectionProblem>()
+                .map { ValidationProblemResponse(null, it.endUserTranslatedMessage) }
+
+            val response = ValResponse(fieldProblems + collectionProblems, emptySet(), emptySet())
 
             return Gson().toJson(response)
         }
@@ -670,7 +683,8 @@ public class EventForm<T : Any, C : KlerkContext>(
                         email,
                         getNewInstance(propertyName, parameters),  // since value can be null
                         classProvider?.let { cp ->
-                            cp("input",
+                            cp(
+                                "input",
                                 type.name,
                                 propertyName,
                                 value?.valueWithoutAuthorization.toString()
@@ -960,7 +974,11 @@ public class EventForm<T : Any, C : KlerkContext>(
         val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
         if (emptyNonNullableReferenceSelects.isNotEmpty()) {
             tag.p {
-                +"${template.defaultValues.eventReference.eventName} is not possible since there are no options available for the required field(s): ${emptyNonNullableReferenceSelects.joinToString(", ") { it.propertyName }}"
+                +"${template.defaultValues.eventReference.eventName} is not possible since there are no options available for the required field(s): ${
+                    emptyNonNullableReferenceSelects.joinToString(
+                        ", "
+                    ) { it.propertyName }
+                }"
             }
             return
         }
@@ -1080,8 +1098,7 @@ public class EventForm<T : Any, C : KlerkContext>(
             if (event.target.response) {
                 const response = JSON.parse(event.target.response);
                 
-                handlePropertyProblems(response);
-                handlePropertyCollectionProblems(response);
+                handleProblems(response.problems);
                 //toggleNullableFields(response);
                 const hasErrors = Object.keys(response.propertyProblems).length > 0 || response.propertyCollectionProblems.length > 0 || response.formProblems.length > 0 || response.dryRunProblems.length > 0;
                 submitButton.disabled = hasErrors;
@@ -1097,11 +1114,11 @@ public class EventForm<T : Any, C : KlerkContext>(
     }
 
 
-    function handlePropertyProblems(response) {
-        if (response.propertyProblems.length == 0) {
-            return;
-        }
+    function handleProblems(problems) {
         for (var key in response.propertyProblems) {
+            if (key == null) {
+                continue;            
+            }
             var value = response.propertyProblems[key];
             var input = document.getElementById(key);
             input.setCustomValidity(value);
@@ -1114,16 +1131,6 @@ public class EventForm<T : Any, C : KlerkContext>(
             }
         }
 }
-
-    function handlePropertyCollectionProblems(response) {
-        if (response.propertyCollectionProblems.length == 0) {
-                return;
-        }
-        var span = document.getElementById("errormessages");
-        response.propertyCollectionProblems.forEach(collectionProblem => {
-            span.innerText = collectionProblem;
-        });
-    }
 
 function toggleNullableFields(response) {
     response.fieldsMustBeNull.forEach(f => {

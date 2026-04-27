@@ -37,18 +37,18 @@ public class AutoButtons<C: KlerkContext, V>(
 
     }
 
-    public fun <C : KlerkContext, V> render(
+    public fun render(
         event: EventReference,
-        klerk: Klerk<C, V>,
         modelId: ModelID<*>?,
-        completionPaths: CompletionPaths,
-        context: C
+        context: C,
+        onCancelPath: String? = null,
+        onSuccessAndModelExistPath: String? = null,
+        onErrorPath: String? = null,
     ): HtmlBlockTag.() -> Unit = {
-        //val buttonTargets = """${LowCodeCreateEvent.ButtonTarget.error}=${config.basePath}&${LowCodeCreateEvent.ButtonTarget.model}=${config.}basePath/$modelPathPart/items/$modelId&${LowCodeCreateEvent.ButtonTarget.back}=$basePath/$modelPathPart"""
-
+        val completionPaths = CompletionPaths(cancel = onCancelPath ?: "/", model = onSuccessAndModelExistPath ?: "/", error = onErrorPath ?: "/")
         val parameters = klerk.config.getParameters(event)
         var url =
-            "/$path?eventId=${event.urlEncode()}&_showOptionalParameters=true${completionPaths.toQueryParamsString()}"
+            "/$path?eventId=${event.urlEncode()}&_showOptionalParameters=true&${completionPaths.toQueryParamsString()}"
         if (modelId != null) {
             url = url.plus("&modelId=${modelId}")
         }
