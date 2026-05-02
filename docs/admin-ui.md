@@ -8,18 +8,20 @@
 The Admin-UI provides a web-interface to manage your system. To use it, you first need to create
 a `LowCodeMain`:
 ```kotlin
-val LowCodeMain = LowCodeMain(
-    basePath = "/admin",
-    contextProvider = ApplicationCall::ctx,
-    showOptionalParameters = { eventReference -> false },
-    cssPath = "https://unpkg.com/almond.css@latest/dist/almond.min.css",
+adminUI = AdminUI(
+    klerk,
+    "/admin",
+    ApplicationCall::ctx,
+    cssPath = css.url,
+    canSeeAdminUI = ::canSeeAdminUI,
+    autoButtons = autoButtons
 )
 ```
 
 Then you use the config to register the routes:
 ```kotlin
     routing {
-        apply(LowCodeMain(klerk, LowCodeMain).registerRoutes())
+        apply(adminUI.registerRoutes())
         // other routes
     }
 ```

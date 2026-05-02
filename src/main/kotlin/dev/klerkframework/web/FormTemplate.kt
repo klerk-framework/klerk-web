@@ -991,7 +991,7 @@ public class EventForm<T : Any, C : KlerkContext>(
         try {
             val path = getPath(postPath, queryParams)
             tag.script {
-                src = klerkFormValidationJs.getUrl()
+                src = klerkFormValidationJs.url
                 defer = true
             }
             tag.form(path, method = FormMethod.post) {

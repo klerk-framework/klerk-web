@@ -15,13 +15,12 @@ public class AdminUI<C : KlerkContext, V>(
     internal val basePath: String,
     internal val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
     internal val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
-    internal val showOptionalParameters: (EventReference) -> Boolean,
+    internal val showOptionalParameters: (EventReference) -> Boolean = {(eventReference) -> true},
     internal val cssPath: String,
     internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
     internal val createCommandPath: String = "/_createevent",
     internal val canSeeAdminUI: suspend (C) -> Boolean,
     internal val autoButtons: AutoButtons<C, V>
-
 ) {
     private val listViews: List<LowCodeList<out Any, C, V>>
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>

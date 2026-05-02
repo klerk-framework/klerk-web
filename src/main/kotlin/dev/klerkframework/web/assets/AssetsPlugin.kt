@@ -170,7 +170,7 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
     override val page: PluginPage<C, V> = Page(textAssetCollections)
 
     override fun registerExtraRoutes(routing: Routing, basePath: String) {
-        routing.get("$basePath/_assets/{key...}") {
+        routing.get("$klerkAssetsPath/{key...}") {
             val path = call.parameters.getAll("key")?.joinToString("/")
             if (path == null) {
                 call.respond(HttpStatusCode.BadRequest)
@@ -234,6 +234,8 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
 
 }
 
+internal const val klerkAssetsPath = "_klerk-assets"
+
 public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelViews<TextAsset, C>) :
     PluginPage<C, V> {
     override val buttonText: String = "Assets"
@@ -294,9 +296,8 @@ public abstract class KlerkAsset(public val resourcePath: String) {
         _hash = hash
     }
 
-    internal fun getUrl(): String {
-        return "/admin/_assets${getPathAndHash()}"
-    }
+    public val url: String
+        get() = "/$klerkAssetsPath${getPathAndHash()}"
 
     internal fun getPathAndHash(): String {
         if (_hash == null) {
@@ -315,3 +316,7 @@ private object ResourceReader {
     fun readResource(path: String): String? =
         this::class.java.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() }
 }
+
+public fun HEAD.styleLink(css: CssAsset): Unit = styleLink(css.url)
+
+public inline fun FlowOrMetaDataOrPhrasingContent.script(js: JsAsset, crossinline block : SCRIPT.() -> Unit = {}): Unit = script(src = js.url, block = block)

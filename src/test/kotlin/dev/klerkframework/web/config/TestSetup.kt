@@ -28,7 +28,7 @@ import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import dev.klerkframework.web.config.AuthorStates.*
 import dev.klerkframework.web.myScript
-import dev.klerkframework.web.myStyle
+import dev.klerkframework.web.css
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -87,7 +87,7 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
             }
         }
         systemContextProvider(::myContextProvider)
-    }.withPlugin(AssetsPlugin(setOf(myStyle, myScript)))
+    }.withPlugin(AssetsPlugin(setOf(css, myScript)))
 }
 
 fun myContextProvider(systemIdentity: SystemIdentity): Context {

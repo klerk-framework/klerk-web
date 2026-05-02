@@ -73,3 +73,12 @@ klerk.readSuspend(call::ctx) {
 
 It is recommended to start with a classless CSS. When you are ready to add some styling, you can provide your own
 class provider function to customize the CSS classes applied to form elements.
+
+## How to build a basic web UI
+Putting it all together, here is a rough guide how to build a basic UI:
+* Start with a classless CSS. Use the tools provided by klerk-web to serve the CSS.
+* Generate the admin-UI using klerk-web. 
+* For each model that you want to create a UI for, do this:
+  * Register two routes:
+    * /<model-name>: Use renderTable to show a list of all instances of the model and use AutoButton to automatically generate buttons for the events.
+    * /<model-name>/<id>: Use renderModel to display the model. Use AutoButton to automatically generate buttons for the events.

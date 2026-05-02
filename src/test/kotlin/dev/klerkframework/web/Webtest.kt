@@ -9,6 +9,8 @@ import dev.klerkframework.klerk.read.ModelModification.*
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
+import dev.klerkframework.web.assets.script
+import dev.klerkframework.web.assets.styleLink
 import dev.klerkframework.web.config.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -53,14 +55,14 @@ fun main() {
             //data.makeSnapshot()
         }
 
-        autoButtons = AutoButtons(klerk, "_autobuttons", ApplicationCall::ctx, myStyle.getUrl())
+        autoButtons = AutoButtons(klerk, "_autobuttons", ApplicationCall::ctx, css.url)
 
         adminUI = AdminUI(
             klerk,
             "/admin",
             ApplicationCall::ctx,
             // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
-            cssPath = myStyle.getUrl(),
+            cssPath = css.url,
             showOptionalParameters = { eventReference -> false },
             knownAlgorithms = setOf(),
             canSeeAdminUI = ::canSeeAdminUI,
@@ -102,7 +104,7 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
     return true
 }
 
-val myStyle = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
+val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("/assets/other/my-script.js")
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
@@ -119,13 +121,12 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
             call.respondHtml {
                 head {
                     title { +"Test assets" }
-                    styleLink(myStyle.getUrl())
+                    styleLink(css)
                 }
                 body {
                     h1 { +"Testing the assets. " }
                     +"Did the css and js load? Correct encoding?"
-                    script(src = myScript.getUrl()) {}
-
+                    script(myScript) { defer = true }
                 }
             }
         }
@@ -137,17 +138,18 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
 
 fun HEAD.favicon(): Unit =
     link {
-        rel="icon"
-        type="image/svg+xml"
-        sizes="any"
-        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
+        rel = "icon"
+        type = "image/svg+xml"
+        sizes = "any"
+        href =
+            "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
     }
 
 private fun renderIndex(): suspend RoutingContext.() -> Unit = {
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            styleLink(myStyle.getUrl())
+            styleLink(css)
             favicon()
         }
         body {
@@ -177,7 +179,7 @@ private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend Routing
         call.respondHtml {
             head {
                 title { +"Klerk Web Test" }
-                styleLink(myStyle.getUrl())
+                styleLink(css)
                 favicon()
             }
             body {
@@ -199,7 +201,7 @@ private fun renderAuthorDetails(klerk: Klerk<Context, MyCollections>): suspend R
         call.respondHtml {
             head {
                 title { +"Klerk Web Test" }
-                styleLink(myStyle.getUrl())
+                styleLink(css)
             }
             body {
                 h1 { +"About ${author.props.firstName.value} ${author.props.lastName.value}" }
@@ -222,7 +224,7 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            styleLink(myStyle.getUrl())
+            styleLink(css)
         }
         body {
             h1 { +"Here are the books" }
@@ -241,7 +243,7 @@ private fun renderBookDetails(klerk: Klerk<Context, MyCollections>): suspend Rou
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            styleLink(myStyle.getUrl())
+            styleLink(css)
         }
         body {
             h1 { +"About ${book.props.title.value}" }
