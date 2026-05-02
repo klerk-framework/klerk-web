@@ -135,11 +135,20 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
     }
 }
 
+fun HEAD.favicon(): Unit =
+    link {
+        rel="icon"
+        type="image/svg+xml"
+        sizes="any"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
+    }
+
 private fun renderIndex(): suspend RoutingContext.() -> Unit = {
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
             styleLink(myStyle.getUrl())
+            favicon()
         }
         body {
             h1 { +"Testing Klerk Web" }
@@ -169,6 +178,7 @@ private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend Routing
             head {
                 title { +"Klerk Web Test" }
                 styleLink(myStyle.getUrl())
+                favicon()
             }
             body {
                 h1 { +"Here are the authors" }

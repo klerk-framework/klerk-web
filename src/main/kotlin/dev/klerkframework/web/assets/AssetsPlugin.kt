@@ -8,6 +8,7 @@ import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
 import dev.klerkframework.web.AdminUI
 import dev.klerkframework.web.PluginPage
+import dev.klerkframework.web.klerkFormValidationJs
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders.ContentEncoding
 import io.ktor.server.application.*
@@ -20,13 +21,18 @@ import kotlinx.io.asSource
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlin.plus
 
 private const val contentEncodingBrotli = "br"
 private val log = KotlinLogging.logger {}
 
-public class AssetsPlugin<C : KlerkContext, V>(private val assets: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
+private val builtInAssets = setOf(klerkFormValidationJs)
+
+public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
+
     private lateinit var textAssets: List<Model<TextAsset>>
     override val name: String = "Assets"
+    private val assets = userAssets.plus(builtInAssets)
 
     override val description: String =
         """Plugin that efficiently serves static assets. 

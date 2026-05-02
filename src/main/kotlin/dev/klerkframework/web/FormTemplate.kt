@@ -14,6 +14,8 @@ import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.validation.PropertyValidation
+import dev.klerkframework.web.assets.JsAsset
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -34,6 +36,8 @@ import kotlin.reflect.jvm.reflect
 
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
 private val IDEMPOTENCE_KEY = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
+
+internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js")
 
 
 public data class UIElementData(val propertyName: String, val dataContainer: DataContainer<*>, val enabled: Boolean)
@@ -288,6 +292,7 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             @Suppress("UNCHECKED_CAST")
             val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
 
+            // validate the collection of parameters
             val validationProblems: Set<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
                 paramsClass.validators()
                     .mapNotNull {
@@ -544,9 +549,9 @@ public class FormTemplate<T : Any, C : KlerkContext>(
 
             val collectionProblems = problems
                 .filterIsInstance<InvalidPropertyCollectionProblem>()
-                .map { ValidationProblemResponse(null, it.endUserTranslatedMessage) }
+                .map { it.endUserTranslatedMessage }
 
-            val response = ValResponse(fieldProblems + collectionProblems, emptySet(), emptySet())
+            val response = ValResponse(fieldProblems, collectionProblems, emptySet(), emptySet())
 
             return Gson().toJson(response)
         }
@@ -554,7 +559,8 @@ public class FormTemplate<T : Any, C : KlerkContext>(
 }
 
 internal data class ValResponse(
-    val problems: List<ValidationProblemResponse>,
+    val propertyProblems: List<ValidationProblemResponse>,
+    val propertyCollectionProblems: List<String>,
     val fieldsMustBeNull: Set<String>,
     val fieldsMustNotBeNull: Set<String>
 )
@@ -984,7 +990,10 @@ public class EventForm<T : Any, C : KlerkContext>(
         }
         try {
             val path = getPath(postPath, queryParams)
-            tag.script { unsafe { +generateValidationScript(path) } }
+            tag.script {
+                src = klerkFormValidationJs.getUrl()
+                defer = true
+            }
             tag.form(path, method = FormMethod.post) {
                 id = "eventForm"
                 onChange = "validate()"
@@ -1067,84 +1076,6 @@ public class EventForm<T : Any, C : KlerkContext>(
         return "$path${queryParams.map { "${it.key}=${it.value}" }.joinToString("&")}"
     }
 
-    private fun generateValidationScript(postPath: String) = """
-    function validate() {
-        const form = document.getElementById("eventForm")
-        const XHR = new XMLHttpRequest();
-        const FD = new FormData(form);
-
-        XHR.addEventListener("load", (event) => {
-                        // clear all errors
-            document.querySelectorAll('input').forEach(input => {
-                input.setCustomValidity("");
-                input.setAttribute('aria-invalid', 'false');          
-                var errormessageId = input.getAttribute('aria-errormessage');
-                if (errormessageId !== null) {
-                    var errorSpan = document.getElementById(errormessageId);
-                    if (errorSpan == null) {
-                        } else {
-                        errorSpan.innerText = '';
-                        errorSpan.style.visibility = 'hidden';
-                    }
-                }
-            });
-        
-            document.getElementById("errormessages").replaceChildren();
-            const submitButton = document.getElementById("submitButton");
-            if (event.target.status == 200) {
-                submitButton.disabled = false;
-                return;
-            }
-            if (event.target.response) {
-                const response = JSON.parse(event.target.response);
-                
-                handleProblems(response.problems);
-                //toggleNullableFields(response);
-                const hasErrors = Object.keys(response.propertyProblems).length > 0 || response.propertyCollectionProblems.length > 0 || response.formProblems.length > 0 || response.dryRunProblems.length > 0;
-                submitButton.disabled = hasErrors;
-            }
-        });
-
-        XHR.addEventListener("error", (event) => {
-            console.log('Oops! Validation went wrong.');
-        });
-
-        XHR.open("POST", "$postPath${if (postPath.contains("?")) "&" else "?"}dryRun=true&onlyErrors=true");
-        XHR.send(FD);
-    }
-
-
-    function handleProblems(problems) {
-        for (var key in response.propertyProblems) {
-            if (key == null) {
-                continue;            
-            }
-            var value = response.propertyProblems[key];
-            var input = document.getElementById(key);
-            input.setCustomValidity(value);
-            input.setAttribute('aria-invalid', 'true');
-            input.style.visibility = 'visible';
-            var errorSpan = document.getElementById("error-" + key);
-            if (errorSpan !== null) {
-                    errorSpan.innerText = value;
-                    errorSpan.style.visibility = 'visible';
-            }
-        }
-}
-
-function toggleNullableFields(response) {
-    response.fieldsMustBeNull.forEach(f => {
-        document.getElementById(f).disabled = true;
-        document.getElementById("label-" + f).style = "opacity: 0.5;";
-    });
-
-        response.fieldsMustNotBeNull.forEach(f => {
-            document.getElementById(f).disabled = false;
-            document.getElementById("label-" + f).style = "opacity: 1.0;";
-    });
-
-}
-""".trimIndent()
 }
 
 public sealed class ParseResult<T> {
