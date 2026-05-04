@@ -40,8 +40,19 @@ public class KlerkWeb<C : KlerkContext, V>(
     private val cssPath: String,
     private val pathProvider: PathProvider = DefaultPathProvider(),
     private val classProvider: CssClassProvider? = null,
+    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, "_autobuttons", contextProvider, cssPath),
+    private val adminUI: AdminUI<C, V> = AdminUI(
+        klerk,
+        "/admin",
+        contextProvider,
+        cssPath = cssPath,
+        showOptionalParameters = { eventReference -> false },
+        knownAlgorithms = setOf(),
+        canSeeAdminUI = { true },   // TODO
+        autoButtons = autoButtons,
+        pathProvider = DefaultPathProvider("/admin/")
+    )
 ) {
-    private val autoButtons = AutoButtons(klerk, "_autobuttons", contextProvider, cssPath)
 
     public fun generateNav(): HtmlBlockTag.() -> Unit = {
         nav {
@@ -56,6 +67,8 @@ public class KlerkWeb<C : KlerkContext, V>(
     }
 
     public fun generateRoutes(): Routing.() -> Unit = {
+        apply(autoButtons.registerRoutes())
+        apply(adminUI.registerRoutes())
         klerk.config.managedModels.forEach { model ->
             get(pathProvider.pathForCollection(model.kClass)) {
                 val lcl = LowCodeList<Any, C, V>(
@@ -228,7 +241,7 @@ public class KlerkWeb<C : KlerkContext, V>(
 
      */
 
-    private val adminUI = AdminUI(
+/*    private val adminUI = AdminUI(
         klerk,
         basePath = "/admin",
         contextProvider = contextProvider,
@@ -237,6 +250,8 @@ public class KlerkWeb<C : KlerkContext, V>(
         autoButtons = autoButtons,
         pathProvider = DefaultPathProvider("/admin/"),
     )
+
+ */
 
 }
 

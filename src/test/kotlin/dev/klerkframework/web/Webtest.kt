@@ -26,9 +26,6 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 import org.sqlite.SQLiteDataSource
 
-internal var adminUI: AdminUI<Context, MyCollections>? = null
-lateinit var autoButtons: AutoButtons<Context, MyCollections>
-
 fun main() {
     System.setProperty("DEVELOPMENT_MODE", "true")
     val bc = BookCollections()
@@ -52,21 +49,6 @@ fun main() {
             generateSampleData(5, 2, klerk)
             //data.makeSnapshot()
         }
-
-        autoButtons = AutoButtons(klerk, "_autobuttons", ApplicationCall::ctx, css.url)
-
-        adminUI = AdminUI(
-            klerk,
-            "/admin",
-            ApplicationCall::ctx,
-            // cssPath = "https://unpkg.com/sakura.css/css/sakura.css",
-            cssPath = css.url,
-            showOptionalParameters = { eventReference -> false },
-            knownAlgorithms = setOf(),
-            canSeeAdminUI = ::canSeeAdminUI,
-            autoButtons = autoButtons,
-            pathProvider = DefaultPathProvider("/admin/")
-        )
 
         val embeddedServer = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
             configureRouting(klerk)
@@ -112,7 +94,6 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         ApplicationCall::ctx,
         cssPath = css.url,
         classProvider = MyClassProvider,
-        pathProvider = DefaultPathProvider()
         )
 
     routing {
@@ -142,8 +123,6 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
             }
         }
 
-        apply(autoButtons.registerRoutes())
-        apply(adminUI!!.registerRoutes())
     }
 }
 
@@ -178,51 +157,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
     }
 }
 
-@OptIn(ExperimentalUnsignedTypes::class)
-private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
-    val context = call.ctx(klerk)
-    klerk.readSuspend(context) {
-        call.respondHtml {
-            head {
-                title { +"Klerk Web Test" }
-                styleLink(css)
-                favicon()
-            }
-            body {
-                h1 { +"Here are the authors" }
-                //apply(renderTable(query(views.authors.all), authorsTableConfig))
-                renderTable(query(views.authors.all), authorsTableConfig)
-                getPossibleVoidEvents(Author::class).forEach {
-                    apply(autoButtons.render(it, null, context, onCancelPath = call.request.uri))
-                }
-            }
-        }
-    }
-}
 
-private fun renderAuthorDetails(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
-    val id = ModelID<Author>(requireNotNull(call.parameters["id"]).toInt())
-    val context = call.ctx(klerk)
-    klerk.readSuspend(context) {
-        val author = get(id)
-        call.respondHtml {
-            head {
-                title { +"Klerk Web Test" }
-                styleLink(css)
-            }
-            body {
-                h1 { +"About ${author.props.firstName.value} ${author.props.lastName.value}" }
-                apply(renderModel(author, includeMetadata = false))
-                h2 { +"Actions" }
-                p {
-                    getPossibleEvents(id).forEach { event ->
-                        apply(autoButtons.render(event, id, context, onCancelPath = call.request.uri))
-                    }
-                }
-            }
-        }
-    }
-}
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     val queryResponse = klerk.read(call::ctx) {
@@ -241,29 +176,7 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
 
 }
 
-private fun renderBookDetails(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
-    val id = ModelID<Book>(requireNotNull(call.parameters["id"]).toInt())
-    val context = call.ctx(klerk)
-    val (book, events) = klerk.read(context) {
-        get(id) to getPossibleEvents(id)
-    }
-    call.respondHtml {
-        head {
-            title { +"Klerk Web Test" }
-            styleLink(css)
-        }
-        body {
-            h1 { +"About ${book.props.title.value}" }
-            apply(renderModel(book, includeMetadata = false))
-            h2 { +"Actions" }
-            p {
-                events.forEach { event ->
-                    apply(autoButtons.render(event, id, context, onCancelPath = call.request.uri))
-                }
-            }
-        }
-    }
-}
+
 
 fun authorizeAllDatatypes(instance: Any) {
     TODO()
