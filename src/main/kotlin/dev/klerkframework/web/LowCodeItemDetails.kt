@@ -12,10 +12,11 @@ import kotlin.reflect.KClass
 internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
     private val config: AdminUI<C, V>,
-    private val modelPathPart: String,
+    //private val modelPathPart: String,
     private val humanName: String,
     private val klerk: Klerk<C, V>,
-    private val auditPath: String
+    private val auditPath: String,
+    private val pathProvider: PathProvider,
 ) {
 
     private lateinit var basePath: String
@@ -25,7 +26,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     }
 
     fun registerRoutes(): Routing.() -> Unit = {
-        get("${basePath}/$modelPathPart/items/{id}") {
+        get(pathProvider.pathForItem(kClass, "{id}")) {
             renderModel(call)
         }
 
@@ -68,8 +69,8 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
                         reflectedModel.id,
                         context,
                         onCancelPath = "/",
-                        onSuccessAndModelExistPath = "${config.basePath}/$modelPathPart/items/{id}",
-                        onErrorPath = "/"
+                        onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
+                        onErrorPath = basePath
                     )
                 )
             }
@@ -117,7 +118,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     }
 
 
-    private suspend fun renderModel(call: ApplicationCall) {
+    internal suspend fun renderModel(call: ApplicationCall) {
         val context = config.contextProvider(call, klerk)
         val id = ModelID<Any>(call.parameters["id"]!!.toInt())
         val (reflectedModelPopulated, model) = klerk.read(context) {
@@ -132,7 +133,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         call.respondHtml {
             apply(lowCodeHtmlHead(config))
             body {
-                apply(navMenu(basePath, modelPathPart, humanName))
+                breadcumbs(basePath, model.props::class, pathProvider, true)
                 div {
                     apply(renderModelDetails(reflectedModelPopulated, events, model, context))
                 }

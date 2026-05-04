@@ -7,12 +7,14 @@ import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.collection.QueryResponse
 import dev.klerkframework.klerk.misc.ReflectedModel
+import kotlinx.html.Entities
 import kotlinx.html.FormMethod
 import kotlinx.html.HtmlBlockTag
 import kotlinx.html.a
 import kotlinx.html.button
 import kotlinx.html.caption
 import kotlinx.html.details
+import kotlinx.html.div
 import kotlinx.html.form
 import kotlinx.html.onClick
 import kotlinx.html.p
@@ -28,13 +30,14 @@ import kotlin.reflect.full.memberProperties
 
 public data class TableConfig<M : Any>(
     val columns: List<Pair<String, (Model<M>) -> String>>,
-    val pathProvider: (Model<M>) -> String,
+    val pathProvider: PathProvider,
     val caption: String? = null,
     val classProvider: CssClassProvider?,
     val ifEmptyText: String = "The list is empty"
 )
 
-public fun <M : Any> renderTable(queryResponse: QueryResponse<M>, config: TableConfig<M>): HtmlBlockTag.() -> Unit = {
+// public fun <M : Any> renderTable(queryResponse: QueryResponse<M>, config: TableConfig<M>): HtmlBlockTag.() -> Unit = {
+public fun <M : Any> HtmlBlockTag.renderTable(queryResponse: QueryResponse<M>, config: TableConfig<M>): Unit = div {
     fun classesFor(element: String, model: Model<M>? = null) =
         config.classProvider?.tableOfModels(element, model)?.joinToString(" ")?.takeIf { it.isNotEmpty() }
 
@@ -52,7 +55,7 @@ public fun <M : Any> renderTable(queryResponse: QueryResponse<M>, config: TableC
             }
             tbody(classesFor("tbody")) {
                 queryResponse.items.forEach { model ->
-                    val path = config.pathProvider(model)
+                    val path = config.pathProvider.pathForItem(model.props::class, model.id)
                     tr(classesFor("tr", model)) {
                         onClick = """window.location = '$path';"""
                         config.columns.forEach { column ->

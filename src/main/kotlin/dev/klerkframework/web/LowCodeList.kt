@@ -29,13 +29,15 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
     private val config: AdminUI<C, V>,
     private val createCommandPages: List<LowCodeCreateEvent<C, V>>,
-    private val modelPathPart: String,
+    //private val modelPathPart: String,
     val pathToList: String,
     val humanName: String,
-    private val klerk: Klerk<C, V>
+    private val klerk: Klerk<C, V>,
+    private val renderListDetails: Boolean = false,
+    private val pathProvider: PathProvider
 ) {
     private lateinit var basePath: String
-    private val tableTemplate = DefaultTableTemplate(5, klerk, kClass)
+    private val tableTemplate = TableTemplate(klerk, kClass, pathProvider = pathProvider)
 
 
     fun initView(basePath: String) {
@@ -43,27 +45,27 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
     }
 
     fun registerRoutes(): Routing.() -> Unit = {
-        get("${basePath}/${modelPathPart}") {
+        get(pathProvider.pathForCollection(kClass)) {
             renderModelList(call, config)
         }
 
-        get("${basePath}/${modelPathPart}/analysis") {
+        get("${pathProvider.pathForCollection(kClass)}/analysis") {
             renderListAnalysis<T, V, C>(call, config, klerk, kClass)
         }
     }
 
-    private fun <T : Any> detailsPathProvider(model: Model<T>) = "${kClass.simpleName!!}/items/${model.id}"
+    //private fun <T : Any> detailsPathProvider(model: Model<T>) = "${kClass.simpleName!!}/items/${model.id}"
 
     // ------------ List ------------------------------------------------------
 
-    private suspend fun renderModelList(call: ApplicationCall, config: AdminUI<C, V>) {
+    internal suspend fun renderModelList(call: ApplicationCall, config: AdminUI<C, V>) {
         val context = config.contextProvider(call, klerk)
         val modelView = klerk.config.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
 
         val (table, voidEvents) = klerk.read(context) {
             Pair(
-                tableTemplate.create(collection, ::detailsPathProvider, this, call),
+                tableTemplate.build(collection, this, call),
                 getPossibleVoidEvents(kClass)
             )
         }
@@ -71,7 +73,7 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         call.respondHtml {
             apply(lowCodeHtmlHead(config.cssPath))
             body {
-                apply(navMenu(basePath, modelPathPart, humanName))
+                breadcumbs(basePath,kClass, pathProvider)
                 h2 { +humanName }
                 ul {
                     /*klerk.config.getView<T>(kClass).getCollections().forEach {
@@ -150,11 +152,13 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         voidEventReferences.forEach { event ->
             p { apply(config.autoButtons.render(event, null, context,
                 onCancelPath = call.request.uri,
-                onSuccessAndModelExistPath = "${config.basePath}/$modelPathPart/items/{id}",
-                onErrorPath = "/")) }
+                onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
+                onErrorPath = basePath)) }
         }
 
-        a(href = "$basePath/$modelPathPart/analysis") { +"(More details about the list)" }
+        if (renderListDetails) {
+            a(href = "$basePath/${pathProvider.pathForCollection(kClass)}/analysis") { +"(More details about the list)" }
+        }
     }
 
 }
@@ -170,70 +174,72 @@ private fun <C : KlerkContext, V> renderFilter(
             .stateMachine.states.filter { it !is VoidState }
             .map { it.name }
 
-        fieldSet {
-            legend { +"Filters" }
-            form(action = call.request.uri, method = FormMethod.get) {
+        details {
+            summary { +"Filters" }
+            fieldSet {
+                legend { +"Filters" }
+                form(action = call.request.uri, method = FormMethod.get) {
 
-                p {
-                    label {
-                        htmlFor = "collectionselect"
-                        +"Collection"
+                    p {
+                        label {
+                            htmlFor = "collectionselect"
+                            +"Collection"
+                        }
+                        br()
+                        select {
+                            id = "collectionselect"
+                            name = "collection"
+                            klerk.config.getCollections().filter { it.first == kClass }.map { it.second }.forEach {
+                                option {
+                                    value = it.getFullId().toString()
+                                    if (call.request.queryParameters["collection"]?.equals(
+                                            it.getFullId().toString()
+                                        ) == true
+                                    ) {
+                                        selected = true
+                                    }
+                                    +camelCaseToPretty(it.getId())
+                                }
+                            }
+                        }
                     }
-                    br()
-                    select {
-                        id = "collectionselect"
-                        name = "collection"
-                        klerk.config.getCollections().filter { it.first == kClass }.map { it.second }.forEach {
+
+                    p {
+                        label {
+                            htmlFor = "filterselect"
+                            +"State"
+                        }
+                        br()
+                        select() {
+                            id = "filterselect"
+                            name = "filterState"
                             option {
-                                value = it.getFullId().toString()
-                                if (call.request.queryParameters["collection"]?.equals(
-                                        it.getFullId().toString()
-                                    ) == true
-                                ) {
+                                value = "All"
+                                if (call.request.queryParameters["filterState"]?.equals("All") == true) {
                                     selected = true
                                 }
-                                +camelCaseToPretty(it.getId())
+                                +"All"
                             }
-                        }
-                    }
-                }
 
-                p {
-                    label {
-                        htmlFor = "filterselect"
-                        +"State"
-                    }
-                    br()
-                    select() {
-                        id = "filterselect"
-                        name = "filterState"
-                        option {
-                            value = "All"
-                            if (call.request.queryParameters["filterState"]?.equals("All") == true) {
-                                selected = true
-                            }
-                            +"All"
-                        }
-
-                        stateNames.forEach {
-                            option {
-                                value = it
-                                if (call.request.queryParameters["filterState"]?.equals(it) == true) {
-                                    selected = true
+                            stateNames.forEach {
+                                option {
+                                    value = it
+                                    if (call.request.queryParameters["filterState"]?.equals(it) == true) {
+                                        selected = true
+                                    }
+                                    +it
                                 }
-                                +it
                             }
                         }
                     }
-                }
 
-                p {
-                    label {
-                        htmlFor = "filterstring"
-                        title = additionalFiltersExplanationText
-                        +"Additional filters"
+                    p {
+                        label {
+                            htmlFor = "filterstring"
+                            title = additionalFiltersExplanationText
+                            +"Additional filters"
 
-                        /*                    details {
+                            /*                    details {
                                             summary { +"Filter" }
                                             +"This field understands a few filter commands. Some examples:"
                                             ul {
@@ -245,21 +251,22 @@ private fun <C : KlerkContext, V> renderFilter(
                                         }
 
                      */
+                        }
+                        br()
+                        textInput {
+                            id = "filterstring"
+                            name = "filterString"
+                            size = "40"
+                            title = additionalFiltersExplanationText
+                            value = call.request.queryParameters["filterString"] ?: ""
+                        }
                     }
-                    br()
-                    textInput {
-                        id = "filterstring"
-                        name = "filterString"
-                        size = "40"
-                        title = additionalFiltersExplanationText
-                        value = call.request.queryParameters["filterString"] ?: ""
+
+                    p {
+                        button(type = ButtonType.submit) { +"Apply filter" }
                     }
-                }
 
-                p {
-                    button(type = ButtonType.submit) { +"Apply filter" }
                 }
-
             }
         }
 
@@ -268,7 +275,8 @@ private fun <C : KlerkContext, V> renderFilter(
 
 private fun <T : Any> renderTable(
     models: List<Model<T>>,
-    pathProvider: (Model<T>) -> String
+    pathProvider: PathProvider,
+    kClass: KClass<out Any>,
 ): HtmlBlockTag.() -> Unit = {
 
     table(classes = "indicator table") {
@@ -285,7 +293,7 @@ private fun <T : Any> renderTable(
             models
                 .forEach { model ->
                     //val path = "$basePath/$modelPathPart/items/${model.id}"
-                    val path = pathProvider(model)
+                    val path = pathProvider.pathForItem(kClass, model.id)
                     tr {
                         onClick = """window.location = '$path';"""
                         td {
@@ -462,33 +470,52 @@ internal fun withQueryParam(url: String, paramName: String, paramValue: String):
     return url.replace(oldValue, paramValue)
 }
 
-public open class DefaultTableTemplate<C : KlerkContext, V>(
-    private val maxItems: Int,
-    private val klerk: Klerk<C, V>,
-    private val kClass: KClass<out Any>
-) {
+/**
+ * This interface provides path generation for collections and individual items. Used by various klerk-web
+ * components to generate URLs for navigation and linking within the application.
+ */
+public interface PathProvider {
+    public fun pathForCollection(kClass: KClass<out Any>): String
+    public fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String
+    public fun pathForItem(kClass: KClass<out Any>, id: String): String
+}
 
-    init {
-        require(maxItems in 1..999)
+public class DefaultPathProvider(private val prefix: String = "/") : PathProvider {
+    override fun pathForCollection(kClass: KClass<out Any>): String {
+        return prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
     }
 
-    public fun <T : Any> create(
+    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String {
+        return "${pathForCollection(kClass)}/${id.value}"
+    }
+
+    override fun pathForItem(kClass: KClass<out Any>, id: String): String {
+        return "${pathForCollection(kClass)}/$id"
+    }
+}
+
+public open class TableTemplate<C : KlerkContext, V>(
+    private val klerk: Klerk<C, V>,
+    private val kClass: KClass<out Any>,
+    private val pathProvider: PathProvider = DefaultPathProvider()
+) {
+
+    public fun <T : Any> build(
         source: ModelView<T, C>,
-        detailsPathProvider: (Model<T>) -> String,
         reader: Reader<C, V>,
         call: ApplicationCall,
     ): Table<T, C, V> {
         val queryOptions = createQueryOptions(call.request.queryParameters)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
         val queryResponse = reader.query(source.filter(filter = metaFilter), queryOptions)
-        return Table(queryResponse, detailsPathProvider, call, klerk, kClass)
+        return Table(queryResponse, pathProvider, call, klerk, kClass)
     }
 
 }
 
 public class Table<T : Any, C : KlerkContext, V>(
     private val queryResponse: QueryResponse<T>,
-    private val pathProvider: (Model<T>) -> String,
+    private val pathProvider: PathProvider,
     private val call: ApplicationCall,
     private val klerk: Klerk<C, V>,
     private val kClass: KClass<out Any>,
@@ -498,7 +525,7 @@ public class Table<T : Any, C : KlerkContext, V>(
         if (queryResponse.items.isEmpty()) {
             p { +"The list is empty" }
         } else {
-            apply(renderTable(queryResponse.items, pathProvider))
+            apply(renderTable(queryResponse.items, pathProvider, kClass))
             apply(renderPagination(queryResponse, call))
         }
     }

@@ -29,8 +29,6 @@ import org.sqlite.SQLiteDataSource
 internal var adminUI: AdminUI<Context, MyCollections>? = null
 lateinit var autoButtons: AutoButtons<Context, MyCollections>
 
-data class AuthorAndRecentPucl(val author: Author, val recentBooks: List<Book>)
-
 fun main() {
     System.setProperty("DEVELOPMENT_MODE", "true")
     val bc = BookCollections()
@@ -66,7 +64,8 @@ fun main() {
             showOptionalParameters = { eventReference -> false },
             knownAlgorithms = setOf(),
             canSeeAdminUI = ::canSeeAdminUI,
-            autoButtons = autoButtons
+            autoButtons = autoButtons,
+            pathProvider = DefaultPathProvider("/admin/")
         )
 
         val embeddedServer = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
@@ -108,14 +107,26 @@ val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("/assets/other/my-script.js")
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
+    val klerkWeb = KlerkWeb(
+        klerk,
+        ApplicationCall::ctx,
+        cssPath = css.url,
+        classProvider = MyClassProvider,
+        pathProvider = DefaultPathProvider()
+        )
 
     routing {
 
-        get("/", renderIndex())
-        get("/authors", renderAuthors(klerk))
+        get("/", renderIndex(klerkWeb))
+
+        apply(klerkWeb.generateRoutes())
+
+/*        get("/authors", renderAuthors(klerk))
         get("/authors/{id}", renderAuthorDetails(klerk))
         get("/books", renderBooks(klerk))
         get("/books/{id}", renderBookDetails(klerk))
+
+ */
 
         get("/testassets") {
             call.respondHtml {
@@ -145,7 +156,7 @@ fun HEAD.favicon(): Unit =
             "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
     }
 
-private fun renderIndex(): suspend RoutingContext.() -> Unit = {
+private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
@@ -161,13 +172,8 @@ private fun renderIndex(): suspend RoutingContext.() -> Unit = {
                 a(href = "/admin") { +"admin UI" }
                 +" for your application."
             }
-            h2 { +"List items" }
-            p {
-                a(href = "/authors") { +"Go to list of authors" }
-            }
-            p {
-                a(href = "/books") { +"Go to list of books" }
-            }
+            h2 { +"Item lists" }
+            apply(klerkWeb.generateNav())
         }
     }
 }
@@ -184,7 +190,8 @@ private fun renderAuthors(klerk: Klerk<Context, MyCollections>): suspend Routing
             }
             body {
                 h1 { +"Here are the authors" }
-                apply(renderTable(query(views.authors.all), authorsTableConfig))
+                //apply(renderTable(query(views.authors.all), authorsTableConfig))
+                renderTable(query(views.authors.all), authorsTableConfig)
                 getPossibleVoidEvents(Author::class).forEach {
                     apply(autoButtons.render(it, null, context, onCancelPath = call.request.uri))
                 }
@@ -228,7 +235,7 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
         }
         body {
             h1 { +"Here are the books" }
-            apply(renderTable(queryResponse, booksTableConfig))
+            renderTable(queryResponse, booksTableConfig)
         }
     }
 
@@ -271,6 +278,15 @@ fun authorizeAllDatatypes(instance: Any) {
 
 class MyInstant(value: Instant) : InstantContainer(value)
 
+object MyCssClassProvider : CssClassProvider {
+    override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
+        return when (element) {
+            "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
+            else -> setOf()
+        }
+    }
+}
+
 val authorsTableConfig = TableConfig<Author>(
     caption = "Authors",
     columns = listOf(
@@ -279,15 +295,8 @@ val authorsTableConfig = TableConfig<Author>(
         "Created" to { m -> dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
         "State" to { m -> m.state },
     ),
-    classProvider = object : CssClassProvider {
-        override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
-            return when (element) {
-                "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
-                else -> setOf()
-            }
-        }
-    },
-    pathProvider = { "/authors/${it.id}" }
+    classProvider = MyCssClassProvider,
+    pathProvider = DefaultPathProvider()
 )
 
 val booksTableConfig = TableConfig<Book>(
@@ -298,7 +307,7 @@ val booksTableConfig = TableConfig<Book>(
         "State" to { m -> m.state },
     ),
     classProvider = MyClassProvider,
-    pathProvider = { "/books/${it.id}" }
+    pathProvider = DefaultPathProvider()
 )
 
 object MyClassProvider : CssClassProvider {

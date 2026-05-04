@@ -33,7 +33,8 @@ fun main() {
             CreateAuthor.id,
             EventParameters(CreateAuthorParams::class),
         ),
-        klerk, "/",
+        klerk,
+        "/",
         classProvider = ::myClassProvider,
     ) {
         text(CreateAuthorParams::firstName)
@@ -52,6 +53,7 @@ fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         routing {
             get("/") {
+
                val p = CreateAuthorParams(
                     firstName = FirstName(""),
                     lastName = LastName(""),
@@ -61,8 +63,7 @@ fun main() {
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(false),
                     nullableFirstName = null,
-                )
-
+               )
 
                 //authorizeAllDatatypes(p)
 

@@ -1,7 +1,6 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.Model
 import dev.klerkframework.web.config.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
@@ -19,7 +18,7 @@ fun main() {
         val collections = MyCollections(bc, AuthorCollections(bc.all))
         val klerk = Klerk.create(createConfig(collections))
         klerk.meta.start()
-        if (klerk.meta.modelsCount == 0) {
+        if (klerk.meta.modelsCount < 5) {
             val rowling = createAuthorJKRowling(klerk)
             createBookHarryPotter1(klerk, rowling)
         }
@@ -29,9 +28,8 @@ fun main() {
                 get("/") {
 
                     val table = klerk.read(Context.system()) {
-                        DefaultTableTemplate(5, klerk, Author::class).create(
+                        TableTemplate(klerk, Author::class).build(
                             klerk.config.views.authors.all,
-                            ::detailsPashProvider,
                             this,
                             call
                         )
@@ -54,5 +52,3 @@ fun main() {
         }.start(wait = true)
     }
 }
-
-private fun <T : Any> detailsPashProvider(model: Model<T>) = "Author/items/${model.id}"

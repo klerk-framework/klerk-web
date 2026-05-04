@@ -20,7 +20,8 @@ public class AdminUI<C : KlerkContext, V>(
     internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
     internal val createCommandPath: String = "/_createevent",
     internal val canSeeAdminUI: suspend (C) -> Boolean,
-    internal val autoButtons: AutoButtons<C, V>
+    internal val autoButtons: AutoButtons<C, V>,
+    internal val pathProvider: PathProvider,
 ) {
     private val listViews: List<LowCodeList<out Any, C, V>>
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
@@ -44,14 +45,15 @@ public class AdminUI<C : KlerkContext, V>(
         val pairs = klerk.config.getManagedClasses().map { managedClass ->
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-            val modelPathPart = managedClass.simpleName!!
+            val modelPathPart = managedClass.simpleName!!.lowercase()
             val pathToList = "${basePath}/$modelPathPart"
 
             val listView = LowCodeList<Any, C, V>(
-                managedClass, this, createCommandsWithParams, modelPathPart, pathToList, humanName, klerk
+                managedClass, this, createCommandsWithParams, pathToList, humanName, klerk,
+                pathProvider = pathProvider,
             )
             val detailView = LowCodeItemDetails<Any, C, V>(
-                managedClass, this, modelPathPart, humanName, klerk, auditPath
+                managedClass, this, humanName, klerk, auditPath, pathProvider
             )
             Pair(listView, detailView)
         }

@@ -47,7 +47,7 @@ template.validate()
 
 2. Build an instance of the form when rendering a page.
 ```kotlin
-val instance = template.build(
+val form = template.build(
     call,
     params,
     this,
@@ -59,7 +59,7 @@ val instance = template.build(
 ```kotlin
 call.respondHtml {
     body {
-        form1.render(this)
+        form.render(this)
     }
 }
 ```

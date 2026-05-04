@@ -649,9 +649,7 @@ class Quantity(value: Int) : IntContainer(value) {
     override val max: Int = Int.MAX_VALUE
 }
 
-class BookWrittenAt(value: Instant) : InstantContainer(value) {
-
-}
+class BookWrittenAt(value: Instant) : InstantContainer(value)
 
 class ReadingTime(value: Duration) : DurationContainer(value)
 

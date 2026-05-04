@@ -38,7 +38,7 @@ It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) t
 
 ## Building blocks
 Klerk-web provides a set of building blocks that can be used to build a UI for Klerk:
-* renderTable: Display a ModelView.
+* TableTemplate: Display a list of models.
 * renderModel: Display a Model.
 * FormTemplate: Generate forms and parse submitted data.
 * AutoButton: Generate a button for an event. When the button is clicked, a form is generated. When the form is 
