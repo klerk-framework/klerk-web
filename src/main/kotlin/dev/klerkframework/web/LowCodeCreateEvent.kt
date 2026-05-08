@@ -13,9 +13,11 @@ import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.html.*
 import mu.KotlinLogging
+import java.lang.reflect.ParameterizedType
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
+import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.jvmErasure
@@ -279,14 +281,16 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         return type.jvmErasure.constructors.first().call(value.toFloat())
     }
 
-    /*    if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||
-            type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(true))
-        ) {
-            val enumClassName =
-                type.jvmErasure.members.first() { it.name == "value" }.returnType.arguments.single().toString()
-            return type.jvmErasure.constructors.first().call(getEnumValue(enumClassName, value))
-        }
-     */
+    if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||
+        type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(true))
+    ) {
+        val enumClass = type.jvmErasure.supertypes
+            .first { it.jvmErasure == EnumContainer::class }
+            .arguments.first().type!!.jvmErasure.java
+        @Suppress("UNCHECKED_CAST")
+        val enum = java.lang.Enum.valueOf(enumClass as Class<out Enum<*>>, value)
+        return type.jvmErasure.constructors.first().call(enum)
+    }
 
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))

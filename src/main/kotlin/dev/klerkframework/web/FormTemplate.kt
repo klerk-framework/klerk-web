@@ -30,6 +30,7 @@ import java.time.format.FormatStyle
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
+import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.*
 import kotlin.reflect.jvm.ExperimentalReflectionOnLambdas
 import kotlin.reflect.jvm.reflect
@@ -187,7 +188,7 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             csrfToken,
             inputs,
             populateMissingReferenceSelects(modelIDSelects, reader, inputs),
-            //  enumSelects,
+            populateEnumSelects(),
             propsPopulatedAfterSubmit,
             params,
             path ?: postPath,
@@ -197,6 +198,29 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             this,
             translator
         )
+    }
+
+    private fun populateEnumSelects(): Set<EnumPropertyWithOptions> {
+        val result = mutableSetOf<EnumPropertyWithOptions>()
+        parameters.all
+            .filter { selectEnums.contains(it.name) }
+            .forEach { eventParameter ->
+                val validEnums =
+                    klerk.config.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
+                        eventParameter.valueClass.supertypes.first { it.classifier == EnumContainer::class }.arguments.first()
+                    )
+                result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
+            }
+        return result
+    }
+
+    private fun getEnumEntries(projection: KTypeProjection): Set<Enum<*>>  {
+        val kType = projection.type ?: error("Projection has no type")
+        val kClass = kType.classifier as? KClass<*> ?: error("Not a class type")
+        if (!kClass.java.isEnum) {
+            error("Type is not an enum")
+        }
+        return kClass.java.enumConstants.toSet() as Set<Enum<*>>
     }
 
     private fun populateMissingReferenceSelects(
@@ -574,7 +598,7 @@ public class EventForm<T : Any, C : KlerkContext>(
     private val csrfToken: String,
     private val inputs: List<Pair<String, InputType>>,
     private val referenceSelects: Set<ReferencePropertyWithOptions>,
-    //   private val enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>?,
+    private val enumSelects: Set<EnumPropertyWithOptions>,
     private val propsPopulatedAfterSubmit: List<String>,
     private val params: T?,
     private val postPath: String?,
@@ -620,42 +644,35 @@ public class EventForm<T : Any, C : KlerkContext>(
             }
         }
     }
-    /*
-        private fun renderEnumSelect(
-            property: KProperty1<*, EnumContainer<*>>,
-            options: Array<out Enum<*>>,
-            params: T
-        ): HtmlBlockTag.() -> Unit = {
-            val paramValue = getEnumValue(property.name, params)
-            label {
-                id = "label-${property.name}"
-                htmlFor = property.name
-                /*    if (!enabled) {
-                        style = "opacity: 0.5;"
-                    }
-                 */
-                +camelCaseToPretty(property.name)
-            }
-            select {
-                name = property.name
-                if (property.returnType.isMarkedNullable) {
-                    option {
-                        value = ""
-                        +"(none)"
-                    }
+    private fun renderEnumSelect(prop: EnumPropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
+        label {
+            id = "label-${prop.propertyName}"
+            htmlFor = prop.propertyName
+            +camelCaseToPretty(prop.propertyName)
+        }
+        br()
+        select {
+            name = prop.propertyName
+            if (prop.propertyNullable) {
+                option {
+                    value = ""
+                    +"(none)"
                 }
-                optGroup() {
-                    options.forEach {
-                        option {
-                            value = it.name
-                            selected = paramValue == it.name
-                            +it.toString()
+            }
+            optGroup() {
+                prop.options.forEach { enumValue ->
+                    option {
+                        value = enumValue.name
+                        params?.let {
+                            val paramValue = getEnumValue(prop.propertyName, params)
+                            selected = paramValue == enumValue.name
                         }
+                        +enumValue.toString()
                     }
                 }
             }
         }
-     */
+    }
 
     private fun renderInput(
         propertyName: String,
@@ -933,11 +950,10 @@ public class EventForm<T : Any, C : KlerkContext>(
         return (prop.getter.call(params) as? ModelID<*>)?.value
     }
 
-    /*    private fun getEnumValue(propertyName: String, params: T): String {
-            val prop = params::class.memberProperties.single { it.name == propertyName }
-            return (prop.getter.call(params) as? EnumContainer<*>)?.value?.name ?: throw IllegalArgumentException()
-        }
-     */
+    private fun getEnumValue(propertyName: String, params: T): String? {
+        val prop = params::class.memberProperties.single { it.name == propertyName }
+        return (prop.getter.call(params) as? Enum<*>)?.name
+    }
 
     private fun getNewInstance(propertyName: String, eventParameters: EventParameters<*>): DataContainer<*> {
         val prop = eventParameters.all.single { it.name == propertyName }.raw
@@ -1025,14 +1041,9 @@ public class EventForm<T : Any, C : KlerkContext>(
                 referenceSelects.forEach { refSelect ->
                     p { tag.apply(renderReferenceSelect(refSelect, params)) }
                 }
-
-                /*                enumSelects?.forEach { enumSelect ->
-                                    val definedInput = inputs.singleOrNull { it.first == enumSelect.key.name }
-                                    if (definedInput != null && definedInput.second != InputType.hidden) { // not tested
-                                        tag.apply(renderEnumSelect(enumSelect.key, enumSelect.value, requireNotNull(params)))
-                                    }
-                                }
-                 */
+                enumSelects.forEach { enumSelect ->
+                    p { tag.apply(renderEnumSelect(enumSelect, params)) }
+                }
                 if (htmlDetailsContents.isNotEmpty()) {
                     details {
                         summary { +(htmlDetailsSummary ?: "Details") }
@@ -1091,6 +1102,12 @@ public data class ReferencePropertyWithOptions(
     val propertyName: String,
     val propertyNullable: Boolean,
     val options: List<Model<out Any>>
+)
+
+public data class EnumPropertyWithOptions(
+    val propertyName: String,
+    val propertyNullable: Boolean,
+    val options: Set<Enum<*>>
 )
 
 internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {

@@ -247,6 +247,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             validateWithParameters(::secretTokenShouldBeZeroIfNameStartsWithM)
             validateWithParameters(::onlyAuthenticationIdentityCanCreateDaniel)
             validReferences(CreateAuthorParams::favouriteColleague, collections.authors.all)
+            validEnums(CreateAuthorParams::primaryLanguage, setOf(Languages.English, Languages.Swedish))
         }
 
         event(AnEventWithoutParameters) {}
