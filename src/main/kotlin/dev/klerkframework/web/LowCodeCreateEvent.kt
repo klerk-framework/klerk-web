@@ -44,7 +44,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 remaining()
             }
         } catch (e: NotImplementedError) {
-            logger.warn { "AutoUI will not be able to create the event '${eventReference}' (not implemented)" }
+            logger.warn { "AutoUI will not be able to create the event '${eventReference}' (${e.message})" }
         }
     }
 

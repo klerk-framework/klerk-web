@@ -115,6 +115,8 @@ public class FormTemplate<T : Any, C : KlerkContext>(
 
     private fun selectReference(parameter: EventParameter) = selectReferences.add(parameter.name)
 
+    private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
+
     /*    fun selectEnum(property: KProperty1<*, EnumContainer<*>>) = selectEnums.add(property.name)
         private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
      */
@@ -144,6 +146,7 @@ public class FormTemplate<T : Any, C : KlerkContext>(
                     PropertyType.Long -> number(p)
                     PropertyType.Float -> number(p)
                     PropertyType.Ref -> selectReference(p)
+                    PropertyType.Enum -> selectEnum(p)
                     else -> TODO(p.type?.name ?: "Cannot handle this")
                 }
             }

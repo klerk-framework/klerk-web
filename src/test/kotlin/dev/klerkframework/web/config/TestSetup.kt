@@ -187,6 +187,7 @@ data class Author(
     val lastName: LastName,
     val address: Address,
     val darkThemePreference: DarkThemePreference,
+    val primaryLanguage: PrimaryLanguage,
 ) : Validatable {
     override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::noAuthorCanBeNamedJamesClavell)
 
@@ -219,6 +220,7 @@ data class CreateAuthorParams(
     val isLikedByMyDaughter: IsLikedByMyDaughter?,
     val nullableFirstName: FirstName?,
     val nullableAge: EvenIntContainer? = null,
+    val primaryLanguage: PrimaryLanguage = PrimaryLanguage(Languages.English),
 ) : Validatable {
 
     override fun validators(): Set<() -> PropertyCollectionValidity> =
@@ -418,12 +420,14 @@ fun newAuthor(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyColle
         firstName = params.firstName,
         lastName = params.lastName,
         address = Address(Street("kjh")),
-        darkThemePreference = DarkThemePreference(true)
+        darkThemePreference = DarkThemePreference(true),
+        primaryLanguage = params.primaryLanguage,
     )
 }
 
 fun newAuthor2(args: ArgForVoidEvent<Author, Nothing?, Context, MyCollections>): Author {
-    return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")), DarkThemePreference(false))
+    return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")), DarkThemePreference(false),
+        primaryLanguage = PrimaryLanguage(Languages.English),)
 }
 
 
@@ -471,7 +475,7 @@ fun newBook(args: ArgForVoidEvent<Book, CreateBookParams, Context, MyCollections
         writtenAt = BookWrittenAt(Instant.fromEpochSeconds(100000)),
         readingTime = ReadingTime(23.hours),
         publishedAt = null,
-        //  releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456))
+        //  releasePartyPosition = ReleasePartyPosition(GeoPosition(latitude = 1.234, longitude = 3.456)),
     )
 }
 
@@ -650,6 +654,15 @@ class Quantity(value: Int) : IntContainer(value) {
 }
 
 class BookWrittenAt(value: Instant) : InstantContainer(value)
+
+class PrimaryLanguage(value: Languages) : EnumContainer<Languages>(value)
+
+enum class Languages {
+    Swedish,
+    English,
+    French,
+    German,
+}
 
 class ReadingTime(value: Duration) : DurationContainer(value)
 
@@ -859,7 +872,7 @@ data class CreateBookParams(
     val coAuthors: Set<ModelID<Author>> = emptySet(),
     val previousBooksInSameSeries: List<ModelID<Book>> = emptyList(),
     val tags: Set<BookTag> = emptySet(),
-    val averageScore: AverageScore
+    val averageScore: AverageScore,
 )
 
 class AverageScore(value: Float) : FloatContainer(value) {
