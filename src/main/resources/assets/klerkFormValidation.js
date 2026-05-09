@@ -29,7 +29,7 @@ function validate() {
             const response = JSON.parse(event.target.response);
             handleProblems(response.propertyProblems);
             handleCollectionProblems(response.propertyCollectionProblems);
-            const hasErrors = Object.keys(response.propertyProblems).length > 0 || response.propertyCollectionProblems.length > 0 || response.formProblems.length > 0 || response.dryRunProblems.length > 0;
+            const hasErrors = Object.keys(response.propertyProblems).length > 0 || response.propertyCollectionProblems.length > 0; //|| response.formProblems.length > 0 || response.dryRunProblems.length > 0;
             submitButton.disabled = hasErrors;
         }
     });

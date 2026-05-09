@@ -691,6 +691,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         {
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
             val value = if (params == null) null else getParamDatatype(propertyName, params)
+            if (isNullable && type != InputType.hidden) {
+                apply(renderNullableToggle(propertyName, (params == null || value != null)))
+            }
             when (type) {
                 text -> this.apply(
                     renderTextInput(
@@ -770,9 +773,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
                 else -> TODO(type.name)
             }
-            if (isNullable && type != InputType.hidden) {
-                apply(renderNullableToggle(propertyName, value))
-            }
         }
 
     private fun getModelId(propertyName: String, params: T): ModelID<*>? {
@@ -816,14 +816,15 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
     private fun renderNullableToggle(
         propertyName: String,
-        currentValue: DataContainer<*>?,
+        enabled: Boolean,
     ): HtmlBlockTag.() -> Unit = {
         val checkboxId = "null-toggle-$propertyName"
         input(checkBox) {
             id = checkboxId
             name = checkboxId
             value = "on"
-            checked = (currentValue != null)
+            checked = enabled
+            autoComplete = "off"
             attributes["onchange"] = "document.getElementById('$propertyName').disabled = !this.checked;"
         }
     }
