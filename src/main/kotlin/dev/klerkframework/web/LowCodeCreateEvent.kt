@@ -78,14 +78,14 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             requireNotNull(eventWithParameters.parameters)
             val possibleReferenceValues = getPossibleReferenceValues(eventWithParameters.parameters, context.actor)
 
+            @Suppress("UNCHECKED_CAST")
             val template =
-                createCommandsWithParams.single { it.eventReference == eventWithParameters.eventReference }.template
-
-            requireNotNull(template) { "AutoUI not available for this event (as earlier mentioned in the log)" }
+                requireNotNull(createCommandsWithParams.single { it.eventReference == eventWithParameters.eventReference }.template) { "AutoUI not available for this event (as earlier mentioned in the log)" } as FormTemplate<Any, C, V>
 
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
-                val params = if (eventReference.modelName == eventWithParameters.parameters.raw.simpleName && id != null) get(id).props else null
+                // TODO: this if statement should not check for "Update", that config should be injected into the template somehow. A function?
+                val params = if (eventReference.eventName.contains("Update") && eventReference.modelName == eventWithParameters.parameters.raw.simpleName && id != null) get(id).props else null
                 template.build(
                     call,
                     params = params,
