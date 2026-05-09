@@ -29,6 +29,10 @@ import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import dev.klerkframework.web.config.AuthorStates.*
 import dev.klerkframework.web.myScript
 import dev.klerkframework.web.css
+import dev.klerkframework.web.models.City
+import dev.klerkframework.web.models.Publisher
+import dev.klerkframework.web.models.cityStateMachine
+import dev.klerkframework.web.models.publisherStateMachine
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -51,6 +55,8 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
         managedModels {
             model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
             model(Author::class, authorStateMachine(collections), collections.authors)
+            model(Publisher::class, publisherStateMachine(collections), collections.publishers)
+            model(City::class, cityStateMachine(collections), collections.cities)
             //model(Shop::class, cudStateMachine(Shop::class), views.shops)
         }
         authorization {
@@ -488,7 +494,9 @@ enum class AuthorStates {
 
 data class MyCollections(
     val books: BookCollections,
-    val authors: AuthorCollections<MyCollections>
+    val authors: AuthorCollections<MyCollections>,
+    val publishers: ModelViews<Publisher, Context> = ModelViews(),
+    val cities: ModelViews<City, Context> = ModelViews(),
 ) //, val shops: ModelView<Shop, Context>)
 
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
@@ -1043,3 +1051,4 @@ class PrimeNumber(value: Int) : IntContainer(value) {
 }
 
 class IsLikedByMyDaughter(value: Boolean) : BooleanContainer(value)
+

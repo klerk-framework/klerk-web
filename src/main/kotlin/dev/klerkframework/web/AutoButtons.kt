@@ -22,7 +22,7 @@ public class AutoButtons<C: KlerkContext, V>(
 ) {
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>> = klerk.config.managedModels.flatMap { managed ->
         managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-            LowCodeCreateEvent(klerk, path, event, managed.kClass)
+            LowCodeCreateEvent(klerk, path, event, managed.kClass, this@AutoButtons)
         }
     }
 

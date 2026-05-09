@@ -14,7 +14,6 @@ import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
-import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -32,8 +31,6 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.*
-import kotlin.reflect.jvm.ExperimentalReflectionOnLambdas
-import kotlin.reflect.jvm.reflect
 
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
 private val IDEMPOTENCE_KEY = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
@@ -46,12 +43,13 @@ public data class UIElementData(val propertyName: String, val dataContainer: Dat
 /**
  * Regarding CSRF protection: the 'Double Submit Pattern' with '__Host-' cookie-prefix is used.
  */
-public class FormTemplate<T : Any, C : KlerkContext>(
+public class FormTemplate<T : Any, C : KlerkContext, V>(
     internal val defaultValues: EventWithParameters<T>,
-    internal val klerk: Klerk<C, *>,
+    internal val klerk: Klerk<C, V>,
     private val postPath: String? = null,
     internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
-    init: FormTemplate<T, C>.() -> Unit
+    internal val autoButtons: AutoButtons<C, V>? = null,
+    init: FormTemplate<T, C, V>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -161,8 +159,9 @@ public class FormTemplate<T : Any, C : KlerkContext>(
         // enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>? = null,
         path: String? = null,
         queryParams: Map<String, String> = emptyMap(),
-        translator: Translation
-    ): EventForm<T, C> {
+        translator: Translation,
+        context: C
+    ): EventForm<T, C, V> {
         val csrfToken = generateRandomString()
         try {
             call.response.cookies.append(
@@ -184,10 +183,11 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             }
             throw e
         }
+
         return EventForm(
             csrfToken,
             inputs,
-            populateMissingReferenceSelects(modelIDSelects, reader, inputs),
+            populateMissingReferenceSelects(modelIDSelects, reader, inputs, context),
             populateEnumSelects(),
             propsPopulatedAfterSubmit,
             params,
@@ -196,7 +196,9 @@ public class FormTemplate<T : Any, C : KlerkContext>(
             htmlDetailsSummary = htmlDetailsSummary,
             htmlDetailsContents = htmlDetailsContents,
             this,
-            translator
+            translator,
+            context,
+            call.request.uri,
         )
     }
 
@@ -226,7 +228,8 @@ public class FormTemplate<T : Any, C : KlerkContext>(
     private fun populateMissingReferenceSelects(
         developerProvidedModelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>>,
         reader: Reader<C, *>,
-        inputs: List<Pair<String, InputType>>
+        inputs: List<Pair<String, InputType>>,
+        context: C,
     ): Set<ReferencePropertyWithOptions> {
         val result = mutableSetOf<ReferencePropertyWithOptions>()
         parameters.all
@@ -238,14 +241,17 @@ public class FormTemplate<T : Any, C : KlerkContext>(
                 if (options.size >= 300) {
                     TODO("Too many options")
                 } else {
-                    result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options))
+                    // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
+                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.config.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
+                    result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
 
         result.addAll(developerProvidedModelIDSelects.map { entry ->
             ReferencePropertyWithOptions(
                 entry.key.name, entry.key.returnType.isMarkedNullable,
-                reader.query(entry.value).items
+                reader.query(entry.value).items,
+                emptyList(),
             )
         }
         )
@@ -594,7 +600,7 @@ internal data class ValResponse(
 
 public data class ValidationProblemResponse(public val field: String?, public val humanReadable: String)
 
-public class EventForm<T : Any, C : KlerkContext>(
+public class EventForm<T : Any, C : KlerkContext, V>(
     private val csrfToken: String,
     private val inputs: List<Pair<String, InputType>>,
     private val referenceSelects: Set<ReferencePropertyWithOptions>,
@@ -605,10 +611,11 @@ public class EventForm<T : Any, C : KlerkContext>(
     private val queryParams: Map<String, String>,
     private val htmlDetailsSummary: String?,
     private val htmlDetailsContents: Set<String>,
-    private val template: FormTemplate<T, C>,
-    private val translator: Translation
-
-) {
+    private val template: FormTemplate<T, C, V>,
+    private val translator: Translation,
+    private val context: C,
+    private val currentUri: String,
+    ) {
     private val log = KotlinLogging.logger {}
 
     private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
@@ -1005,6 +1012,16 @@ public class EventForm<T : Any, C : KlerkContext>(
                     ) { it.propertyName }
                 }"
             }
+
+            emptyNonNullableReferenceSelects.forEach {
+                it.suggestedEvents.forEach { event ->
+                    template.autoButtons?.let { ab ->
+                        tag.p {
+                            apply(ab.render(event, null, context, onCancelPath = currentUri, onSuccessAndModelExistPath = currentUri))
+                        }
+                    }
+                }
+            }
             return
         }
         try {
@@ -1101,7 +1118,8 @@ public sealed class ParseResult<T> {
 public data class ReferencePropertyWithOptions(
     val propertyName: String,
     val propertyNullable: Boolean,
-    val options: List<Model<out Any>>
+    val options: List<Model<out Any>>,
+    val suggestedEvents: Collection<EventReference>
 )
 
 public data class EnumPropertyWithOptions(

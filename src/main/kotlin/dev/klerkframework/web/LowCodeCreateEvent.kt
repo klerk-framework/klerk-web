@@ -13,11 +13,10 @@ import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.html.*
 import mu.KotlinLogging
-import java.lang.reflect.ParameterizedType
+import kotlin.io.encoding.Base64
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.full.primaryConstructor
 import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.full.withNullability
 import kotlin.reflect.jvm.jvmErasure
@@ -28,10 +27,11 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     private val path: String,
     internal val eventReference: EventReference,
-    internal val modelClass: KClass<out Any>
+    internal val modelClass: KClass<out Any>,
+    autoButtons: AutoButtons<C, V>,
 ) {
     private val logger = KotlinLogging.logger {}
-    private var template: FormTemplate<out Any, C>? = null
+    private var template: FormTemplate<out Any, C, V>? = null
 
     init {
         val parameters = requireNotNull(klerk.config.getParameters(eventReference))
@@ -42,6 +42,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 klerk,
                 getUrl(),
                 classProvider = null,
+                autoButtons = autoButtons,
             ) {
                 remaining()
             }
@@ -65,7 +66,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             klerk: Klerk<C, V>,
             contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
             cssPath: String,
-        ) {
+            ) {
             val context = contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             val completionPaths = CompletionPaths.parse(call, null)
@@ -89,7 +90,8 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     params = null,
                     reader = this,
                     queryParams = completionPaths.toQueryParams().plus(modelIdQueryParams),
-                    translator = context.translation
+                    translator = context.translation,
+                    context = context,
                 )
             }
 
@@ -355,6 +357,8 @@ private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): BODY.()
 }
 
 /**
+ * Utility to encode and decode the button targets from query parameters.
+ *
  * @param cancel The path to redirect to when the user clicks the cancel button. Also used when the command was
  * executed successfully but there is no relevant model (e.g. it was deleted).
  * @param model The path to redirect to when the command was executed successfully and the model exists.
@@ -364,23 +368,30 @@ public data class CompletionPaths(internal val cancel: String, internal val mode
 
     internal fun toQueryParams(): Map<String, String> {
         if (model == null) {
-            return mapOf("bt_cancel" to cancel, "bt_error" to error)
+            return mapOf(
+                "bt_cancel" to Base64.UrlSafe.encode(cancel.encodeToByteArray()),
+                "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray())
+            )
         }
-        return mapOf("bt_cancel" to cancel, "bt_model" to model, "bt_error" to error)
+        return mapOf(
+            "bt_cancel" to Base64.UrlSafe.encode(cancel.encodeToByteArray()),
+            "bt_model" to Base64.UrlSafe.encode(model.encodeToByteArray()),
+            "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray())
+        )
     }
 
     internal fun toQueryParamsString(): String = toQueryParams().map { "${it.key}=${it.value}" }.joinToString("&")
 
     internal companion object {
         fun parse(call: ApplicationCall, id: ModelID<out Any>?): CompletionPaths {
-            var parsedModelPath = call.request.queryParameters["bt_model"] ?: "/"
+            var parsedModelPath = call.request.queryParameters["bt_model"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/"
             if (id != null) {
                 parsedModelPath = parsedModelPath.replace("{id}", id.toString())
             }
             return CompletionPaths(
-                cancel = call.request.queryParameters["bt_cancel"] ?: "/",
+                cancel = call.request.queryParameters["bt_cancel"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/",
                 model = parsedModelPath,
-                error = call.request.queryParameters["bt_error"] ?: "/",
+                error = call.request.queryParameters["bt_error"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/",
             )
         }
     }

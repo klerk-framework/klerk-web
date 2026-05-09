@@ -38,7 +38,7 @@ public class AdminUI<C : KlerkContext, V>(
         // TODO: remove and use autobuttons instead
         createCommandsWithParams = klerk.config.managedModels.flatMap { managed ->
             managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass)
+                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass, autoButtons)
             }
         }
 

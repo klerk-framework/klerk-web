@@ -154,13 +154,13 @@ fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {
 suspend fun <T:Any> renderForm(
     call: ApplicationCall,
     klerk: Klerk<Context, MyCollections>,
-    template: FormTemplate<T, Context>,
+    template: FormTemplate<T, Context, MyCollections>,
     params: T?,
     parseResult: Parsed<T>? = null
 ) {
     val context = Context.swedishUnauthenticated()
     val form2 = klerk.read(context) {
-        template.build(call, params, this, translator = context.translation)
+        template.build(call, params, this, translator = context.translation, context = context)
     }
 
     call.respondHtml {

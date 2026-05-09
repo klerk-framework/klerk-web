@@ -91,6 +91,7 @@ fun main() {
                                     translator = context.translation,
                                     // referenceSelects = mapOf(TestParams::book to collections.books.all, TestParams::author to collections.authors.all),
                                     //enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
+                                    context = context,
                                 )
                             call.respondHtml {
                                 head {

@@ -26,7 +26,7 @@ class EmptyReferenceOptionsTest {
         klerk.meta.start()
 
         // No authors are created, so the non-nullable author field has no options
-        val template = FormTemplate(
+        val template = FormTemplate<CreateBookParams, Context, MyCollections>(
             EventWithParameters(CreateBook.id, EventParameters(CreateBookParams::class)),
             klerk, "/create-book",
             classProvider = null,
@@ -44,7 +44,8 @@ class EmptyReferenceOptionsTest {
                             call = call,
                             params = null,
                             reader = this,
-                            translator = context.translation
+                            translator = context.translation,
+                            context = context,
                         )
                         createHTML().div { form.render(this) }
                     }
@@ -67,7 +68,7 @@ class EmptyReferenceOptionsTest {
         klerk.meta.start()
 
         // No authors are created, but favouriteColleague is nullable so it should still render
-        val template = FormTemplate(
+        val template = FormTemplate<CreateAuthorParams, Context, MyCollections>(
             EventWithParameters(CreateAuthor.id, EventParameters(CreateAuthorParams::class)),
             klerk, "/create-author",
             classProvider = null,
@@ -85,7 +86,8 @@ class EmptyReferenceOptionsTest {
                             call = call,
                             params = null,
                             reader = this,
-                            translator = context.translation
+                            translator = context.translation,
+                            context = context,
                         )
                         createHTML().div { form.render(this) }
                     }

@@ -3,6 +3,7 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.collection.ModelViews
 import dev.klerkframework.klerk.datatypes.InstantContainer
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelModification.*
@@ -12,6 +13,7 @@ import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.script
 import dev.klerkframework.web.assets.styleLink
 import dev.klerkframework.web.config.*
+import dev.klerkframework.web.models.Publisher
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
@@ -29,7 +31,7 @@ import org.sqlite.SQLiteDataSource
 fun main() {
     System.setProperty("DEVELOPMENT_MODE", "true")
     val bc = BookCollections()
-    val collections = MyCollections(bc, AuthorCollections(bc.all))
+    val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
 
     val dbFilePath = "/tmp/klerktest.sqlite"
     //File(dbFilePath).delete()
