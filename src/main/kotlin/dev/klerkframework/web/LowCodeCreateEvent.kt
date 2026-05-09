@@ -85,9 +85,10 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
+                val params = if (eventReference.modelName == eventWithParameters.parameters.raw.simpleName && id != null) get(id).props else null
                 template.build(
                     call,
-                    params = null,
+                    params = params,
                     reader = this,
                     queryParams = completionPaths.toQueryParams().plus(modelIdQueryParams),
                     translator = context.translation,

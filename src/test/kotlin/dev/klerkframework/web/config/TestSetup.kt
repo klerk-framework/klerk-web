@@ -751,7 +751,6 @@ sealed class AlwaysFalseDecisions(
     override val function: (ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>) -> Boolean
 ) : Decision<Boolean, ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>> {
     data object Something : AlwaysFalseDecisions("This will always be false", ::alwaysFalse)
-
 }
 
 fun alwaysFalse(args: ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>): Boolean {
@@ -1052,3 +1051,7 @@ class PrimeNumber(value: Int) : IntContainer(value) {
 
 class IsLikedByMyDaughter(value: Boolean) : BooleanContainer(value)
 
+class NumberOfOffices(value: Int) : IntContainer(value) {
+    override val min: Int = 2
+    override val max: Int = Int.MAX_VALUE
+}
