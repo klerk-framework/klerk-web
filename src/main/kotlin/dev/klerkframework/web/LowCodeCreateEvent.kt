@@ -232,14 +232,14 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     ) {
         if (value == null) {
             return if (!type.isMarkedNullable) {
-                type.jvmErasure.constructors.first().call(false)
+                type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(false)
             } else {
                 null
             }
         }
         // If multiple values are sent (checkbox + hidden), Ktor's callParams[name] returns the first one.
         // If checkbox is checked, it's "true". If unchecked, only "false" (from hidden) is present.
-        return type.jvmErasure.constructors.first().call(value.toBoolean())
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toBoolean())
     }
 
     if (value == null) {
@@ -261,13 +261,13 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     if (type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.first().call(value)
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value)
     }
     if (type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(true))
     ) {
         try {
-            return type.jvmErasure.constructors.first().call(value.toInt())
+            return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toInt())
         } catch (e: NumberFormatException) {
             throw RuntimeException("Could not parse $type", e)
         }
@@ -275,13 +275,13 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     if (type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.first().call(value.toLong())
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toLong())
     }
 
     if (type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.first().call(value.toFloat())
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toFloat())
     }
 
     if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||
@@ -292,17 +292,17 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
             .arguments.first().type!!.jvmErasure.java
         @Suppress("UNCHECKED_CAST")
         val enum = java.lang.Enum.valueOf(enumClass as Class<out Enum<*>>, value)
-        return type.jvmErasure.constructors.first().call(enum)
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(enum)
     }
 
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.first().call(ModelID<Any>(value.toInt()))
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(ModelID<Any>(value.toInt()))
     }
 
     try {
-        return type.jvmErasure.constructors.first().call(value)
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value)
     } catch (e: Exception) {
         logger.error(e) { "Could not extract value from '$value' for type: $type " }
         throw e

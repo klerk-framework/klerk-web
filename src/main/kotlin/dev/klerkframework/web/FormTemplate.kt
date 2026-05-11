@@ -690,7 +690,12 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): HtmlBlockTag.() -> Unit =
         {
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
-            val value = if (params == null) null else getParamDatatype(propertyName, params)
+            val value = if (params == null) {
+                parameters.all.singleOrNull {it.name == propertyName}?.valueClass?.constructors?.single {it.parameters.isEmpty()}?.call() as DataContainer<*>
+            } else {
+                getParamDatatype(propertyName, params)
+            }
+
             if (isNullable && type != InputType.hidden) {
                 apply(renderNullableToggle(propertyName, (params == null || value != null)))
             }
@@ -968,25 +973,25 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         val clazz = prop.type.withNullability(false).classifier as KClass<*>
         try {
             if (clazz.isSubclassOf(StringContainer::class)) {
-                return clazz.constructors.first().call("") as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call("") as DataContainer<*>
             }
             if (clazz.isSubclassOf(IntContainer::class)) {
-                return clazz.constructors.first().call(0) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(0) as DataContainer<*>
             }
             if (clazz.isSubclassOf(LongContainer::class)) {
-                return clazz.constructors.first().call(0L) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(0L) as DataContainer<*>
             }
             if (clazz.isSubclassOf(FloatContainer::class)) {
-                return clazz.constructors.first().call(0f) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(0f) as DataContainer<*>
             }
             if (clazz.isSubclassOf(BooleanContainer::class)) {
-                return clazz.constructors.first().call(false) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(false) as DataContainer<*>
             }
             if (clazz.isSubclassOf(Enum::class)) {
-                return clazz.constructors.first().call(false) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(false) as DataContainer<*>
             }
             if (clazz.isSubclassOf(ModelID::class)) {
-                return clazz.constructors.first().call(ModelID<Any>(0)) as DataContainer<*>
+                return clazz.constructors.single { it.parameters.size == 1 }.call(ModelID<Any>(0)) as DataContainer<*>
             }
             TODO("cannot handle $clazz")
         } catch (e: InstantiationException) {
@@ -1042,12 +1047,12 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 +System.lineSeparator()
                 hiddenInput(name = IDEMPOTENCE_KEY) { value = CommandToken.simple().toString() }
                 +System.lineSeparator()
-                inputs.filterNot { htmlDetailsContents.contains(it.first) }.forEach {
+                inputs.filterNot { htmlDetailsContents.contains(it.first) }.forEach { (propertyName, type) ->
                     p {
                         tag.apply(
                             renderInput(
-                                it.first,
-                                it.second,
+                                propertyName,
+                                type,
                                 template.parameters,
                                 params,
                                 template.classProvider

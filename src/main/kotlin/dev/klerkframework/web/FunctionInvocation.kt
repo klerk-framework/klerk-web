@@ -43,7 +43,7 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
 
         if (prop.returnType.isSubtypeOf(StringContainer::class.starProjectedType)) {
             val container =
-                (prop.returnType.classifier as KClass<*>).constructors.first().call(value) as DataContainer<*>
+                (prop.returnType.classifier as KClass<*>).constructors.single { it.parameters.size == 1 }.call(value) as DataContainer<*>
             val problem = container.validate(name, context.translation)
             if (problem != null) {
                 call.respondHtml {

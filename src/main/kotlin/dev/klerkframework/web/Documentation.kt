@@ -117,20 +117,21 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
             li { +prop.name }
             table {
                 tr {
-                    td { +"Required" }
-                    td { +if (prop.isRequired) "yes" else "no" }
-                }
-                tr {
                     td { +"Nullable" }
                     td { +if (prop.isNullable) "yes" else "no" }
                 }
                 tr {
-                    td { +"Type" }
+                    td { +"Base type" }
                     td { +prop.type.toString() }
                 }
                 tr {
-                    td { +"Class" }
-                    td { +prop.valueClass.toString() }
+                    td { +"Container" }
+                    td {
+                        span {
+                            prop.valueClass.qualifiedName?.let { title = it }
+                            +(prop.valueClass.simpleName ?: prop.valueClass.toString())
+                        }
+                    }
                 }
                 prop.validationRulesDescription().forEach { entry ->
                     tr {
@@ -203,13 +204,25 @@ private fun <C : KlerkContext, V> renderEvents(
                                                 td { +if (parameter.isNullable) "yes" else "no" }
                                             }
                                             tr {
-                                                td { +"Type" }
+                                                td { +"Base type" }
                                                 td { +parameter.type.toString() }
                                             }
                                             tr {
-                                                td { +"Class" }
-                                                td { +parameter.valueClass.toString() }
+                                                td { +"Container" }
+                                                td {
+                                                    span {
+                                                        parameter.valueClass.qualifiedName?.let { title = it }
+                                                        +(parameter.valueClass.simpleName ?: parameter.valueClass.toString())
+                                                    }
+                                                }
                                             }
+                                            parameter.defaultValue?.let {
+                                                tr {
+                                                    td { +"Recommended default value" }
+                                                    td { +it }
+                                                }
+                                            }
+
                                             parameter.validationRulesDescription().forEach { entry ->
                                                 tr {
                                                     td { +entry.key }

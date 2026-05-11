@@ -22,7 +22,6 @@ import io.ktor.server.plugins.compression.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
@@ -191,7 +190,7 @@ fun authorizeAllDatatypes(instance: Any) {
      */
 }
 
-class MyInstant(value: Instant) : InstantContainer(value)
+//class MyInstant(value: Instant) : InstantContainer(value)
 
 object MyCssClassProvider : CssClassProvider {
     override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
