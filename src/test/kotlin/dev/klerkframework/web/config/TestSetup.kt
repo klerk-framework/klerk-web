@@ -614,15 +614,15 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
 class FirstName(value: String) : StringContainer(value) {
     override val minLength = 1
     override val maxLength = 50
-    override val maxLines: Int = 1
+    override val maxLines = 1
+    override val recommendedDefault = "John"
 
-    constructor() : this("John")
 }
 
 class LastName(value: String) : StringContainer(value) {
     override val minLength = 1
     override val maxLength = 50
-    override val maxLines: Int = 1
+    override val maxLines = 1
 }
 
 class BookTitle(value: String) : StringContainer(value) {

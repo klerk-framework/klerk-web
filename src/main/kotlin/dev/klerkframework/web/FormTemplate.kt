@@ -690,8 +690,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): HtmlBlockTag.() -> Unit =
         {
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
-            val value = if (params == null) {
-                parameters.all.singleOrNull {it.name == propertyName}?.valueClass?.constructors?.single {it.parameters.isEmpty()}?.call() as DataContainer<*>
+            val value: DataContainer<*> = if (params == null) {
+                val prop = parameters.all.single { it.name == propertyName }
+                prop.recommendedDefaultValue?.let { prop.getInstance(it) } ?: prop.getDummyInstance()
             } else {
                 getParamDatatype(propertyName, params)
             }
@@ -705,7 +706,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         text,
-                        getNewInstance(propertyName, parameters),  // since value can be null
                         classProvider?.let { cp ->
                             cp(
                                 "input",
@@ -722,7 +722,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         email,
-                        getNewInstance(propertyName, parameters),  // since value can be null
                         classProvider?.let { cp ->
                             cp(
                                 "input",
@@ -739,7 +738,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         password,
-                        getNewInstance(propertyName, parameters),  // since value can be null
                         classProvider?.let { cp ->
                             cp(
                                 "input",
@@ -752,11 +750,10 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 )
 
                 number -> {
-                    val newInstance = getNewInstance(propertyName, parameters)  // since value can be null
-                    when (newInstance) {
-                        is IntContainer -> this.apply(renderIntNumberInput(propertyName, value, newInstance))
-                        is LongContainer -> this.apply(renderLongNumberInput(propertyName, value, newInstance))
-                        is FloatContainer -> this.apply(renderFloatNumberInput(propertyName, value, newInstance))
+                    when (value) {
+                        is IntContainer -> this.apply(renderIntNumberInput(propertyName, value))
+                        is LongContainer -> this.apply(renderLongNumberInput(propertyName, value))
+                        is FloatContainer -> this.apply(renderFloatNumberInput(propertyName, value))
                     }
                 }
 
@@ -764,7 +761,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                     renderCheckboxInput(
                         propertyName,
                         value,
-                        getNewInstance(propertyName, parameters)
                     )
                 )
 
@@ -792,7 +788,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun createLabel(
         propertyName: String,
         //typeInstance: DataContainer<*>,
-        enabled: Boolean
+        //enabled: Boolean
     ): HtmlBlockTag.() -> Unit = {
         //val elementData = UIElementData(propertyName, typeInstance, enabled)
         label {
@@ -846,16 +842,15 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
     private fun renderCheckboxInput(
         propertyName: String,
-        theValue: DataContainer<*>?,
-        newInstance: DataContainer<*>
+        theValue: DataContainer<*>,
     ): HtmlBlockTag.() -> Unit = {
-        apply(createLabel(propertyName, (theValue != null)))
-        theValue as BooleanContainer?
+        apply(createLabel(propertyName))
+        theValue as BooleanContainer
         input(checkBox) {
             id = propertyName
             name = propertyName
             value = "true"
-            checked = theValue?.boolean ?: false
+            checked = theValue.boolean
             //  disabled = theValue == null
         }
         input(InputType.hidden) {
@@ -867,21 +862,18 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
     private fun renderIntNumberInput(
         propertyName: String,
-        theValue: DataContainer<*>?,
-        newInstance: DataContainer<*>
+        theValue: IntContainer,
     ): HtmlBlockTag.() -> Unit = {
-        apply(createLabel(propertyName, (theValue != null)))
-        theValue as IntContainer?
-        newInstance as IntContainer
+        apply(createLabel(propertyName))
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
             id = propertyName
             name = propertyName
+            value = theValue.toString()
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = "error-$propertyName"
-            value = theValue?.toString() ?: ""
             // required = !property.returnType.isMarkedNullable
-            newInstance.min?.apply { min = this.toString() }
-            newInstance.max?.apply { max = this.toString() }
+            theValue.min?.apply { min = this.toString() }
+            theValue.max?.apply { max = this.toString() }
         }
         apply(createErrorPlaceholder(propertyName))
     }
@@ -889,73 +881,66 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
     private fun renderLongNumberInput(
         propertyName: String,
-        theValue: DataContainer<*>?,
-        newInstance: DataContainer<*>
+        theValue: LongContainer,
     ): HtmlBlockTag.() -> Unit = {
-        apply(createLabel(propertyName, (theValue != null)))
-        theValue as LongContainer?
-        newInstance as LongContainer
+        apply(createLabel(propertyName))
         input(number) {
             id = propertyName
             name = propertyName
-            value = theValue?.toString() ?: ""
+            value = theValue.toString()
             // required = !property.returnType.isMarkedNullable
-            newInstance.min?.apply { min = this.toString() }
-            newInstance.max?.apply { max = this.toString() }
+            theValue.min?.apply { min = this.toString() }
+            theValue.max?.apply { max = this.toString() }
         }
     }
 
     private fun renderFloatNumberInput(
         propertyName: String,
-        theValue: DataContainer<*>?,
-        newInstance: DataContainer<*>
+        theValue: FloatContainer,
     ): HtmlBlockTag.() -> Unit = {
-        apply(createLabel(propertyName, (theValue != null)))
-        theValue as FloatContainer?
-        newInstance as FloatContainer
+        apply(createLabel(propertyName))
         input(number) {
             id = propertyName
             name = propertyName
-            value = theValue?.toString() ?: ""
+            value = theValue.toString()
             // required = !property.returnType.isMarkedNullable
-            newInstance.min?.apply { min = this.toString() }
-            newInstance.max?.apply { max = this.toString() }
+            theValue.min?.apply { min = this.toString() }
+            theValue.max?.apply { max = this.toString() }
             step = "any"
         }
     }
 
     private fun renderTextInput(
         propertyName: String,
-        theValue: DataContainer<*>?,
+        theValue: DataContainer<*>,
         type: InputType,
-        newInstance: DataContainer<*>,
         classes: String?,
     ): HtmlBlockTag.() -> Unit = {
-        apply(createLabel(propertyName, (theValue != null)))
-        theValue as StringContainer?
-        newInstance as StringContainer
+        apply(createLabel(propertyName))
+        theValue as StringContainer
         input(type, classes = classes) {
             id = propertyName
             name = propertyName
+            value = theValue.string
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = "error-$propertyName"
-            value = theValue?.toString() ?: ""
+            //
             // disabled = theValue == null
-            newInstance.minLength?.let {
+            theValue.minLength?.let {
                 minLength = it.toString()
                 required = it > 0
             }
-            newInstance.maxLength?.let { maxLength = it.toString() }
-            if (newInstance.regexPattern != null) {
-                pattern = newInstance.regexPattern!!.toString()
+            theValue.maxLength?.let { maxLength = it.toString() }
+            if (theValue.regexPattern != null) {
+                pattern = theValue.regexPattern!!.toString()
             } // for some reason, the apply didn't work
         }
         apply(createErrorPlaceholder(propertyName))
     }
 
-    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? {
+    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*> {
         val prop = params::class.memberProperties.single { it.name == propertyName }
-        return prop.getter.call(params) as? DataContainer<*>
+        return prop.getter.call(params) as DataContainer<*>
     }
 
     private fun getModelIdValue(propertyName: String, params: T): Int? {
@@ -967,42 +952,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         val prop = params::class.memberProperties.single { it.name == propertyName }
         return (prop.getter.call(params) as? Enum<*>)?.name
     }
-
-    private fun getNewInstance(propertyName: String, eventParameters: EventParameters<*>): DataContainer<*> {
-        val prop = eventParameters.all.single { it.name == propertyName }.raw
-        val clazz = prop.type.withNullability(false).classifier as KClass<*>
-        try {
-            if (clazz.isSubclassOf(StringContainer::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call("") as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(IntContainer::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(0) as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(LongContainer::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(0L) as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(FloatContainer::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(0f) as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(BooleanContainer::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(false) as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(Enum::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(false) as DataContainer<*>
-            }
-            if (clazz.isSubclassOf(ModelID::class)) {
-                return clazz.constructors.single { it.parameters.size == 1 }.call(ModelID<Any>(0)) as DataContainer<*>
-            }
-            TODO("cannot handle $clazz")
-        } catch (e: InstantiationException) {
-            log.error(
-                "Double check that your parameter class only consists of Datatypes and ModelIds (or set, list thereof). Note that it cannot be abstract!",
-                e
-            )
-            throw e
-        }
-    }
-
 
     /**
      * Renders the form in the provided tag.

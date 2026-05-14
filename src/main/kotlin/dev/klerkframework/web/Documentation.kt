@@ -128,12 +128,12 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                     td { +"Container" }
                     td {
                         span {
-                            prop.valueClass.qualifiedName?.let { title = it }
-                            +(prop.valueClass.simpleName ?: prop.valueClass.toString())
+                            title = prop.qualifiedName
+                            +prop.name
                         }
                     }
                 }
-                prop.validationRulesDescription().forEach { entry ->
+                prop.validationRulesDescriptions.forEach { entry ->
                     tr {
                         td { +entry.key }
                         td { +entry.value }
@@ -141,8 +141,8 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                 }
             }
 
-            val propClass = prop.valueClass.qualifiedName
-            if (prop.type == PropertyType.String && propClass != null) {
+            val propClass = prop.qualifiedName
+            if (prop.type == PropertyType.String) {
                 form("$documentationPath/functionInvocation", method = FormMethod.post) {
                     hiddenInput(name = FUNCTION_KIND) { value = DATA_CONTAINER_VALIDATION }
                     hiddenInput(name = DATA_CONTAINER_CLASS) { value = propClass }
@@ -211,19 +211,19 @@ private fun <C : KlerkContext, V> renderEvents(
                                                 td { +"Container" }
                                                 td {
                                                     span {
-                                                        parameter.valueClass.qualifiedName?.let { title = it }
-                                                        +(parameter.valueClass.simpleName ?: parameter.valueClass.toString())
+                                                        title = parameter.qualifiedName
+                                                        +parameter.name
                                                     }
                                                 }
                                             }
-                                            parameter.defaultValue?.let {
+                                            parameter.recommendedDefaultValue?.let {
                                                 tr {
                                                     td { +"Recommended default value" }
-                                                    td { +it }
+                                                    td { +it.toString() }
                                                 }
                                             }
 
-                                            parameter.validationRulesDescription().forEach { entry ->
+                                            parameter.validationRulesDescriptions.forEach { entry ->
                                                 tr {
                                                     td { +entry.key }
                                                     td { +entry.value }
