@@ -826,7 +826,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             value = "on"
             checked = enabled
             autoComplete = "off"
-            attributes["onchange"] = "document.getElementById('$propertyName').disabled = !this.checked;"
+            attributes["onchange"] = """let e = document.getElementById('$propertyName'); e.style.display = this.checked ? null : "none"; e.disabled = !this.checked;"""
         }
     }
 

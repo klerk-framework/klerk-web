@@ -176,7 +176,7 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
                 call.respond(HttpStatusCode.BadRequest)
                 return@get
             }
-            val asset = assets.firstOrNull { a -> a.getPathAndHash() == "/${path}" }
+            val asset = assets.firstOrNull { a -> a.getPathAndHash() == path }
             if (asset == null) {
                 call.respond(HttpStatusCode.NotFound)
                 return@get
@@ -288,16 +288,12 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
 public abstract class KlerkAsset(public val resourcePath: String) {
     internal var _hash: Base64hash? = null
 
-    init {
-        require(resourcePath.startsWith("/")) { "Resource path must start with '/'" }
-    }
-
     internal fun setHash(hash: Base64hash) {
         _hash = hash
     }
 
     public val url: String
-        get() = "/$klerkAssetsPath${getPathAndHash()}"
+        get() = "$klerkAssetsPath/${getPathAndHash()}"
 
     internal fun getPathAndHash(): String {
         if (_hash == null) {
@@ -313,8 +309,11 @@ public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath) // TODO: S
 
 
 private object ResourceReader {
-    fun readResource(path: String): String? =
-        this::class.java.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() }
+    fun readResource(path: String): String? {
+        val resourcePath = if (path.startsWith("/")) path else "/$path"
+        return this::class.java.getResourceAsStream(resourcePath)?.bufferedReader()?.use { it.readText() }
+    }
+
 }
 
 public fun HEAD.styleLink(css: CssAsset): Unit = styleLink(css.url)

@@ -57,7 +57,7 @@ public class KlerkWeb<C : KlerkContext, V>(
     public fun generateNav(): HtmlBlockTag.() -> Unit = {
         nav {
             ul {
-                klerk.config.managedModels.forEach { model ->
+                klerk.config.managedModels.sortedBy { it.kClass.simpleName }.forEach { model ->
                     li {
                         a(href = pathProvider.pathForCollection(model.kClass)) { +"${model.kClass.simpleName}" }
                     }
@@ -104,27 +104,39 @@ public class KlerkWeb<C : KlerkContext, V>(
             }
             body {
                 breadcumbs("/", model.props::class, pathProvider, true)
-                h1 { +requireNotNull(model.props::class.simpleName) }
+                h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
+
+
+
                 table {
                     tbody {
-                        reflectedModelPopulated.getMeta().forEach { property ->
+                        ReflectedModel(model).getProperties().forEach {
                             tr {
-                                td { apply(property.renderNameNonBreakingHtml()) }
-                                td {
-                                    property.description()?.let { title = it }
-                                    +property.toString()
+                                td { +it.name() }
+                                td { +it.value.toString() }
+                            }
+                        }
+                    }
+                }
+
+                details {
+                    summary { +"Meta" }
+
+                    table {
+                        tbody {
+                            reflectedModelPopulated.getMeta().forEach { property ->
+                                tr {
+                                    td { apply(property.renderNameNonBreakingHtml()) }
+                                    td {
+                                        property.description()?.let { title = it }
+                                        +property.toString()
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                val jsonPretty = klerk.config.toJson(model.props)
-                textArea {
-                    disabled = true
-                    rows = "10" // jsonPretty.lines().size.toString()
-                    +jsonPretty
-                }
 
                 h3 { +"Commands" }
 

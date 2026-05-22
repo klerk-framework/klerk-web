@@ -86,8 +86,9 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
     return true
 }
 
-val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
-val myScript = JsAsset("/assets/other/my-script.js")
+//val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
+val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
+val myScript = JsAsset("assets/other/my-script.js")
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
     val klerkWeb = KlerkWeb(
