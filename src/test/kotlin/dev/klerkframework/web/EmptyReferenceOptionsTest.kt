@@ -30,6 +30,7 @@ class EmptyReferenceOptionsTest {
             EventWithParameters(CreateBook.id, EventParameters(CreateBookParams::class)),
             klerk, "/create-book",
             classProvider = null,
+            pathProvider = DefaultPathProvider(),
         ) {
             remaining()
         }
@@ -72,6 +73,7 @@ class EmptyReferenceOptionsTest {
             EventWithParameters(CreateAuthor.id, EventParameters(CreateAuthorParams::class)),
             klerk, "/create-author",
             classProvider = null,
+            pathProvider = DefaultPathProvider(),
         ) {
             remaining()
         }

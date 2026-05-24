@@ -2,9 +2,9 @@ package dev.klerkframework.web
 
 
 import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.web.assets.CssAsset
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.format.char
 import kotlinx.html.*
@@ -16,12 +16,12 @@ internal val secureRandom = SecureRandom.getInstanceStrong()
 
 
 internal fun <C : KlerkContext, V> lowCodeHtmlHead(config: AdminUI<C, V>): HTML.() -> Unit =
-    lowCodeHtmlHead(config.cssPath)
+    lowCodeHtmlHead(config.pathProvider)
 
-internal fun lowCodeHtmlHead(cssPath: String): HTML.() -> Unit = {
+internal fun lowCodeHtmlHead(pathProvider: PathProvider): HTML.() -> Unit = {
     head {
-        meta(name = "viewport", content = "width=device-width, initial-scale=1")
-        styleLink(cssPath)
+        //meta(name = "viewport", content = "width=device-width, initial-scale=1")
+        pathProvider.cssUrl()?.let { styleLink(it) }
     }
 }
 
@@ -30,9 +30,9 @@ internal fun isModelId(type: KType): Boolean {
     return type.toString().startsWith(ModelID::class.qualifiedName!!, false)
 }
 
-internal fun BODY.breadcumbs(homePath: String, clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
+internal fun BODY.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
     val name = camelCaseToPretty(requireNotNull(clazz.simpleName))
-    a(href = homePath) { +"Home" }
+    a(href = pathProvider.withPrefix()) { +"Home" }
     unsafe {
         +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
     }

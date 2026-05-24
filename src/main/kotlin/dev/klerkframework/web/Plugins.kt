@@ -15,7 +15,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
         apply(lowCodeHtmlHead(config))
         body {
             header {
-                nav { div { a(href = config.basePath) { +"Home" } } }
+                nav { div { a(href = config.pathProvider.withPrefix()) { +"Home" } } }
             }
             h1 { +"Plugins" }
             main {
@@ -27,7 +27,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
                         plugins.forEach { plugin ->
                             li {
                                 if (plugin is AdminUIPluginIntegration<C, V>) {
-                                    a(href = "${config.basePath}/plugin?name=${plugin.name}") { +plugin.name }
+                                    a(href = "${config.pathProvider.withPrefix()}/plugin?name=${plugin.name}") { +plugin.name }
                                 } else {
                                     +plugin.name
                                 }

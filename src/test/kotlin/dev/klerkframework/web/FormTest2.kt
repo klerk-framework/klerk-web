@@ -36,6 +36,7 @@ fun main() {
         klerk,
         "/",
         classProvider = ::myClassProvider,
+        pathProvider = DefaultPathProvider(),
     ) {
         text(CreateAuthorParams::firstName)
         text(CreateAuthorParams::lastName)

@@ -12,11 +12,9 @@ import kotlin.reflect.KClass
 
 public class AdminUI<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
-    internal val basePath: String,
     internal val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
     internal val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
     internal val showOptionalParameters: (EventReference) -> Boolean = {(eventReference) -> true},
-    internal val cssPath: String,
     internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
     internal val createCommandPath: String = "/_createevent",
     internal val canSeeAdminUI: suspend (C) -> Boolean,
@@ -27,18 +25,18 @@ public class AdminUI<C : KlerkContext, V>(
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>>
 
-    private val auditPath = "${basePath}/_audit"
-    private val jobsPath = "${basePath}/_jobs"
-    private val metricsPath = "${basePath}/_metrics"
-    private val pluginsPath = "${basePath}/_plugins"
-    private val logPath = "${basePath}/_log"
-    private val documentationPath = "${basePath}/_documentation"
+    private val auditPath = "${pathProvider.withPrefix()}/_audit"
+    private val jobsPath = "${pathProvider.withPrefix()}/_jobs"
+    private val metricsPath = "${pathProvider.withPrefix()}/_metrics"
+    private val pluginsPath = "${pathProvider.withPrefix()}/_plugins"
+    private val logPath = "${pathProvider.withPrefix()}/_log"
+    private val documentationPath = "${pathProvider.withPrefix()}/_documentation"
 
     init {
         // TODO: remove and use autobuttons instead
         createCommandsWithParams = klerk.config.managedModels.flatMap { managed ->
             managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass, autoButtons)
+                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass, autoButtons, pathProvider)
             }
         }
 
@@ -46,7 +44,7 @@ public class AdminUI<C : KlerkContext, V>(
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             val modelPathPart = managedClass.simpleName!!.lowercase()
-            val pathToList = "${basePath}/$modelPathPart"
+            val pathToList = "${pathProvider.withPrefix()}$modelPathPart"
 
             val listView = LowCodeList<Any, C, V>(
                 managedClass, this, createCommandsWithParams, pathToList, humanName, klerk,
@@ -59,8 +57,6 @@ public class AdminUI<C : KlerkContext, V>(
         }
         listViews = pairs.map { it.first }
         detailViews = pairs.map { it.second }
-        listViews.forEach { it.initView(basePath) }
-        detailViews.forEach { it.initView(basePath) }
 
         AlgorithmDocumenter.setKnownAlgorithms(knownAlgorithms)
     }
@@ -69,7 +65,7 @@ public class AdminUI<C : KlerkContext, V>(
         listViews.forEach { apply(it.registerRoutes()) }
         detailViews.forEach { apply(it.registerRoutes()) }
 
-        get(basePath) {
+        get(pathProvider.withPrefix()) {
             requireAdmin(call) {
                 renderMain(call)
             }
@@ -77,7 +73,7 @@ public class AdminUI<C : KlerkContext, V>(
 
         get(auditPath) {
             requireAdmin(call) {
-                renderAudit(call, this@AdminUI, basePath, klerk)
+                renderAudit(call, this@AdminUI, pathProvider, klerk)
             }
         }
 
@@ -129,14 +125,14 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        get("${basePath}/plugin") {
+        get("${pathProvider.withPrefix()}/plugin") {
             requireAdmin(call) {
                 renderPluginPage(call, this@AdminUI, klerk)
             }
         }
 
         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
-            plugin.registerExtraRoutes(this, basePath)
+            plugin.registerExtraRoutes(this, pathProvider)
         }
 
         get(logPath) {
@@ -151,7 +147,7 @@ public class AdminUI<C : KlerkContext, V>(
     private suspend fun renderMain(call: ApplicationCall) {
         val actor = contextProvider(call, klerk)
         call.respondHtml {
-            apply(lowCodeHtmlHead(cssPath))
+            apply(lowCodeHtmlHead(pathProvider))
             body {
                 header {
                     h1 { +"Klerk Admin" }
@@ -190,7 +186,7 @@ public class AdminUI<C : KlerkContext, V>(
                         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
                             span {
                                 style = "margin: 10px;"
-                                a(href = "${basePath}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                                a(href = "${pathProvider.withPrefix()}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
                             }
 
                         }
@@ -227,7 +223,7 @@ public class AdminUI<C : KlerkContext, V>(
 public interface AdminUIPluginIntegration<C : KlerkContext, V> : KlerkPlugin<C, V> {
 
     public val page: PluginPage<C, V>
-    public fun registerExtraRoutes(routing: Routing, basePath: String)
+    public fun registerExtraRoutes(routing: Routing, pathProvider: PathProvider)
 
 }
 

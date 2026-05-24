@@ -7,8 +7,8 @@ import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
 import dev.klerkframework.web.AdminUI
+import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.PluginPage
-import dev.klerkframework.web.klerkFormValidationJs
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders.ContentEncoding
 import io.ktor.server.application.*
@@ -21,18 +21,15 @@ import kotlinx.io.asSource
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import kotlin.plus
 
 private const val contentEncodingBrotli = "br"
 private val log = KotlinLogging.logger {}
 
-private val builtInAssets = setOf(klerkFormValidationJs)
+public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
 
-public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
-
+    private lateinit var assets: Set<KlerkAsset>
     private lateinit var textAssets: List<Model<TextAsset>>
     override val name: String = "Assets"
-    private val assets = userAssets.plus(builtInAssets)
 
     override val description: String =
         """Plugin that efficiently serves static assets. 
@@ -56,13 +53,14 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
 
     override suspend fun start(klerk: Klerk<C, V>) {
         _klerk = klerk
-        var context = klerk.config.systemContextProvider(SystemIdentity)
-        textAssets = klerk.read(context) {
+        var context = _klerk.config.systemContextProvider(SystemIdentity)
+        textAssets = _klerk.read(context) {
             list(textAssetCollections.all)
         }
 
         val brotliAvailable = isBrotliAvailable()
 
+        assets = userAssetResources.plus(JsAsset(klerkFormValidationJsFile))
         assets.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)
                 ?: throw IllegalStateException("Resource not found: ${asset.resourcePath}")
@@ -81,13 +79,13 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
                 if (textAssets.none { ta -> ta.props.hash == base64hash }) {
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
-                        val brotliToken = klerk.keyValueStore.prepareBlob(brotli.inputStream())
-                        klerk.keyValueStore.put(brotliToken)
+                        val brotliToken = _klerk.keyValueStore.prepareBlob(brotli.inputStream())
+                        _klerk.keyValueStore.put(brotliToken)
                     } else null
 
-                    context = klerk.config.systemContextProvider(SystemIdentity)
+                    context = _klerk.config.systemContextProvider(SystemIdentity)
 
-                    klerk.handle(
+                    _klerk.handle(
                         Command(
                             event = CreateTextAsset,
                             model = null,
@@ -106,7 +104,7 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
         }
         deleteObsoleteTextAssets(assets, textAssets)
 
-        textAssets = klerk.read(context) {
+        textAssets = _klerk.read(context) {
             list(textAssetCollections.all)
         }
     }
@@ -143,6 +141,7 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
     }
 
     private fun compressBrotli(input: ByteArrayInputStream): ByteArray {
+        log.info { "Compressing text asset with brotli" }
         val process = ProcessBuilder("brotli", "-Z", "--stdout")  // Compress to stdout
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
@@ -164,13 +163,15 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
         if (exitCode != 0) {
             throw RuntimeException("brotli process failed with exit code $exitCode")
         }
+        log.info { "Compressed text asset with brotli" }
         return compressedOutput.toByteArray()
     }
 
     override val page: PluginPage<C, V> = Page(textAssetCollections)
 
-    override fun registerExtraRoutes(routing: Routing, basePath: String) {
-        routing.get("$klerkAssetsPath/{key...}") {
+    override fun registerExtraRoutes(routing: Routing, pathProvider: PathProvider) {
+        log.info { "Registering assets route: ${pathProvider.assetsBase}/{key...}" }
+        routing.get("${pathProvider.assetsBase}/{key...}") {
             val path = call.parameters.getAll("key")?.joinToString("/")
             if (path == null) {
                 call.respond(HttpStatusCode.BadRequest)
@@ -209,12 +210,14 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
         asset: KlerkAsset,
         contentType: ContentType
     ) {
-        val inputString = this::class.java.getResourceAsStream(asset.resourcePath)
+        val resourcePath = if (asset.resourcePath.startsWith("/")) asset.resourcePath else "/$asset.resourcePath"
+        val inputString = this::class.java.getResourceAsStream(resourcePath)
         if (inputString != null) {
             setCacheControl(call)
             call.respondSource(inputString.asSource(), contentType, HttpStatusCode.OK)
             return
         }
+        log.warn { "Could not find resource: $resourcePath" }
         call.respond(HttpStatusCode.InternalServerError)
     }
 
@@ -233,8 +236,6 @@ public class AssetsPlugin<C : KlerkContext, V>(userAssets: Set<KlerkAsset>) : Ad
     }
 
 }
-
-internal const val klerkAssetsPath = "_klerk-assets"
 
 public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelViews<TextAsset, C>) :
     PluginPage<C, V> {
@@ -261,7 +262,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
 
         call.respondHtml {
             head {
-                styleLink(config.cssPath)
+                config.pathProvider.cssUrl()?.let { styleLink(it) }
             }
             body {
                 h1 { +"Assets" }
@@ -292,9 +293,6 @@ public abstract class KlerkAsset(public val resourcePath: String) {
         _hash = hash
     }
 
-    public val url: String
-        get() = "$klerkAssetsPath/${getPathAndHash()}"
-
     internal fun getPathAndHash(): String {
         if (_hash == null) {
             throw IllegalStateException("Asset '$resourcePath' has not been registered")
@@ -311,11 +309,13 @@ public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath) // TODO: S
 private object ResourceReader {
     fun readResource(path: String): String? {
         val resourcePath = if (path.startsWith("/")) path else "/$path"
-        return this::class.java.getResourceAsStream(resourcePath)?.bufferedReader()?.use { it.readText() }
+        return this::class.java.getResourceAsStream("/assets$resourcePath")?.bufferedReader()?.use { it.readText() }
     }
 
 }
 
-public fun HEAD.styleLink(css: CssAsset): Unit = styleLink(css.url)
 
-public inline fun FlowOrMetaDataOrPhrasingContent.script(js: JsAsset, crossinline block : SCRIPT.() -> Unit = {}): Unit = script(src = js.url, block = block)
+
+//internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js", pathProvider)
+
+internal val klerkFormValidationJsFile = "klerkFormValidation.js"

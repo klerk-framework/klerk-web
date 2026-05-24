@@ -12,7 +12,7 @@ import kotlinx.html.*
 internal suspend fun <C : KlerkContext, V> renderAudit(
     call: ApplicationCall,
     config: AdminUI<C, V>,
-    basePath: String,
+    pathProvider: PathProvider,
     klerk: Klerk<C, V>
 ) {
     val context = config.contextProvider(call, klerk)
@@ -24,10 +24,10 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
     val events = klerk.events.getEventsInAuditLog(context, id)
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config.cssPath))
+        apply(lowCodeHtmlHead(pathProvider))
         body {
             header {
-                nav { div { a(href = config.basePath) { +"Home" } } }
+                nav { div { a(href = pathProvider.withPrefix()) { +"Home" } } }
             }
             h1 { +"Events" }
             if (forModel != null) {
@@ -70,14 +70,14 @@ internal suspend fun <C : KlerkContext, V> renderAuditDetails(
     val event = klerk.events.getEventsInAuditLog(context, after = time, before = time).single()
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config.cssPath))
+        apply(lowCodeHtmlHead(config.pathProvider))
         body {
             header {
                 nav {
                     div {
-                        a(href = config.basePath) { +"Home" }
+                        a(href = config.pathProvider.withPrefix()) { +"Home" }
                         +" / "
-                        a(href = "${config.basePath}/_audit") { +"Audit log" }
+                        a(href = "${config.pathProvider.withPrefix()}/_audit") { +"Audit log" }
                     }
                 }
             }

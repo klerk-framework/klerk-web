@@ -15,6 +15,7 @@ import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.web.assets.JsAsset
+import dev.klerkframework.web.assets.klerkFormValidationJsFile
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -35,7 +36,7 @@ import kotlin.reflect.full.*
 private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
 private val IDEMPOTENCE_KEY = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
 
-internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js")
+
 
 
 public data class UIElementData(val propertyName: String, val dataContainer: DataContainer<*>, val enabled: Boolean)
@@ -49,6 +50,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     private val postPath: String? = null,
     internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
     internal val autoButtons: AutoButtons<C, V>? = null,
+    internal val pathProvider: PathProvider,
     init: FormTemplate<T, C, V>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
@@ -982,7 +984,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         try {
             val path = getPath(postPath, queryParams)
             tag.script {
-                src = klerkFormValidationJs.url
+                src = "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
                 defer = true
             }
             tag.form(path, method = FormMethod.post) {

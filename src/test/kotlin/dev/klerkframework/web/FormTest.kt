@@ -56,6 +56,7 @@ fun main() {
                 defaultValues = EventWithParameters(CreateAuthor.id, eventParams),
                 klerk, "/noklerkvalidation",
                 classProvider = null,
+                pathProvider = DefaultPathProvider(),
             ) {
                 text(CreateAuthorParams::phone)
                 remaining(inHtmlDetails = "Remaining stuff")

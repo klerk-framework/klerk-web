@@ -25,33 +25,32 @@ import kotlinx.html.summary
 import kotlinx.html.table
 import kotlinx.html.tbody
 import kotlinx.html.td
-import kotlinx.html.textArea
 import kotlinx.html.th
 import kotlinx.html.thead
 import kotlinx.html.title
 import kotlinx.html.tr
 import kotlinx.html.ul
+import mu.KotlinLogging
 import kotlin.collections.forEach
 import kotlin.text.toInt
+
+private val log = KotlinLogging.logger {}
 
 public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     private val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-    private val cssPath: String,
     private val pathProvider: PathProvider = DefaultPathProvider(),
+    private val adminPathProvider: PathProvider = DefaultPathProvider(pathProvider.base, "admin/", css = pathProvider.css, externalCssPath = pathProvider.externalCssPath),
     private val classProvider: CssClassProvider? = null,
-    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, "_autobuttons", contextProvider, cssPath),
+    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, "_autobuttons", contextProvider, pathProvider),
     private val adminUI: AdminUI<C, V> = AdminUI(
         klerk,
-        "/admin",
         contextProvider,
-        cssPath = cssPath,
         showOptionalParameters = { eventReference -> false },
         knownAlgorithms = setOf(),
         canSeeAdminUI = { true },   // TODO
         autoButtons = autoButtons,
-        pathProvider = DefaultPathProvider("/admin/")
-    )
+        pathProvider = adminPathProvider)
 ) {
 
     public fun generateNav(): HtmlBlockTag.() -> Unit = {
@@ -70,6 +69,7 @@ public class KlerkWeb<C : KlerkContext, V>(
         apply(autoButtons.registerRoutes())
         apply(adminUI.registerRoutes())
         klerk.config.managedModels.forEach { model ->
+            log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
             get(pathProvider.pathForCollection(model.kClass)) {
                 val lcl = LowCodeList<Any, C, V>(
                     model.kClass, adminUI, emptyList(),
@@ -78,10 +78,10 @@ public class KlerkWeb<C : KlerkContext, V>(
                     klerk,
                     pathProvider = pathProvider,
                 )
-                lcl.initView("/")
                 lcl.renderModelList(call, adminUI)
             }
 
+            log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}/{id}" }
             get("${pathProvider.pathForCollection(model.kClass)}/{id}") {
                 yetAnotherCopyOfRenderDetails(call)
             }
@@ -100,10 +100,10 @@ public class KlerkWeb<C : KlerkContext, V>(
         val events = klerk.read(context) { getPossibleEvents(id) }
         call.respondHtml {
             head {
-                styleLink(cssPath)
+                pathProvider.cssUrl()?.let { styleLink(it) }
             }
             body {
-                breadcumbs("/", model.props::class, pathProvider, true)
+                breadcrumbs(model.props::class, pathProvider, true)
                 h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
 
 

@@ -16,7 +16,7 @@ internal suspend fun <C : KlerkContext, V> renderLog(
         apply(lowCodeHtmlHead(config))
         body {
             header {
-                nav { div { a(href = config.basePath) { +"Home" } } }
+                nav { div { a(href = config.pathProvider.withPrefix()) { +"Home" } } }
             }
             main {
                 h1 { +"Log" }

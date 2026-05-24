@@ -19,12 +19,6 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
     private val pathProvider: PathProvider,
 ) {
 
-    private lateinit var basePath: String
-
-    fun initView(basePath: String) {
-        this.basePath = basePath
-    }
-
     fun registerRoutes(): Routing.() -> Unit = {
         get(pathProvider.pathForItem(kClass, "{id}")) {
             renderModel(call)
@@ -70,7 +64,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
                         context,
                         onCancelPath = "/",
                         onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
-                        onErrorPath = basePath
+                        onErrorPath = pathProvider.base
                     )
                 )
             }
@@ -133,7 +127,7 @@ internal class LowCodeItemDetails<T : Any, C : KlerkContext, V>(
         call.respondHtml {
             apply(lowCodeHtmlHead(config))
             body {
-                breadcumbs(basePath, model.props::class, pathProvider, true)
+                breadcrumbs(model.props::class, pathProvider, true)
                 div {
                     apply(renderModelDetails(reflectedModelPopulated, events, model, context))
                 }

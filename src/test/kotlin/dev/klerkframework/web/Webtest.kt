@@ -2,24 +2,18 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.datatypes.InstantContainer
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelModification.*
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
-import dev.klerkframework.web.assets.script
-import dev.klerkframework.web.assets.styleLink
 import dev.klerkframework.web.config.*
-import dev.klerkframework.web.models.Publisher
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.compression.*
-import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
@@ -86,21 +80,25 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
     return true
 }
 
+val css = CssAsset("water.css")
+
+val pathProvider = DefaultPathProvider(css = css)
+
 //val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
-val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
-val myScript = JsAsset("assets/other/my-script.js")
+//val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
+val myScript = JsAsset("other/my-script.js")
 
 fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
     val klerkWeb = KlerkWeb(
         klerk,
         ApplicationCall::ctx,
-        cssPath = css.url,
+        pathProvider = pathProvider,
         classProvider = MyClassProvider,
         )
 
     routing {
 
-        get("/", renderIndex(klerkWeb))
+        get(renderIndex(klerkWeb))
 
         apply(klerkWeb.generateRoutes())
 
@@ -115,12 +113,12 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
             call.respondHtml {
                 head {
                     title { +"Test assets" }
-                    styleLink(css)
+                    pathProvider.cssUrl()?.let { styleLink(it) }
                 }
                 body {
                     h1 { +"Testing the assets. " }
                     +"Did the css and js load? Correct encoding?"
-                    script(myScript) { defer = true }
+                    script(pathProvider.assetPath("other/my-script.js")) { defer = true }
                 }
             }
         }
@@ -141,7 +139,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            styleLink(css)
+            pathProvider.cssUrl()?.let { styleLink(it) }
             favicon()
         }
         body {
@@ -150,7 +148,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
             h2 { +"Admin UI" }
             p {
                 +"Klerk-web can generate an "
-                a(href = "/admin") { +"admin UI" }
+                a(href = "/admin/") { +"admin UI" }
                 +" for your application."
             }
             h2 { +"Item lists" }
@@ -168,7 +166,7 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            styleLink(css)
+            pathProvider.cssUrl()?.let { styleLink(it) }
         }
         body {
             h1 { +"Here are the books" }

@@ -29,6 +29,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     internal val eventReference: EventReference,
     internal val modelClass: KClass<out Any>,
     autoButtons: AutoButtons<C, V>,
+    pathProvider: PathProvider,
 ) {
     private val logger = KotlinLogging.logger {}
     private var template: FormTemplate<out Any, C, V>? = null
@@ -43,6 +44,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 getUrl(),
                 classProvider = null,
                 autoButtons = autoButtons,
+                pathProvider = pathProvider
             ) {
                 remaining()
             }
@@ -65,7 +67,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
             contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-            cssPath: String,
+            pathProvider: PathProvider,
             ) {
             val context = contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
@@ -102,7 +104,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 if (eventName.lowercase().contains(modelName.lowercase())) eventName else "$eventName ($modelName)"
 
             call.respondHtml {
-                apply(lowCodeHtmlHead(cssPath))
+                apply(lowCodeHtmlHead(pathProvider))
                 body {
                     main {
                         h1 { +heading }
@@ -122,7 +124,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
             klerk: Klerk<C, V>,
             contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-            cssPath: String,
+            pathProvider: PathProvider,
         ) {
             val context = contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
@@ -142,7 +144,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     klerk,
                     context,
                     call,
-                    cssPath,
+                    pathProvider,
                     CommandToken.simple(),
                     null
                 )
@@ -157,7 +159,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                             klerk,
                             context,
                             call,
-                            cssPath,
+                            pathProvider,
                             parseResult.key,
                             parseResult.params
                         )
@@ -172,7 +174,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             klerk: Klerk<C, V>,
             context: C,
             call: ApplicationCall,
-            cssPath: String,
+            pathProvider: PathProvider,
             key: CommandToken,
             params: Any?
         ) {
@@ -187,7 +189,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             when (val eventResult = klerk.handle(command, context, options)) {
                 is CommandResult.Failure -> {
                     call.respondHtml {
-                        apply(lowCodeHtmlHead(cssPath))
+                        apply(lowCodeHtmlHead(pathProvider))
                         body {
                             h1 { +"Bad request" }
                             val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
@@ -207,7 +209,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     val modelWasDeleted = eventResult.deletedModels.contains(modelId)
                     val completionPaths = CompletionPaths.parse(call, modelId)
                     call.respondHtml {
-                        apply(lowCodeHtmlHead(cssPath))
+                        apply(lowCodeHtmlHead(pathProvider))
                         body {
                             h3 { +"Event was executed" }
                             apply(renderSuccess(eventResult))

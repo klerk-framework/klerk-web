@@ -22,7 +22,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
         apply(lowCodeHtmlHead(config))
         body {
             header {
-                nav { div { a(href = config.basePath) { +"Home" } } }
+                nav { div { a(href = config.pathProvider.base) { +"Home" } } }
             }
             main {
                 h1 { +"Jobs" }
@@ -86,9 +86,9 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
         body {
             nav {
                 div {
-                    a(href = config.basePath) { +"Home" }
+                    a(href = config.pathProvider.withPrefix()) { +"Home" }
                     +" / "
-                    a(href = "${config.basePath}/_jobs") { +"Jobs" }
+                    a(href = "${config.pathProvider.withPrefix()}/_jobs") { +"Jobs" }
                 }
             }
             h1 { +"Job details" }

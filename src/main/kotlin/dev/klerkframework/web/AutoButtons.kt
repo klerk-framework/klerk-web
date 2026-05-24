@@ -17,22 +17,22 @@ public class AutoButtons<C: KlerkContext, V>(
     internal val klerk: Klerk<C, V>,
     private val path: String,
     internal val contextProvider: suspend (call: io.ktor.server.application.ApplicationCall, Klerk<C, V>) -> C,
-    internal val cssPath: String,
+    internal val pathProvider: PathProvider,
     internal val cssClassProvider: CssClassProvider? = null,
 ) {
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>> = klerk.config.managedModels.flatMap { managed ->
         managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-            LowCodeCreateEvent(klerk, path, event, managed.kClass, this@AutoButtons)
+            LowCodeCreateEvent(klerk, path, event, managed.kClass, this@AutoButtons, pathProvider)
         }
     }
 
     public fun registerRoutes(): Routing.() -> Unit = {
         get(path) {
-            LowCodeCreateEvent.renderCreateEventPage(call, createCommandsWithParams, klerk, contextProvider, cssPath)
+            LowCodeCreateEvent.renderCreateEventPage(call, createCommandsWithParams, klerk, contextProvider, pathProvider)
         }
 
         post(path) {
-            LowCodeCreateEvent.renderExecuteEvent(call, createCommandsWithParams, klerk, contextProvider, cssPath)
+            LowCodeCreateEvent.renderExecuteEvent(call, createCommandsWithParams, klerk, contextProvider, pathProvider)
         }
 
     }

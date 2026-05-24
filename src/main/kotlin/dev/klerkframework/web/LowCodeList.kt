@@ -7,6 +7,8 @@ import dev.klerkframework.klerk.misc.ReflectedProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.statemachine.VoidState
+import dev.klerkframework.web.assets.CssAsset
+import io.ktor.client.request.request
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -34,15 +36,9 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
     val humanName: String,
     private val klerk: Klerk<C, V>,
     private val renderListDetails: Boolean = false,
-    private val pathProvider: PathProvider
+    private val pathProvider: PathProvider,
 ) {
-    private lateinit var basePath: String
     private val tableTemplate = TableTemplate(klerk, kClass, pathProvider = pathProvider)
-
-
-    fun initView(basePath: String) {
-        this.basePath = basePath
-    }
 
     fun registerRoutes(): Routing.() -> Unit = {
         get(pathProvider.pathForCollection(kClass)) {
@@ -71,9 +67,9 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
         }
 
         call.respondHtml {
-            apply(lowCodeHtmlHead(config.cssPath))
+            apply(lowCodeHtmlHead(pathProvider))
             body {
-                breadcumbs(basePath,kClass, pathProvider)
+                breadcrumbs(kClass, pathProvider)
                 h2 { +humanName }
                 ul {
                     /*klerk.config.getView<T>(kClass).getCollections().forEach {
@@ -153,11 +149,11 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
             p { apply(config.autoButtons.render(event, null, context,
                 onCancelPath = call.request.uri,
                 onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
-                onErrorPath = basePath)) }
+                onErrorPath = pathProvider.base)) }
         }
 
         if (renderListDetails) {
-            a(href = "$basePath/${pathProvider.pathForCollection(kClass)}/analysis") { +"(More details about the list)" }
+            a(href = "${pathProvider.pathForCollection(kClass)}/analysis") { +"(More details about the list)" }
         }
     }
 
@@ -468,30 +464,6 @@ internal fun withQueryParam(url: String, paramName: String, paramValue: String):
     val oldValue =
         if (valueEndIndex == -1) url.substring(valueStartIndex) else url.substring(valueStartIndex, valueEndIndex)
     return url.replace(oldValue, paramValue)
-}
-
-/**
- * This interface provides path generation for collections and individual items. Used by various klerk-web
- * components to generate URLs for navigation and linking within the application.
- */
-public interface PathProvider {
-    public fun pathForCollection(kClass: KClass<out Any>): String
-    public fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String
-    public fun pathForItem(kClass: KClass<out Any>, id: String): String
-}
-
-public class DefaultPathProvider(private val prefix: String = "/") : PathProvider {
-    override fun pathForCollection(kClass: KClass<out Any>): String {
-        return prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
-    }
-
-    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String {
-        return "${pathForCollection(kClass)}/${id.value}"
-    }
-
-    override fun pathForItem(kClass: KClass<out Any>, id: String): String {
-        return "${pathForCollection(kClass)}/$id"
-    }
 }
 
 public open class TableTemplate<C : KlerkContext, V>(

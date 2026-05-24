@@ -27,12 +27,12 @@ import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import dev.klerkframework.web.config.AuthorStates.*
-import dev.klerkframework.web.myScript
 import dev.klerkframework.web.css
 import dev.klerkframework.web.models.City
 import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.models.cityStateMachine
 import dev.klerkframework.web.models.publisherStateMachine
+import dev.klerkframework.web.myScript
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime

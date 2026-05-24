@@ -27,10 +27,10 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
 
     call.respondHtml {
-        apply(lowCodeHtmlHead(config.cssPath))
+        apply(lowCodeHtmlHead(config.pathProvider))
         body {
             header {
-                nav { div { a(href = config.basePath) { +"Home" } } }
+                nav { div { a(href = config.pathProvider.base) { +"Home" } } }
             }
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
