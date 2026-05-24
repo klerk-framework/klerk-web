@@ -82,7 +82,7 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
 
 val css = CssAsset("water.css")
 
-val pathProvider = DefaultPathProvider(css = css)
+val pathProvider = DefaultPathProvider(base = "/gls/", css = css)
 
 //val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
@@ -97,28 +97,30 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         )
 
     routing {
-
-        get(renderIndex(klerkWeb))
-
         apply(klerkWeb.generateRoutes())
 
-/*        get("/authors", renderAuthors(klerk))
+        route(pathProvider.base) {
+            get(renderIndex(klerkWeb))
+
+
+            /*        get("/authors", renderAuthors(klerk))
         get("/authors/{id}", renderAuthorDetails(klerk))
         get("/books", renderBooks(klerk))
         get("/books/{id}", renderBookDetails(klerk))
 
  */
 
-        get("/testassets") {
-            call.respondHtml {
-                head {
-                    title { +"Test assets" }
-                    pathProvider.cssUrl()?.let { styleLink(it) }
-                }
-                body {
-                    h1 { +"Testing the assets. " }
-                    +"Did the css and js load? Correct encoding?"
-                    script(pathProvider.assetPath("other/my-script.js")) { defer = true }
+            get("/testassets") {
+                call.respondHtml {
+                    head {
+                        title { +"Test assets" }
+                        pathProvider.cssUrl()?.let { styleLink(it) }
+                    }
+                    body {
+                        h1 { +"Testing the assets. " }
+                        +"Did the css and js load? Correct encoding?"
+                        script(pathProvider.assetPath("other/my-script.js")) { defer = true }
+                    }
                 }
             }
         }

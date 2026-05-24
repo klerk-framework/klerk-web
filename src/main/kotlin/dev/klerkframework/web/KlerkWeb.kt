@@ -42,7 +42,7 @@ public class KlerkWeb<C : KlerkContext, V>(
     private val pathProvider: PathProvider = DefaultPathProvider(),
     private val adminPathProvider: PathProvider = DefaultPathProvider(pathProvider.base, "admin/", css = pathProvider.css, externalCssPath = pathProvider.externalCssPath),
     private val classProvider: CssClassProvider? = null,
-    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, "_autobuttons", contextProvider, pathProvider),
+    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, contextProvider, pathProvider),
     private val adminUI: AdminUI<C, V> = AdminUI(
         klerk,
         contextProvider,

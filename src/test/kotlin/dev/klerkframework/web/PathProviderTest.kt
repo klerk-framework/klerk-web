@@ -11,18 +11,21 @@ class PathProviderTest {
         var dpp = DefaultPathProvider()
         assertEquals("/book", dpp.pathForCollection(Book::class))
         assertEquals("/book/123", dpp.pathForItem(Book::class, "123"))
-        assertEquals("/assets/test", dpp.assetPath("test"))
+        assertEquals("/_assets/test", dpp.assetPath("test"))
         assertEquals(null, dpp.cssUrl())
+        assertEquals("/_autobuttons", dpp.autoButtons)
 
         dpp = DefaultPathProvider("/base/")
         assertEquals("/base/book", dpp.pathForCollection(Book::class))
         assertEquals("/base/book/123", dpp.pathForItem(Book::class, "123"))
-        assertEquals("/base/assets/test", dpp.assetPath("test"))
+        assertEquals("/base/_assets/test", dpp.assetPath("test"))
+        assertEquals("/base/_autobuttons", dpp.autoButtons)
 
         dpp = DefaultPathProvider("/base/", "prefix/")
         assertEquals("/base/prefix/book", dpp.pathForCollection(Book::class))
         assertEquals("/base/prefix/book/123", dpp.pathForItem(Book::class, "123"))
-        assertEquals("/base/assets/test", dpp.assetPath("test"))
+        assertEquals("/base/_assets/test", dpp.assetPath("test"))
+        assertEquals("/base/_autobuttons", dpp.autoButtons)
     }
 
 }

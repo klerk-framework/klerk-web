@@ -158,7 +158,6 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
 
 private fun <V> renderCollections(collections: V): BODY.() -> Unit = {
     h2 { +"Collections" }
-    print(collections)
 
 }
 

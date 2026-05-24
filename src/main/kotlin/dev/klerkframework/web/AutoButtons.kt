@@ -15,23 +15,22 @@ import kotlinx.html.form
 
 public class AutoButtons<C: KlerkContext, V>(
     internal val klerk: Klerk<C, V>,
-    private val path: String,
     internal val contextProvider: suspend (call: io.ktor.server.application.ApplicationCall, Klerk<C, V>) -> C,
     internal val pathProvider: PathProvider,
     internal val cssClassProvider: CssClassProvider? = null,
 ) {
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>> = klerk.config.managedModels.flatMap { managed ->
         managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-            LowCodeCreateEvent(klerk, path, event, managed.kClass, this@AutoButtons, pathProvider)
+            LowCodeCreateEvent(klerk, pathProvider.autoButtons, event, managed.kClass, this@AutoButtons, pathProvider)
         }
     }
 
     public fun registerRoutes(): Routing.() -> Unit = {
-        get(path) {
+        get(pathProvider.autoButtons) {
             LowCodeCreateEvent.renderCreateEventPage(call, createCommandsWithParams, klerk, contextProvider, pathProvider)
         }
 
-        post(path) {
+        post(pathProvider.autoButtons) {
             LowCodeCreateEvent.renderExecuteEvent(call, createCommandsWithParams, klerk, contextProvider, pathProvider)
         }
 
@@ -48,7 +47,7 @@ public class AutoButtons<C: KlerkContext, V>(
         val completionPaths = CompletionPaths(cancel = onCancelPath ?: "/", model = onSuccessAndModelExistPath ?: "/", error = onErrorPath ?: "/")
         val parameters = klerk.config.getParameters(event)
         var url =
-            "/$path?eventId=${event.urlEncode()}&_showOptionalParameters=true&${completionPaths.toQueryParamsString()}"
+            "${pathProvider.autoButtons}?eventId=${event.urlEncode()}&_showOptionalParameters=true&${completionPaths.toQueryParamsString()}"
         if (modelId != null) {
             url = url.plus("&modelId=${modelId}")
         }

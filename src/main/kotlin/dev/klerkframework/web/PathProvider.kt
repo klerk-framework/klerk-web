@@ -14,6 +14,7 @@ public interface PathProvider {
     public val assetsBase: String
     public val externalCssPath: String?
     public val css: CssAsset?
+    public val autoButtons: String
     public fun pathForCollection(kClass: KClass<out Any>): String {
         return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
     }
@@ -31,7 +32,9 @@ public data class DefaultPathProvider(
     override val css: CssAsset? = null
 ) : PathProvider {
 
-    override val assetsBase: String = "${base}assets"
+    override val assetsBase: String = "${base}_assets"
+
+    override val autoButtons: String = "${base}_autobuttons"
 
     override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String {
         return "${pathForCollection(kClass)}/${id.value}"
