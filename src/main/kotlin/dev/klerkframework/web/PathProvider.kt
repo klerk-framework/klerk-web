@@ -7,13 +7,17 @@ import kotlin.reflect.KClass
 /**
  * This interface provides path generation for collections and individual items. Used by various klerk-web
  * components to generate URLs for navigation and linking within the application.
+ * @param base Base path for the application, typically "/"
+ * @param prefix Prefix for collections, e.g. "admin/"
+ * @param css Optional CSS asset to embed in the HTML, e.g. CssAsset("myapp.css")
+ * @param externalCssPath Optional external CSS path, e.g. "https://example.com/beautiful.css"
  */
 public interface PathProvider {
     public val base: String
     public val prefix: String
     public val assetsBase: String
-    public val externalCssPath: String?
     public val css: CssAsset?
+    public val externalCssPath: String?
     public val autoButtons: String
     public fun pathForCollection(kClass: KClass<out Any>): String {
         return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))

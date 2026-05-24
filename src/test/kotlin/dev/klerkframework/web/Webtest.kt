@@ -82,7 +82,7 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
 
 val css = CssAsset("water.css")
 
-val pathProvider = DefaultPathProvider(base = "/gls/", css = css)
+val pathProvider = DefaultPathProvider(css = css)
 
 //val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")

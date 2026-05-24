@@ -13,7 +13,10 @@ import io.ktor.server.routing.get
 import kotlinx.html.HtmlBlockTag
 import kotlinx.html.a
 import kotlinx.html.body
+import kotlinx.html.dd
 import kotlinx.html.details
+import kotlinx.html.dl
+import kotlinx.html.dt
 import kotlinx.html.h1
 import kotlinx.html.h3
 import kotlinx.html.head
@@ -50,7 +53,8 @@ public class KlerkWeb<C : KlerkContext, V>(
         knownAlgorithms = setOf(),
         canSeeAdminUI = { true },   // TODO
         autoButtons = autoButtons,
-        pathProvider = adminPathProvider)
+        pathProvider = adminPathProvider),
+    private val useTableForDetails: Boolean = false,
 ) {
 
     public fun generateNav(): HtmlBlockTag.() -> Unit = {
@@ -106,15 +110,22 @@ public class KlerkWeb<C : KlerkContext, V>(
                 breadcrumbs(model.props::class, pathProvider, true)
                 h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
 
-
-
-                table {
-                    tbody {
-                        ReflectedModel(model).getProperties().forEach {
-                            tr {
-                                td { +it.name() }
-                                td { +it.value.toString() }
+                if (useTableForDetails) {
+                    table {
+                        tbody {
+                            ReflectedModel(model).getProperties().forEach {
+                                tr {
+                                    td { +it.name() }
+                                    td { +it.value.toString() }
+                                }
                             }
+                        }
+                    }
+                } else {
+                    dl {
+                        ReflectedModel(model).getProperties().forEach {
+                            dt { +it.name() }
+                            dd { +it.value.toString() }
                         }
                     }
                 }
@@ -122,15 +133,28 @@ public class KlerkWeb<C : KlerkContext, V>(
                 details {
                     summary { +"Meta" }
 
-                    table {
-                        tbody {
-                            reflectedModelPopulated.getMeta().forEach { property ->
-                                tr {
-                                    td { apply(property.renderNameNonBreakingHtml()) }
-                                    td {
-                                        property.description()?.let { title = it }
-                                        +property.toString()
+                    if (useTableForDetails) {
+
+                        table {
+                            tbody {
+                                reflectedModelPopulated.getMeta().forEach { property ->
+                                    tr {
+                                        td { apply(property.renderNameNonBreakingHtml()) }
+                                        td {
+                                            property.description()?.let { title = it }
+                                            +property.toString()
+                                        }
                                     }
+                                }
+                            }
+                        }
+                    } else {
+                        dl {
+                            reflectedModelPopulated.getMeta().forEach { property ->
+                                dt { apply(property.renderNameNonBreakingHtml()) }
+                                dd {
+                                    property.description()?.let { title = it }
+                                    +property.toString()
                                 }
                             }
                         }
