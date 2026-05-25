@@ -35,6 +35,7 @@ import kotlinx.html.tr
 import kotlinx.html.ul
 import mu.KotlinLogging
 import kotlin.collections.forEach
+import kotlin.reflect.KClass
 import kotlin.text.toInt
 
 private val log = KotlinLogging.logger {}
@@ -113,19 +114,37 @@ public class KlerkWeb<C : KlerkContext, V>(
                 if (useTableForDetails) {
                     table {
                         tbody {
-                            ReflectedModel(model).getProperties().forEach {
+                            reflectedModelPopulated.getProperties().forEach {
                                 tr {
                                     td { +it.name() }
-                                    td { +it.value.toString() }
+                                    td {
+                                        val modelId = it.value
+                                        @Suppress("UNCHECKED_CAST")
+                                        val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
+                                        if (modelId is ModelID<*> && propsClass != null) {
+                                            a(href = pathProvider.pathForItem(propsClass, modelId.value.toString())) { +it.toString() }
+                                        } else {
+                                            +it.toString()
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 } else {
                     dl {
-                        ReflectedModel(model).getProperties().forEach {
+                        reflectedModelPopulated.getProperties().forEach {
                             dt { +it.name() }
-                            dd { +it.value.toString() }
+                            dd {
+                                val modelId = it.value
+                                @Suppress("UNCHECKED_CAST")
+                                val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
+                                if (modelId is ModelID<*> && propsClass != null) {
+                                    a(href = pathProvider.pathForItem(propsClass, modelId.value.toString())) { +it.toString() }
+                                } else {
+                                    +it.toString()
+                                }
+                            }
                         }
                     }
                 }
