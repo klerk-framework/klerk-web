@@ -793,6 +793,23 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         //enabled: Boolean
     ): HtmlBlockTag.() -> Unit = {
         //val elementData = UIElementData(propertyName, typeInstance, enabled)
+        val description = translator.klerk.propertyDescription(propertyName)
+        if (description != null) {
+            label(classes = "tooltip") {
+                attributes["data-description"] = description
+                id = "label-$propertyName"
+                htmlFor = propertyName
+                //if (!enabled) {
+                //  style = "opacity: 0.5;"
+                //}
+                //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
+//            +translator.translateProperty(propertyName)
+                val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
+                +translator.klerk.property(property)
+                //+camelCaseToPretty(propertyName)
+                }
+            } else {
+
         label {
             id = "label-$propertyName"
             htmlFor = propertyName
@@ -805,6 +822,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             +translator.klerk.property(property)
             //+camelCaseToPretty(propertyName)
         }
+            }
         //   br()
     }
 

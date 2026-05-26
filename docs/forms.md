@@ -91,3 +91,7 @@ Other rules (e.g. `cannotHaveMoreNobelPrizesThanLettersInTheirName`) will be eva
 a little JavaScript that sends "dry-run" requests to the server. This means that the validation is not limited to the 
 fields or model, but all rules are evaluated. So if you introduce a rule saying that the name must be unique, the user
 will be notified if it is already taken before submitting the form.
+
+## Tooltips
+If you provide a KlerkTranslation with a function propertyDescription that produces a text, the label will get the "tooltip" class and
+the data-tooltip attribute will be set to the result of the function. You can use this to provide more information about the field.

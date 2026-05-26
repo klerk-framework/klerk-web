@@ -777,7 +777,7 @@ data class Context(
     override val actor: dev.klerkframework.klerk.ActorIdentity,
     override val auditExtra: String? = null,
     override val time: Instant = Clock.System.now(),
-    override val translation: Translation = DefaultTranslation,
+    override val translation: Translation = SwedishTranslation,
     val user: Model<User>? = null,
     val purpose: String = "Pass the butter",
 ) : KlerkContext {
@@ -856,6 +856,14 @@ class SwedishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation 
     }
 
     override fun mustBeAtLeast(value: Number): String = "Måste vara minst $value"
+
+    override fun propertyDescription(property: String): String? {
+        return when (property) {
+            "firstName" -> "Det namn som kommer först"
+            else -> null
+        }
+    }
+
 }
 
 

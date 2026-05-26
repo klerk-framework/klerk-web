@@ -1,6 +1,7 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.collection.ModelViews
 import dev.klerkframework.klerk.misc.camelCaseToPretty
@@ -94,6 +95,7 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         ApplicationCall::ctx,
         pathProvider = pathProvider,
         classProvider = MyClassProvider,
+        useTableForDetails = false
         )
 
     routing {
@@ -158,8 +160,6 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
         }
     }
 }
-
-
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     val queryResponse = klerk.read(call::ctx) {

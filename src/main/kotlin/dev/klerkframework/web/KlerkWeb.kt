@@ -2,41 +2,16 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.misc.ReflectedModel
 import dev.klerkframework.klerk.misc.camelCaseToPretty
-import io.ktor.server.application.ApplicationCall
-import io.ktor.server.html.respondHtml
-import io.ktor.server.routing.Routing
-import io.ktor.server.routing.RoutingCall
-import io.ktor.server.routing.get
-import kotlinx.html.HtmlBlockTag
-import kotlinx.html.a
-import kotlinx.html.body
-import kotlinx.html.dd
-import kotlinx.html.details
-import kotlinx.html.dl
-import kotlinx.html.dt
-import kotlinx.html.h1
-import kotlinx.html.h3
-import kotlinx.html.head
-import kotlinx.html.li
-import kotlinx.html.nav
-import kotlinx.html.p
-import kotlinx.html.styleLink
-import kotlinx.html.summary
-import kotlinx.html.table
-import kotlinx.html.tbody
-import kotlinx.html.td
-import kotlinx.html.th
-import kotlinx.html.thead
-import kotlinx.html.title
-import kotlinx.html.tr
-import kotlinx.html.ul
+import io.ktor.server.application.*
+import io.ktor.server.html.*
+import io.ktor.server.routing.*
+import kotlinx.html.*
 import mu.KotlinLogging
-import kotlin.collections.forEach
 import kotlin.reflect.KClass
-import kotlin.text.toInt
 
 private val log = KotlinLogging.logger {}
 
@@ -44,7 +19,12 @@ public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     private val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
     private val pathProvider: PathProvider = DefaultPathProvider(),
-    private val adminPathProvider: PathProvider = DefaultPathProvider(pathProvider.base, "admin/", css = pathProvider.css, externalCssPath = pathProvider.externalCssPath),
+    private val adminPathProvider: PathProvider = DefaultPathProvider(
+        pathProvider.base,
+        "admin/",
+        css = pathProvider.css,
+        externalCssPath = pathProvider.externalCssPath
+    ),
     private val classProvider: CssClassProvider? = null,
     private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, contextProvider, pathProvider),
     private val adminUI: AdminUI<C, V> = AdminUI(
@@ -54,16 +34,20 @@ public class KlerkWeb<C : KlerkContext, V>(
         knownAlgorithms = setOf(),
         canSeeAdminUI = { true },   // TODO
         autoButtons = autoButtons,
-        pathProvider = adminPathProvider),
+        pathProvider = adminPathProvider
+    ),
     private val useTableForDetails: Boolean = false,
 ) {
 
-    public fun generateNav(): HtmlBlockTag.() -> Unit = {
+    public fun generateNav(
+        translator: (ManagedModel<*, *, C, V>) -> String = { it.kClass.simpleName ?: "?" },
+        filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
+    ): HtmlBlockTag.() -> Unit = {
         nav {
             ul {
-                klerk.config.managedModels.sortedBy { it.kClass.simpleName }.forEach { model ->
+                klerk.config.managedModels.filter(filter).sortedBy { it.kClass.simpleName }.forEach { model ->
                     li {
-                        a(href = pathProvider.pathForCollection(model.kClass)) { +"${model.kClass.simpleName}" }
+                        a(href = pathProvider.pathForCollection(model.kClass)) { +translator(model) }
                     }
                 }
             }
@@ -115,14 +99,30 @@ public class KlerkWeb<C : KlerkContext, V>(
                     table {
                         tbody {
                             reflectedModelPopulated.getProperties().forEach {
+                                val description = it.describe(context.translation.klerk)
                                 tr {
-                                    td { +it.name() }
+                                    td {
+                                        if (description != null) {
+                                            span(classes = "tooltip") {
+                                                attributes["data-description"] = description
+                                                +it.name()
+                                            }
+                                        } else {
+                                            +it.name()
+                                        }
+                                    }
                                     td {
                                         val modelId = it.value
+
                                         @Suppress("UNCHECKED_CAST")
                                         val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
                                         if (modelId is ModelID<*> && propsClass != null) {
-                                            a(href = pathProvider.pathForItem(propsClass, modelId.value.toString())) { +it.toString() }
+                                            a(
+                                                href = pathProvider.pathForItem(
+                                                    propsClass,
+                                                    modelId.value.toString()
+                                                )
+                                            ) { +it.toString() }
                                         } else {
                                             +it.toString()
                                         }
@@ -134,13 +134,29 @@ public class KlerkWeb<C : KlerkContext, V>(
                 } else {
                     dl {
                         reflectedModelPopulated.getProperties().forEach {
-                            dt { +it.name() }
+                            val description = it.describe(context.translation.klerk)
+                            dt {
+                                if (description != null) {
+                                    span(classes = "tooltip") {
+                                        attributes["data-description"] = description
+                                        +it.name()
+                                    }
+                                } else {
+                                    +it.name()
+                                }
+                            }
                             dd {
                                 val modelId = it.value
+
                                 @Suppress("UNCHECKED_CAST")
                                 val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
                                 if (modelId is ModelID<*> && propsClass != null) {
-                                    a(href = pathProvider.pathForItem(propsClass, modelId.value.toString())) { +it.toString() }
+                                    a(
+                                        href = pathProvider.pathForItem(
+                                            propsClass,
+                                            modelId.value.toString()
+                                        )
+                                    ) { +it.toString() }
                                 } else {
                                     +it.toString()
                                 }
@@ -296,17 +312,16 @@ public class KlerkWeb<C : KlerkContext, V>(
 
      */
 
-/*    private val adminUI = AdminUI(
-        klerk,
-        basePath = "/admin",
-        contextProvider = contextProvider,
-        cssPath = cssPath,
-        canSeeAdminUI = { true },
-        autoButtons = autoButtons,
-        pathProvider = DefaultPathProvider("/admin/"),
-    )
+    /*    private val adminUI = AdminUI(
+            klerk,
+            basePath = "/admin",
+            contextProvider = contextProvider,
+            cssPath = cssPath,
+            canSeeAdminUI = { true },
+            autoButtons = autoButtons,
+            pathProvider = DefaultPathProvider("/admin/"),
+        )
 
- */
+     */
 
 }
-
