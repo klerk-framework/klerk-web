@@ -7,7 +7,7 @@ plugins {
     `maven-publish`
 }
 
-val klerkVersion = "1.0.0-beta.7-SNAPSHOT"
+val klerkVersion = "a3640ba3a8"
 val ktorVersion = "3.2.3"
 val gsonVersion = "2.9.0"
 val kotlinLoggingVersion = "2.1.21"
