@@ -15,6 +15,7 @@ import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.web.assets.JsAsset
+import dev.klerkframework.web.assets.formJs
 import dev.klerkframework.web.assets.klerkFormValidationJsFile
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -1002,7 +1003,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         try {
             val path = getPath(postPath, queryParams)
             tag.script {
-                src = "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
+                src = template.pathProvider.assetPath(formJs.getPathAndHash()) // "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
                 defer = true
             }
             tag.form(path, method = FormMethod.post) {

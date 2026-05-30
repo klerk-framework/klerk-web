@@ -18,8 +18,8 @@ private val log = KotlinLogging.logger {}
 public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     private val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-    private val pathProvider: PathProvider = DefaultPathProvider(),
-    private val adminPathProvider: PathProvider = DefaultPathProvider(
+    public val pathProvider: PathProvider = DefaultPathProvider(),
+    public val adminPathProvider: PathProvider = DefaultPathProvider(
         pathProvider.base,
         "admin/",
         css = pathProvider.css,

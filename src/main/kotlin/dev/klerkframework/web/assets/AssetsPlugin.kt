@@ -60,7 +60,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
         val brotliAvailable = isBrotliAvailable()
 
-        assets = userAssetResources.plus(JsAsset(klerkFormValidationJsFile))
+        assets = userAssetResources.plus(formJs)
         assets.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)
                 ?: throw IllegalStateException("Resource not found: ${asset.resourcePath}")
@@ -210,7 +210,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         asset: KlerkAsset,
         contentType: ContentType
     ) {
-        val resourcePath = if (asset.resourcePath.startsWith("/")) asset.resourcePath else "/$asset.resourcePath"
+        val resourcePath = if (asset.resourcePath.startsWith("/")) asset.resourcePath else "/${asset.resourcePath}"
         val inputString = this::class.java.getResourceAsStream(resourcePath)
         if (inputString != null) {
             setCacheControl(call)
@@ -319,3 +319,5 @@ private object ResourceReader {
 //internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js", pathProvider)
 
 internal val klerkFormValidationJsFile = "klerkFormValidation.js"
+
+internal val formJs = JsAsset(klerkFormValidationJsFile)
