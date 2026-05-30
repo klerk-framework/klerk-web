@@ -52,12 +52,13 @@ function handleProblems(propertyProblems) {
         if (key == null) {
             continue;
         }
-        var value = propertyProblems[key];
-        var input = document.getElementById(key);
+        var field = propertyProblems[key].field;
+        var value = propertyProblems[key].humanReadable;
+        var input = document.getElementById(field);
         input.setCustomValidity(value);
         input.setAttribute('aria-invalid', 'true');
         input.style.visibility = 'visible';
-        var errorSpan = document.getElementById("error-" + key);
+        var errorSpan = document.getElementById("error-" + field);
         if (errorSpan !== null) {
             errorSpan.innerText = value;
             errorSpan.style.visibility = 'visible';

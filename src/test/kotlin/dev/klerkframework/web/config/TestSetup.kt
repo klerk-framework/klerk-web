@@ -617,6 +617,14 @@ class FirstName(value: String) : StringContainer(value) {
     override val maxLines = 1
     override val recommendedDefault = "John"
 
+    override val validators: Set<(translator: Translation) -> PropertyValidation> =
+        setOf(::mustNotHavePelleInName)
+
+    fun mustNotHavePelleInName(translation: Translation): PropertyValidation {
+        return if (valueWithoutAuthorization.contains("Pelle", ignoreCase = true))
+            PropertyValidation.Invalid("Must not contain 'Pelle'") else
+            PropertyValidation.Valid
+    }
 }
 
 class LastName(value: String) : StringContainer(value) {

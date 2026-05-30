@@ -14,6 +14,7 @@ import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.formJs
 import dev.klerkframework.web.assets.klerkFormValidationJsFile
@@ -329,7 +330,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
 
             // validate the collection of parameters
-            val validationProblems: Set<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
+            val validationProblems: MutableSet<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
                 paramsClass.validators()
                     .mapNotNull {
                          val result = it.invoke()
@@ -338,11 +339,30 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                          } else {
                              null
                          }
-                    }.toSet()
-            } else emptySet()
+                    }.toMutableSet()
+            } else mutableSetOf()
+
             if (validationProblems.isNotEmpty()) {
                 return ParseResult.Invalid(validationProblems.map { it.toProblem() }.toSet())
             }
+
+            val context = klerk.config.systemContextProvider.invoke(SystemIdentity) // TODO: should use other contextProvider
+            val propertyValidationProblems = mutableSetOf<InvalidPropertyProblem>()
+                paramsClass::class.memberProperties.forEach { property ->
+                if (property.returnType.isSubtypeOf(DataContainer::class.starProjectedType)) {
+                    val problem =
+                        (property.getter.call(paramsClass) as DataContainer<*>).validate(property.name, context.translation)
+                    if (problem != null) {
+                        propertyValidationProblems.add(problem)
+                    }
+                }
+            }
+
+            if (propertyValidationProblems.isNotEmpty()) {
+                return ParseResult.Invalid(propertyValidationProblems.toSet())
+            }
+
+
             if (call.request.queryParameters["dryRun"]?.equals("true") == true) {
                 return ParseResult.DryRun(paramsClass, key)
             }
