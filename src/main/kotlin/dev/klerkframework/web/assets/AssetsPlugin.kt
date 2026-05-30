@@ -211,14 +211,14 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         contentType: ContentType
     ) {
         val resourcePath = if (asset.resourcePath.startsWith("/")) asset.resourcePath else "/${asset.resourcePath}"
-        val inputString = this::class.java.getResourceAsStream(resourcePath)
+        val inputString = this::class.java.getResourceAsStream("/assets$resourcePath")
         if (inputString != null) {
             setCacheControl(call)
             call.respondSource(inputString.asSource(), contentType, HttpStatusCode.OK)
             return
         }
         log.warn { "Could not find resource: $resourcePath" }
-        call.respond(HttpStatusCode.InternalServerError)
+        call.respond(HttpStatusCode.NotFound)
     }
 
     private suspend fun serveBrotli(call: RoutingCall, id: BinaryKeyValueID, contentType: ContentType) {
