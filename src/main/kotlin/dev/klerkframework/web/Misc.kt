@@ -4,10 +4,17 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.web.assets.CssAsset
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.withCharset
+import io.ktor.utils.io.charsets.Charsets
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.format.char
 import kotlinx.html.*
+import kotlinx.html.stream.appendHTML
 import java.security.SecureRandom
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
@@ -82,4 +89,13 @@ internal val dateTimeFormatter = LocalDateTime.Format {
     minute()
     char(':')
     second()
+}
+
+
+public fun <C : KlerkContext, V> Reader<C, V>.html(status: HttpStatusCode = HttpStatusCode.OK, block: HTML.() -> Unit) : TextContent {
+    val text = buildString {
+        append("<!DOCTYPE html>\n")
+        appendHTML().html(block = block)
+    }
+    return TextContent(text, ContentType.Text.Html.withCharset(Charsets.UTF_8), status)
 }

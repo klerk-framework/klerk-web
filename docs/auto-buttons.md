@@ -6,7 +6,8 @@ rendered. And when the user submits the form, the event is triggered.
 First, create an instance of `AutoButtons`:
 
 ```kotlin
-val autoButtons = AutoButtons(klerk, "autobuttons-path", ApplicationCall::ctx, cssPath)
+val pathProvider = DefaultPathProvider()
+val autoButtons = AutoButtons(klerk, ApplicationCall::ctx, pathProvider)
 ```
 
 Register the routes so that AutoButtons can render a form and handle the submission:
@@ -21,40 +22,40 @@ Now you can render buttons for each possible event. For void events:
 
 ```kotlin
 val context = call.ctx(klerk)
-klerk.readSuspend(context) {
-    call.respondHtml {
+call.respond(klerk.read(context) {
+    html {
         body {
             getPossibleVoidEvents(Author::class).forEach {
                 apply(autoButtons.render(it, null, context))
             }
         }
     }
-}
+})
 ```
 
 And for instance events:
 
 ```kotlin
 val context = call.ctx(klerk)
-klerk.readSuspend(context) {
-    val author = get(id)
-    call.respondHtml {
+call.respond(klerk.read(context) {
+    html {
         body {
             getPossibleEvents(id).forEach { event ->
                 apply(autoButtons.render(event, id, context))
             }
         }
     }
-}
+})
 ```
 
 ## Configuration
 
-When creating an instance of `AutoButtons`, you can specify the path to the CSS that should be used when rendering the
-form. You can also specity a CssClassProvider with functions that will be called to get the CSS classes when rendering
-the form.
+When creating an instance of `AutoButtons`, you can optionally specify a `CssClassProvider` with functions that will
+be called to get the CSS classes when rendering the form.
 
-To control where the browser should be redirected after submitting the form, you can specify
-* onCancelPath: 
-* onSuccessAndModelExistPath: 
-* onErrorPath: 
+`render` takes optional path parameters that control where the browser is redirected once the form has been handled:
+* `onCancelPath`: where to redirect if the user cancels the form.
+* `onSuccessAndModelExistPath`: where to redirect after a successful event, if the model still exists.
+* `onErrorPath`: where to redirect if the event fails.
+
+All three default to `/` if not specified.

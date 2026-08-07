@@ -26,7 +26,7 @@ public class KlerkWeb<C : KlerkContext, V>(
         externalCssPath = pathProvider.externalCssPath
     ),
     private val classProvider: CssClassProvider? = null,
-    private val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, contextProvider, pathProvider),
+    public val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, contextProvider, pathProvider),
     private val adminUI: AdminUI<C, V> = AdminUI(
         klerk,
         contextProvider,

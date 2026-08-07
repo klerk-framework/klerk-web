@@ -3,7 +3,7 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import io.ktor.server.application.*
-import io.ktor.server.html.*
+import io.ktor.server.response.*
 import kotlinx.html.*
 import kotlin.reflect.KClass
 
@@ -16,8 +16,8 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     val context = config.contextProvider(call, klerk)
     val modelView = klerk.config.getView<T>(kClass)
 
-    klerk.readSuspend(context) {
-        call.respondHtml {
+    call.respond(klerk.read(context) {
+        html {
             apply(lowCodeHtmlHead(config))
             body {
                 h1 { +"Details" }
@@ -25,7 +25,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                 h2 { +"Collections" }
                 modelView.getCollections().forEach { collection ->
                     h6 { +(collection.getFullId().toString()) }
-                    val groupedByState = collection.withReader(this@readSuspend, null).groupBy { it.state }
+                    val groupedByState = collection.withReader(this@read, null).groupBy { it.state }
                     val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
                     +"Total count: ${countPerState.values.sum()}"
                     ul {
@@ -36,5 +36,5 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                 }
             }
         }
-    }
+    })
 }

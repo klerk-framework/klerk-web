@@ -50,7 +50,7 @@ fun main() {
             println(improveResult)
 
             generateSampleData(50, 3, klerk)
-
+        }
             val eventParams = EventParameters(CreateAuthorParams::class)
             val template = FormTemplate(
                 defaultValues = EventWithParameters(CreateAuthor.id, eventParams),
@@ -83,7 +83,7 @@ fun main() {
 
                         val context = Context.swedishUnauthenticated()
 
-                        klerk.readSuspend(context) {
+                        call.respond(klerk.read(context) {
                             val form1 =
                                 template.build(
                                     call,
@@ -94,7 +94,8 @@ fun main() {
                                     //enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
                                     context = context,
                                 )
-                            call.respondHtml {
+
+                            html {
                                 head {
                                     link(href = "https://unpkg.com/sakura.css/css/sakura.css", rel = "stylesheet")
                                 }
@@ -103,7 +104,7 @@ fun main() {
                                     form1.render(this)
                                 }
                             }
-                        }
+                        })
                     }
 
                     post("/noklerkvalidation") {
@@ -170,7 +171,6 @@ fun main() {
                 }
             }.start(wait = true)
         }
-    }
 }
 
 fun myLabelProvider(elementData: UIElementData): String? {

@@ -1,5 +1,6 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.Event
 import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
@@ -35,6 +36,15 @@ public class AutoButtons<C: KlerkContext, V>(
         }
 
     }
+
+    public fun render(
+        event: Event<*, *>,
+        modelId: ModelID<*>?,
+        context: C,
+        onCancelPath: String? = null,
+        onSuccessAndModelExistPath: String? = null,
+        onErrorPath: String? = null,
+    ): HtmlBlockTag.() -> Unit = render(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
 
     public fun render(
         event: EventReference,

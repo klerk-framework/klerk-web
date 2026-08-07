@@ -30,19 +30,21 @@ We now want to render a form for CreateAuthorParams.
 ## Generate the form
 
 The form is produced in three steps:
-1. A template is created when the server starts. It is recommended to validate the template at startup so you will immediately see any errors.
+1. A `FormTemplate` is created, typically when the server starts. It validates itself on construction (checking that
+every parameter has a matching field declaration), so creating it at startup means you see any errors immediately
+instead of on the first request.
 If you don't care about the order of the fields, just pass `remaining()` in the init block. In this case we start with the field `nobelPrizes` 
 and then the remaining fields:
 ```kotlin
-val template = EventFormTemplate(
+val template = FormTemplate(
     EventWithParameters(CreateAuthor.id, EventParameters(CreateAuthorParams::class)),
-    klerk, 
+    klerk,
     postPath = "/path/to/handle/submission",
+    pathProvider = pathProvider,
 ) {
     text(CreateAuthorParams::nobelPrizes)
     remaining()
 }
-template.validate()
 ```
 
 2. Build an instance of the form when rendering a page.
@@ -52,6 +54,7 @@ val form = template.build(
     params,
     this,
     translator = context.translation,
+    context = context,
 )
 ```
 
@@ -72,7 +75,7 @@ Here is an example of how to use Klerk-web to parse the request:
 routing {
     post("/path/to/handle/submission") {
         when (val parsed = template.parse(call)) {
-            is Invalid -> EventFormTemplate.respondInvalid(parsed, call)
+            is Invalid -> FormTemplate.respondInvalid(parsed, call)
             is DryRun -> call.respond(HttpStatusCode.OK)
             is Parsed -> {
                 println("Hello ${parsed.params.name}")
