@@ -77,13 +77,12 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
                 // at startup: should delete any existing future job
 
                 if (textAssets.none { ta -> ta.props.hash == base64hash }) {
+                    context = _klerk.config.systemContextProvider(SystemIdentity)
+
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
-                        val brotliToken = _klerk.keyValueStore.prepareBlob(brotli.inputStream())
-                        _klerk.keyValueStore.put(brotliToken)
+                        _klerk.attachedData.prepare(brotli.inputStream(), context)
                     } else null
-
-                    context = _klerk.config.systemContextProvider(SystemIdentity)
 
                     _klerk.handle(
                         Command(
@@ -221,10 +220,10 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         call.respond(HttpStatusCode.NotFound)
     }
 
-    private suspend fun serveBrotli(call: RoutingCall, id: BinaryKeyValueID, contentType: ContentType) {
+    private suspend fun serveBrotli(call: RoutingCall, id: AttachedBlobID, contentType: ContentType) {
         call.response.headers.append(ContentEncoding, contentEncodingBrotli)
         val ctx = _klerk.config.systemContextProvider(SystemIdentity)
-        val inputStream = _klerk.keyValueStore.get(id, ctx)
+        val inputStream = _klerk.attachedData.get(id, ctx)
         setCacheControl(call)
         call.suppressCompression()
         call.respondSource(inputStream.asSource(), contentType, HttpStatusCode.OK)
@@ -257,7 +256,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
             AssetDetails(
                 it.props.path.value,
                 ResourceReader.readResource(it.props.path.value)?.length ?: 0,
-                it.props.brotli?.let { klerk.keyValueStore.get(it, context).readBytes().size })
+                it.props.brotli?.let { blobId -> klerk.attachedData.get(blobId, context).readBytes().size })
         }
 
         call.respondHtml {

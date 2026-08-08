@@ -12,7 +12,7 @@ public data class TextAsset(
     val path: AssetPath,
     val contentType: AssetContentType,
     val hash: Base64hash,
-    val brotli: BinaryKeyValueID?,
+    val brotli: AttachedBlobID?,
 )
 
 public enum class TextAssetStates {
@@ -52,7 +52,7 @@ public data class CreateTextAssetParams(
     val path: AssetPath,
     val contentType: AssetContentType,
     val hash: Base64hash,
-    val brotli: BinaryKeyValueID?
+    val brotli: AttachedBlobID?
 )
 
 private fun <C : KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, CreateTextAssetParams, C, V>): TextAsset {

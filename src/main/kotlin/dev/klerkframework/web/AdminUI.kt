@@ -25,12 +25,12 @@ public class AdminUI<C : KlerkContext, V>(
     private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>>
 
-    private val auditPath = "${pathProvider.withPrefix()}/_audit"
-    private val jobsPath = "${pathProvider.withPrefix()}/_jobs"
-    private val metricsPath = "${pathProvider.withPrefix()}/_metrics"
-    private val pluginsPath = "${pathProvider.withPrefix()}/_plugins"
-    private val logPath = "${pathProvider.withPrefix()}/_log"
-    private val documentationPath = "${pathProvider.withPrefix()}/_documentation"
+    private val auditPath = "${pathProvider.withPrefix()}_audit"
+    private val jobsPath = "${pathProvider.withPrefix()}_jobs"
+    private val metricsPath = "${pathProvider.withPrefix()}_metrics"
+    private val pluginsPath = "${pathProvider.withPrefix()}_plugins"
+    private val logPath = "${pathProvider.withPrefix()}_log"
+    private val documentationPath = "${pathProvider.withPrefix()}_documentation"
 
     init {
         // TODO: remove and use autobuttons instead
@@ -89,9 +89,33 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        get("${jobsPath}/{id}") {
+        get("$jobsPath/types") {
             requireAdmin(call) {
-                renderJobDetails(call, this@AdminUI, klerk)
+                renderJobTypes(call, this@AdminUI, jobsPath, klerk)
+            }
+        }
+
+        get("$jobsPath/{id}") {
+            requireAdmin(call) {
+                renderJobDetails(call, this@AdminUI, jobsPath, klerk)
+            }
+        }
+
+        post("$jobsPath/{id}/cancel") {
+            requireAdmin(call) {
+                handleJobCancel(call, this@AdminUI, jobsPath, klerk)
+            }
+        }
+
+        post("$jobsPath/{id}/resume") {
+            requireAdmin(call) {
+                handleJobResume(call, this@AdminUI, jobsPath, klerk)
+            }
+        }
+
+        post("$jobsPath/{id}/delete") {
+            requireAdmin(call) {
+                handleJobDelete(call, this@AdminUI, jobsPath, klerk)
             }
         }
 
@@ -125,7 +149,7 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        get("${pathProvider.withPrefix()}/plugin") {
+        get("${pathProvider.withPrefix()}plugin") {
             requireAdmin(call) {
                 renderPluginPage(call, this@AdminUI, klerk)
             }
@@ -186,7 +210,7 @@ public class AdminUI<C : KlerkContext, V>(
                         klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
                             span {
                                 style = "margin: 10px;"
-                                a(href = "${pathProvider.withPrefix()}/plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                                a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
                             }
 
                         }

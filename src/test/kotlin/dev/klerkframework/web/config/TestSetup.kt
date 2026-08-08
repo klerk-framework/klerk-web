@@ -11,9 +11,13 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
-import dev.klerkframework.klerk.job.JobMetadata
+import dev.klerkframework.klerk.job.JobExecution
+import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobResult
-import dev.klerkframework.klerk.job.RunnableJob
+import dev.klerkframework.klerk.job.JobStepArgs
+import dev.klerkframework.klerk.job.JobType
+import dev.klerkframework.klerk.job.JobsBlock
+import dev.klerkframework.klerk.job.ScheduledJob
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
@@ -49,7 +53,12 @@ import kotlin.time.Instant
 var onEnterAmateurStateActionCallback: (() -> Unit)? = null
 var onEnterImprovingStateActionCallback: (() -> Unit)? = null
 
-fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()): Config<Context, MyCollections> {
+fun createConfig(
+    collections: MyCollections,
+    storage: Persistence = RamStorage(),
+    jobExecution: JobExecution = JobExecution.Automatic,
+    extraJobs: JobsBlock<Context, MyCollections>.() -> Unit = {},
+): Config<Context, MyCollections> {
     return ConfigBuilder<Context, MyCollections>(collections).build {
         persistence(storage)
         managedModels {
@@ -58,6 +67,14 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
             model(Publisher::class, publisherStateMachine(collections), collections.publishers)
             model(City::class, cityStateMachine(collections), collections.cities)
             //model(Shop::class, cudStateMachine(Shop::class), views.shops)
+        }
+        jobs {
+            register(MyJob)
+            cron(MyJob, "0 3 * * *") {
+                cursor = ""
+            }
+            execution = jobExecution
+            extraJobs()
         }
         authorization {
             readModels {
@@ -91,6 +108,12 @@ fun createConfig(collections: MyCollections, storage: Persistence = RamStorage()
                 }
                 negative {}
             }
+            jobs {
+                positive {
+                    rule(::`Everybody can read jobs`)
+                }
+                negative {}
+            }
         }
         systemContextProvider(::myContextProvider)
     }.withPlugin(AssetsPlugin(setOf(css, myScript)))
@@ -119,6 +142,10 @@ fun `Everybody can do everything`(argCommandContextReader: ArgCommandContextRead
 
 
 fun `Everybody can read event log`(args: ArgContextReader<Context, MyCollections>): PositiveAuthorization {
+    return PositiveAuthorization.Allow
+}
+
+fun `Everybody can read jobs`(args: ArgsForJobRead<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
@@ -368,8 +395,8 @@ fun later(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Instant
 fun hasTalent(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = true
 fun isAnImpostor(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = false
 
-fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<RunnableJob<Context, MyCollections>> {
-    return listOf(MyJob())
+fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<ScheduledJob<Context, MyCollections>> {
+    return listOf(MyJob.schedule(""))
 }
 
 
@@ -391,8 +418,8 @@ fun onEnterAmateurStateAction(args: ArgForInstanceNonEvent<Author, Context, MyCo
 }
 
 
-fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<RunnableJob<Context, MyCollections>> {
-    return listOf(MyJob())
+fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<ScheduledJob<Context, MyCollections>> {
+    return listOf(MyJob.schedule(""))
 }
 
 fun changeNameOfAuthor(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): Author {
@@ -811,19 +838,15 @@ data class User(val name: FirstName)
 
 object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, EXTERNAL)
 
-class MyJob : RunnableJob<Context, MyCollections>() {
-    override val parameters: String = "No parameters"
-    override fun getRunFunction(): suspend (metadata: JobMetadata, klerk: Klerk<Context, MyCollections>) -> JobResult =
-        Companion::run
+// A plain String cursor is used (rather than a custom data class) because this module has no kotlinx.serialization
+// compiler plugin applied, and String has a serializer built into kotlinx-serialization-core without it.
+object MyJob : JobType.Local<String, Context, MyCollections>() {
+    override val name: JobName = JobName("my-job")
 
-    companion object {
-        suspend fun run(meta: JobMetadata, klerk: Klerk<Context, MyCollections>): JobResult {
-            println("Did MyJob")
-            return JobResult.Success()
-        }
+    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String> {
+        println("Did MyJob")
+        return JobResult.Success()
     }
-
-
 }
 
 val english = EnglishKlerkTranslation(DefaultKlerkTranslation)

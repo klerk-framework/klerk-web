@@ -27,7 +27,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
                         plugins.forEach { plugin ->
                             li {
                                 if (plugin is AdminUIPluginIntegration<C, V>) {
-                                    a(href = "${config.pathProvider.withPrefix()}/plugin?name=${plugin.name}") { +plugin.name }
+                                    a(href = "${config.pathProvider.withPrefix()}plugin?name=${plugin.name}") { +plugin.name }
                                 } else {
                                     +plugin.name
                                 }

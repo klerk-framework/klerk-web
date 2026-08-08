@@ -77,7 +77,7 @@ internal suspend fun <C : KlerkContext, V> renderAuditDetails(
                     div {
                         a(href = config.pathProvider.withPrefix()) { +"Home" }
                         +" / "
-                        a(href = "${config.pathProvider.withPrefix()}/_audit") { +"Audit log" }
+                        a(href = "${config.pathProvider.withPrefix()}_audit") { +"Audit log" }
                     }
                 }
             }
