@@ -44,7 +44,7 @@ class BuildingBlocksTest {
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
 
         application {
-            routing { apply(klerkWeb.generateRoutes(filter = { it.kClass == Author::class })) }
+            routing { klerkWebRoutes(klerkWeb, filter = { it.kClass == Author::class }) }
         }
 
         assertEquals(HttpStatusCode.OK, client.get("/author").status)
@@ -59,7 +59,7 @@ class BuildingBlocksTest {
         val book = createBookHarryPotter1(klerk, author)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true }, pathProvider = NoBookDetails())
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         // No route was registered for the detail page...
         assertEquals(HttpStatusCode.NotFound, client.get("/book/${book.value}").status)
@@ -89,7 +89,7 @@ class BuildingBlocksTest {
                         TableTemplate(klerk, Author::class, support, columns)
                             .build(klerk.config.views.authors.all, this, call)
                     }
-                    call.respondPage(support.layout, "Authors") { apply(table.render()) }
+                    support.respondPage(call, "Authors") { modelTable(table) }
                 }
             }
         }

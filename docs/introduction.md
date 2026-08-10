@@ -53,6 +53,35 @@ Pass the same instance to every block, so the pages link to each other and look 
   `<head>`. See [Appearance](appearance.md).
 * `CssClassProvider` supplies CSS classes. Leave it out when using a classless CSS.
 
+# Rendering a page
+
+The blocks are ordinary [HTML DSL](https://ktor.io/docs/server-html-dsl.html) functions, so they are called like any
+other tag. `respondPage` renders a whole document and makes the support available to the blocks inside it:
+
+```kotlin
+support.respondPage(call, "Authors") {
+    h1 { +"Authors" }
+    modelTable(table)
+    events.forEach { event -> eventButton(event, id, context) }
+}
+```
+
+Rendering a fragment instead - an HTMX partial, or your own `respondHtml` - works the same way once the support is in
+scope:
+
+```kotlin
+call.respond(klerk.read(context) {
+    html {
+        body {
+            with(support) { eventButton(event, id, context) }
+        }
+    }
+})
+```
+
+Blocks that carry everything they need - `modelTable`, `eventForm`, `modelsNav`, `modelProperties` - require no scope
+at all.
+
 # Building blocks
 
 * [ModelListPage and ModelDetailPage](model-pages.md): a generated list and detail page for one model.
@@ -84,12 +113,12 @@ If you want routes for every managed model without assembling the blocks yoursel
 val klerkWeb = KlerkWeb(klerk, ApplicationCall::ctx, canSeeAdminUI = ::canSeeAdminUI)
 
 routing {
-    apply(klerkWeb.generateRoutes())
+    klerkWebRoutes(klerkWeb)
 }
 ```
 
 This registers a list and a detail route for each managed model, plus the AutoButtons and Admin UI routes.
-`klerkWeb.generateNav()` renders a `<nav>` with a link to each model's list page.
+`modelsNav(klerkWeb)` renders a `<nav>` with a link to each model's list page.
 
 `canSeeAdminUI` has no default: the Admin UI exposes the log, the configuration and job control, so you must decide
 who may see it.
@@ -97,7 +126,7 @@ who may see it.
 To build some pages yourself, exclude those models:
 
 ```kotlin
-apply(klerkWeb.generateRoutes(filter = { it.kClass != Game::class }))
+klerkWebRoutes(klerkWeb, filter = { it.kClass != Game::class })
 ```
 
 `klerkWeb.support` is the `WebSupport` the generated pages use. Pass it to your own blocks so they match.
@@ -115,22 +144,17 @@ follows the configuration. So if the Klerk configuration changes, your UI will a
 
 ```kotlin
 val context = call.ctx(klerk)
-call.respond(klerk.read(context) {
-    html {
-        body {
-            h1 { +"Actions for ${get(id).props.name}" }
-            getPossibleEvents(id).forEach { event ->
-                apply(autoButtons.render(event, id, context))
-            }
-        }
-    }
-})
+val (model, events) = klerk.read(context) { Pair(get(id), getPossibleEvents(id)) }
+support.respondPage(call, "Actions") {
+    h1 { +"Actions for ${model.props.name}" }
+    events.forEach { event -> eventButton(event, id, context) }
+}
 ```
 
 ## How to build a basic web UI
 
 * Start with a classless CSS. Use the [assets](assets.md) tools to serve it, and give it to the `Layout`.
-* Create a `KlerkWeb(klerk, ::ctx, canSeeAdminUI)`, call `generateRoutes()` and `generateNav()` to get a list page and a detail page for every
+* Create a `KlerkWeb(klerk, ::ctx, canSeeAdminUI)`, call `klerkWebRoutes(klerkWeb)` and `modelsNav(klerkWeb)` to get a list page and a detail page for every
   managed model, with buttons for every possible event already wired up.
-* When you need something else for a specific model, exclude it from `generateRoutes` and build that page with
+* When you need something else for a specific model, exclude it from `klerkWebRoutes` and build that page with
   `TableTemplate`/`FormTemplate`/`AutoButtons` - or from scratch. The other models keep their generated pages.

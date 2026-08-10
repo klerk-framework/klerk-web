@@ -35,7 +35,7 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         val prop = klerk.config.managedModels.flatMap { it.kClass.memberProperties }
             .firstOrNull { it.returnType.toString() == property }
         if (prop == null) {
-            call.respondPage(support.layout, "Function") { +"No property found with name $property" }
+            support.respondPage(call, "Function") { +"No property found with name $property" }
             return
         }
 
@@ -44,14 +44,14 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
                 (prop.returnType.classifier as KClass<*>).constructors.single { it.parameters.size == 1 }.call(value) as DataContainer<*>
             val problem = container.validate(name, context.translation)
             if (problem != null) {
-                call.respondPage(support.layout, "Function") { +"Validation problem: $problem" }
+                support.respondPage(call, "Function") { +"Validation problem: $problem" }
                 return
             }
-            call.respondPage(support.layout, "Function") { +"Validation successful" }
+            support.respondPage(call, "Function") { +"Validation successful" }
             return
         }
 
     }
-    call.respondPage(support.layout, "Function") { +"Not implemented" }
+    support.respondPage(call, "Function") { +"Not implemented" }
 
 }

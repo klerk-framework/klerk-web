@@ -23,17 +23,6 @@ import kotlin.reflect.KType
 internal val secureRandom = SecureRandom.getInstanceStrong()
 
 
-/** Responds with a complete document produced by [layout]. */
-internal suspend fun ApplicationCall.respondPage(
-    layout: Layout,
-    title: String,
-    status: HttpStatusCode = HttpStatusCode.OK,
-    pageHead: (HEAD.() -> Unit)? = null,
-    body: BODY.() -> Unit,
-) {
-    respondHtml(status = status, block = layout.page(title, pageHead, body))
-}
-
 /** Refreshes the page every [seconds] seconds. */
 internal fun autoRefresh(seconds: Int): HEAD.() -> Unit = {
     meta { httpEquiv = "refresh"; content = seconds.toString() }
@@ -44,7 +33,7 @@ internal fun isModelId(type: KType): Boolean {
     return type.toString().startsWith(ModelID::class.qualifiedName!!, false)
 }
 
-internal fun BODY.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
+internal fun FlowContent.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
     val name = camelCaseToPretty(requireNotNull(clazz.simpleName))
     a(href = pathProvider.withPrefix()) { +"Home" }
     unsafe {

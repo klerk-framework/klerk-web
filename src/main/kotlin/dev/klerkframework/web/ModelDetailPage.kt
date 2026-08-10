@@ -14,7 +14,7 @@ import kotlin.reflect.KClass
  * A generated detail page for one model: its properties, its metadata, a button for every event that is possible in
  * the model's current state, and the models that refer to it.
  *
- * Register its route, or call [render] from a route of your own.
+ * Register its route, or call [respond] from a route of your own.
  *
  * @param auditPath where the history of a model can be seen, if anywhere.
  * @param useTable renders the properties in a `<table>` instead of a `<dl>`.
@@ -31,17 +31,17 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     private val klerk: Klerk<C, V> = support.klerk
     private val pathProvider: PathProvider = support.pathProvider
 
-    public fun registerRoutes(): Routing.() -> Unit = {
+    internal fun registerInto(route: Route): Unit = with(route) {
         // A null path means the PathProvider says this model has no detail view, so no route is registered.
         pathProvider.pathForItem(kClass, "{id}")?.let { path ->
             get(path) {
-                render(call)
+                respond(call)
             }
         }
     }
 
-    /** Renders the page. */
-    public suspend fun render(call: ApplicationCall) {
+    /** Responds with the page. */
+    public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val id = ModelID<Any>(call.parameters["id"]!!.toInt())
         val (reflected, model) = klerk.read(context) {
@@ -52,7 +52,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
         val events = klerk.read(context) { getPossibleEvents(id) }
 
-        call.respondPage(support.layout, "$humanName ${model.id}") {
+        support.respondPage(call, "$humanName ${model.id}") {
             breadcrumbs(model.props::class, pathProvider, true)
             h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
 
@@ -62,15 +62,13 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             h3 { +"Commands" }
             events.forEach { event ->
                 p {
-                    apply(
-                        support.autoButtons.render(
-                            event,
-                            reflected.id,
-                            context,
-                            onCancelPath = pathProvider.base,
-                            onSuccessAndModelExistPath = pathProvider.pathForItem(model.props::class, model.id),
-                            onErrorPath = pathProvider.base,
-                        )
+                    eventButton(
+                        event,
+                        reflected.id,
+                        context,
+                        onCancelPath = pathProvider.base,
+                        onSuccessAndModelExistPath = pathProvider.pathForItem(model.props::class, model.id),
+                        onErrorPath = pathProvider.base,
                     )
                 }
             }
@@ -111,7 +109,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         if (href != null) a(href = href) { +property.toString() } else +property.toString()
     }
 
-    private fun renderProperties(reflected: ReflectedModel<Any>, context: C): BODY.() -> Unit = {
+    private fun renderProperties(reflected: ReflectedModel<Any>, context: C): FlowContent.() -> Unit = {
         if (useTable) {
             table(classesFor("table")) {
                 tbody {
@@ -133,7 +131,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun renderMeta(reflected: ReflectedModel<Any>): BODY.() -> Unit = {
+    private fun renderMeta(reflected: ReflectedModel<Any>): FlowContent.() -> Unit = {
         details {
             summary { +"Meta" }
             dl {
@@ -148,7 +146,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun renderRelations(reflected: ReflectedModel<Any>): BODY.() -> Unit = {
+    private fun renderRelations(reflected: ReflectedModel<Any>): FlowContent.() -> Unit = {
         reflected.referencesPretty().forEach { relatedList ->
             details {
                 summary { +relatedList.key }
@@ -191,3 +189,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
 internal fun EventReference.urlEncode(): String = id().encodeURLPathPart()
 
 internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = from(encoded.decodeURLPart())
+
+/** The detail route for one model. Registers nothing when [PathProvider.pathForItem] returns null for it. */
+public fun <T : Any, C : KlerkContext, V> Route.modelDetailRoutes(page: ModelDetailPage<T, C, V>): Unit =
+    page.registerInto(this)

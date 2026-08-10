@@ -9,11 +9,11 @@ import kotlin.reflect.full.memberProperties
  * Renders the properties of one model as a table. Use [ModelDetailPage] instead when you also want event buttons and
  * links to related models.
  */
-public fun <M : Any> renderModel(
+public fun <M : Any> FlowContent.modelProperties(
     model: Model<M>,
     classProvider: CssClassProvider? = null,
     includeMetadata: Boolean = true,
-): HtmlBlockTag.() -> Unit = {
+) {
     fun classesFor(element: String) = classProvider.attr(UiPart.ModelDetails, element, model = model)
 
     val reflected = ReflectedModel(model)

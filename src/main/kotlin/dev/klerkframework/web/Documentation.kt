@@ -27,7 +27,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
     val csrfToken = Csrf.issue(call)
 
-    call.respondPage(support.layout, "Documentation") {
+    support.respondPage(call, "Documentation") {
             header {
                 nav { div { a(href = support.pathProvider.base) { +"Home" } } }
             }
@@ -69,7 +69,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     }
 }
 
-private fun <C : KlerkContext, V> renderPluginsDocumentation(plugins: List<KlerkPlugin<C, V>>): BODY.() -> Unit = {
+private fun <C : KlerkContext, V> renderPluginsDocumentation(plugins: List<KlerkPlugin<C, V>>): FlowContent.() -> Unit = {
     h2 { +"Plugins" }
     ul {
         plugins.forEach { plugin ->
@@ -84,7 +84,7 @@ private fun <C : KlerkContext, V> renderModels(
     documentationPath: String,
     translation: KlerkTranslation,
     csrfToken: String,
-): BODY.() -> Unit = {
+): FlowContent.() -> Unit = {
     apply(addMermaidScript())
     h2 { +"Models" }
     models.forEach { model ->
@@ -98,7 +98,7 @@ private fun <C : KlerkContext, V> renderStatemachine(
     stateMachine: StateMachine<out Any, out Enum<*>, C, V>,
     klerk: Klerk<C, V>,
     translation: KlerkTranslation,
-): BODY.() -> Unit = {
+): FlowContent.() -> Unit = {
     h4 { +"States, transitions and events" }
     pre(classes = "mermaid") {
         unsafe {
@@ -109,7 +109,7 @@ private fun <C : KlerkContext, V> renderStatemachine(
 
 }
 
-private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String, csrfToken: String): BODY.() -> Unit = {
+private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String, csrfToken: String): FlowContent.() -> Unit = {
     h4 { +"Properties" }
     ul {
         EventParameters(kClass).all.forEach { prop ->
@@ -156,12 +156,12 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
     }
 }
 
-private fun <V> renderCollections(collections: V): BODY.() -> Unit = {
+private fun <V> renderCollections(collections: V): FlowContent.() -> Unit = {
     h2 { +"Collections" }
 
 }
 
-internal fun renderAlgorithms(documentationPath: String): BODY.() -> Unit = {
+internal fun renderAlgorithms(documentationPath: String): FlowContent.() -> Unit = {
     h2 { +"Algorithms" }
     AlgorithmDocumenter.algorithms.forEach {
         val url = URLEncoder.encode(it::class.qualifiedName, Charset.defaultCharset())
@@ -174,7 +174,7 @@ private const val noBullets = "list-style-type: none;"
 private fun <C : KlerkContext, V> renderEvents(
     stateMachine: StateMachine<out Any, out Enum<*>, C, V>,
     klerk: Klerk<C, V>
-): BODY.() -> Unit =
+): FlowContent.() -> Unit =
     {
         h5 { +"Events" }
         stateMachine.getAllEvents().forEach { externalEvent ->
@@ -252,7 +252,7 @@ private fun <C : KlerkContext, V> renderEvents(
     }
 
 
-internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): BODY.() -> Unit = {
+internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): FlowContent.() -> Unit = {
     h2 { +"Authorization rules" }
     h3 { +"Events" }
     h4 { +"Positive" }
@@ -321,7 +321,7 @@ internal suspend fun <C : KlerkContext, V> renderAlgorithm(
         URLDecoder.decode(call.parameters["name"], Charset.defaultCharset()) ?: throw IllegalArgumentException()
     val algorithm = AlgorithmDocumenter.getAlgorithm(algorithmName)
 
-    call.respondPage(support.layout, algorithm.name) {
+    support.respondPage(call, algorithm.name) {
         apply(addMermaidScript())
         h1 { +algorithm.name }
         pre(classes = "mermaid") {

@@ -14,7 +14,7 @@ class MyPlugin<C : KlerkContext, V> : AdminUIPluginIntegration<C, V> {
     override val page: PluginPage<C, V> = object : PluginPage<C, V> {
         override val buttonText: String = "My plugin"
 
-        override suspend fun render(call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>) {
+        override suspend fun respond(call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>) {
             val context = support.contextProvider(call, klerk)
             call.respond(klerk.read(context) {
                 html {

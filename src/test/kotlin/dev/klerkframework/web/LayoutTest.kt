@@ -34,7 +34,7 @@ class LayoutTest {
         klerk.meta.start()
         createAuthorJKRowling(klerk)
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         listOf("/author", "/admin/", "/admin/_jobs").forEach { path ->
             val body = client.get(path).bodyAsText()
@@ -50,7 +50,7 @@ class LayoutTest {
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         // The admin pages are mounted under a different PathProvider but share the Layout.
         val admin = client.get("/admin/_documentation").bodyAsText()

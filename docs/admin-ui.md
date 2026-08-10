@@ -24,7 +24,7 @@ val adminUI = AdminUI(
 )
 
 routing {
-    apply(adminUI.registerRoutes())
+    adminUiRoutes(adminUI)
 }
 ```
 

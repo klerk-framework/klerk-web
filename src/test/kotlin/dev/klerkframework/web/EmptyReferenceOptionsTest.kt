@@ -48,7 +48,7 @@ class EmptyReferenceOptionsTest {
                             translator = context.translation,
                             context = context,
                         )
-                        createHTML().div { form.render(this) }
+                        createHTML().div { eventForm(form) }
                     }
                 }
             }
@@ -91,7 +91,7 @@ class EmptyReferenceOptionsTest {
                             translator = context.translation,
                             context = context,
                         )
-                        createHTML().div { form.render(this) }
+                        createHTML().div { eventForm(form) }
                     }
                 }
             }

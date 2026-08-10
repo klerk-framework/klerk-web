@@ -46,7 +46,7 @@ fun main() {
                         body {
                             h1 { +"A page that shows a list" }
                             div {
-                                apply(table.render())
+                                modelTable(table)
                             }
                         }
                     }

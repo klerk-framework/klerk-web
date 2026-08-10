@@ -101,7 +101,7 @@ fun main() {
                                 }
                                 body {
                                     h1 { +"No Klerk validation" }
-                                    form1.render(this)
+                                    eventForm(form1)
                                 }
                             }
                         })

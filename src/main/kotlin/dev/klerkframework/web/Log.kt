@@ -12,7 +12,7 @@ internal suspend fun <C : KlerkContext, V> renderLog(
     call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>
 ) {
     val context = support.contextProvider.invoke(call, klerk)
-    call.respondPage(support.layout, "Log") {
+    support.respondPage(call, "Log") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }

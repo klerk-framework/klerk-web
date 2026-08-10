@@ -22,7 +22,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
 
     val events = klerk.events.getEventsInAuditLog(context, id)
 
-    call.respondPage(support.layout, "Audit log") {
+    support.respondPage(call, "Audit log") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
@@ -65,7 +65,7 @@ internal suspend fun <C : KlerkContext, V> renderAuditDetails(
     val time = decode64bitMicroseconds(instantString.toLong())
     val event = klerk.events.getEventsInAuditLog(context, after = time, before = time).single()
 
-    call.respondPage(support.layout, "Audit entry") {
+    support.respondPage(call, "Audit entry") {
             header {
                 nav {
                     div {

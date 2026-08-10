@@ -191,7 +191,7 @@ suspend fun <T:Any> renderForm(
             h1 { +"With server validation" }
             +"Language: ${context.translation}"
             p {
-                form2.render(this)
+                eventForm(form2)
             }
             if (parseResult != null) {
                 h1 { +"Success" }

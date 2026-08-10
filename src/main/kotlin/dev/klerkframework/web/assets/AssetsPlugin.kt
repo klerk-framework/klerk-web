@@ -7,7 +7,7 @@ import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
 import dev.klerkframework.web.WebSupport
-import dev.klerkframework.web.respondPage
+
 import dev.klerkframework.web.AdminUI
 import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.PluginPage
@@ -174,9 +174,9 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
     override val page: PluginPage<C, V> = Page(textAssetCollections)
 
-    override fun registerExtraRoutes(routing: Routing, pathProvider: PathProvider) {
+    override fun registerExtraRoutes(route: Route, pathProvider: PathProvider) {
         log.info { "Registering assets route: ${pathProvider.assetsBase}/{key...}" }
-        routing.get("${pathProvider.assetsBase}/{key...}") {
+        route.get("${pathProvider.assetsBase}/{key...}") {
             val path = call.parameters.getAll("key")?.joinToString("/")
             if (path == null) {
                 call.respond(HttpStatusCode.BadRequest)
@@ -247,7 +247,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
     PluginPage<C, V> {
     override val buttonText: String = "Assets"
 
-    override suspend fun render(
+    override suspend fun respond(
         call: ApplicationCall,
         support: WebSupport<C, V>,
         klerk: Klerk<C, V>
@@ -264,7 +264,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
                 asset.props.brotli?.let { blobId -> klerk.attachedData.get(blobId, context).readBytes().size })
         }
 
-        call.respondPage(support.layout, "Assets") {
+        support.respondPage(call, "Assets") {
             h1 { +"Assets" }
             table {
                 tr {

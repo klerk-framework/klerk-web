@@ -12,34 +12,39 @@ Register the routes so that it can render the form and handle the submission:
 
 ```kotlin
 routing {
-    apply(support.autoButtons.registerRoutes())
+    autoButtonsRoutes(support.autoButtons)
 }
 ```
 
-Now you can render a button for each possible event. For void events:
+Now you can render a button for each possible event. `eventButton` needs the [WebSupport](introduction.md#websupport)
+in scope, which `respondPage` provides. For void events:
 
 ```kotlin
 val context = call.ctx(klerk)
-call.respond(klerk.read(context) {
-    html {
-        body {
-            getPossibleVoidEvents(Author::class).forEach {
-                apply(autoButtons.render(it, null, context))
-            }
-        }
-    }
-})
+val events = klerk.read(context) { getPossibleVoidEvents(Author::class) }
+support.respondPage(call, "New author") {
+    events.forEach { eventButton(it, null, context) }
+}
 ```
 
 And for instance events:
 
 ```kotlin
 val context = call.ctx(klerk)
+val events = klerk.read(context) { getPossibleEvents(id) }
+support.respondPage(call, "Author") {
+    events.forEach { event -> eventButton(event, id, context) }
+}
+```
+
+Rendering a fragment rather than a whole page? Bring the support into scope with `with`:
+
+```kotlin
 call.respond(klerk.read(context) {
     html {
         body {
-            getPossibleEvents(id).forEach { event ->
-                apply(autoButtons.render(event, id, context))
+            with(support) {
+                getPossibleEvents(id).forEach { event -> eventButton(event, id, context) }
             }
         }
     }

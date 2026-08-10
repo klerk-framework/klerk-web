@@ -100,7 +100,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 createCommandsWithParams.singleOrNull { it.eventReference == eventWithParameters.eventReference }
             if (lowCodeCreateEvent == null) {
                 // Either excluded by the application, or klerk-web cannot render a form for it (reported at startup).
-                call.respondPage(support.layout, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+                support.respondPage(call, "Not found", HttpStatusCode.NotFound) { +"Not found" }
                 return
             }
 
@@ -121,10 +121,10 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 )
             }
 
-            call.respondPage(support.layout, eventHeading) {
+            support.respondPage(call, eventHeading) {
                 main {
                     h1 { +eventHeading }
-                    form.render(this)
+                    eventForm(form)
                     a(completionPaths.cancel) {
                         button {
                             +"Cancel"
@@ -158,7 +158,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 .plus(if (id != null) mapOf("modelId" to id.toString()) else emptyMap())
             val action =
                 "${support.pathProvider.autoButtons}?${queryParams.map { "${it.key}=${it.value}" }.joinToString("&")}"
-            call.respondPage(support.layout, heading) {
+            support.respondPage(call, heading) {
                 main {
                     h1 { +heading }
                     form(action = action, method = FormMethod.post) {
@@ -193,7 +193,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             if (parameters != null && template == null) {
                 // Either excluded by the application, or klerk-web cannot render a form for it (reported at startup).
-                call.respondPage(support.layout, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+                support.respondPage(call, "Not found", HttpStatusCode.NotFound) { +"Not found" }
                 return
             }
 
@@ -252,7 +252,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             when (val eventResult = klerk.handle(command, context, options)) {
                 is CommandResult.Failure -> {
-                    call.respondPage(support.layout, "Bad request") {
+                    support.respondPage(call, "Bad request") {
                         h1 { +"Bad request" }
                         val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
                         if (violatedRule != null) {
@@ -269,7 +269,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     val modelId = id ?: eventResult.createdModels.firstOrNull()
                     val modelWasDeleted = eventResult.deletedModels.contains(modelId)
                     val completionPaths = CompletionPaths.parse(call, modelId)
-                    call.respondPage(support.layout, "Done") {
+                    support.respondPage(call, "Done") {
                         h3 { +"Event was executed" }
                         apply(renderSuccess(eventResult))
                         br
@@ -424,7 +424,7 @@ private suspend fun getPossibleReferenceValues(
      */
 }
 
-private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): BODY.() -> Unit = {
+private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): FlowContent.() -> Unit = {
     result.createdModels.forEach { p { +"Model (id: $it) was created" } }
     result.modelsWithUpdatedProps.forEach { p { +"Model (id: $it) was updated" } }
     result.deletedModels.forEach { p { +"Model (id: $it) was deleted" } }

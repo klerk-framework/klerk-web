@@ -13,7 +13,7 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
     klerk: Klerk<C, V>
 ) {
     val actor = support.contextProvider(call, klerk)
-    call.respondPage(support.layout, "Metrics") {
+    support.respondPage(call, "Metrics") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }

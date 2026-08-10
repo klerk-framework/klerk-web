@@ -46,7 +46,7 @@ class JobsAdminTest {
         klerk.meta.start()
         val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         val listBody = client.get("/admin/_jobs").bodyAsText()
         assertTrue(listBody.contains(jobId.toString()))
@@ -66,7 +66,7 @@ class JobsAdminTest {
         klerk.meta.start()
         val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
         val client = createClient { install(HttpCookies) }
 
         val detail = client.get("/admin/_jobs/$jobId").bodyAsText()
@@ -99,7 +99,7 @@ class JobsAdminTest {
         klerk.jobs.runUntilIdle()
         assertTrue(klerk.jobs.getJob(jobId, Context.system()).status == JobStatus.Succeeded)
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
         val client = createClient { install(HttpCookies) }
 
         val detail = client.get("/admin/_jobs/$jobId").bodyAsText()
@@ -119,7 +119,7 @@ class JobsAdminTest {
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         val body = client.get("/admin/_jobs/types").bodyAsText()
         assertTrue(body.contains("my-job"))

@@ -30,7 +30,7 @@ internal const val NON_BREAKING_HYPHEN = "&#8209;"
 /**
  * A generated list page for one model: a table of every instance, plus a button for each event that can create one.
  *
- * Register its route, or call [render] from a route of your own.
+ * Register its route, or call [respond] from a route of your own.
  */
 public class ModelListPage<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
@@ -43,9 +43,9 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     private val pathProvider: PathProvider = support.pathProvider
     private val tableTemplate = TableTemplate<T, C, V>(klerk, kClass, support = support)
 
-    public fun registerRoutes(): Routing.() -> Unit = {
+    internal fun registerInto(route: Route): Unit = with(route) {
         get(pathProvider.pathForCollection(kClass)) {
-            render(call)
+            respond(call)
         }
 
         get("${pathProvider.pathForCollection(kClass)}/analysis") {
@@ -57,8 +57,8 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
 
     // ------------ List ------------------------------------------------------
 
-    /** Renders the page. */
-    public suspend fun render(call: ApplicationCall) {
+    /** Responds with the page. */
+    public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val modelView = klerk.config.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
@@ -70,7 +70,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
             )
         }
 
-        call.respondPage(support.layout, humanName) {
+        support.respondPage(call, humanName) {
             breadcrumbs(kClass, pathProvider)
             h2 { +humanName }
 
@@ -127,16 +127,22 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         call: ApplicationCall,
         ModelViews: ModelViews<T, C>,
         context: C
-    ): DIV.() -> Unit = {
+    ): FlowContent.() -> Unit = {
 
-        apply(table.render())
+        modelTable(table)
 
         h3 { +"Events" }
         voidEventReferences.forEach { event ->
-            p { apply(support.autoButtons.render(event, null, context,
-                onCancelPath = call.request.uri,
-                onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
-                onErrorPath = pathProvider.base)) }
+            p {
+                with(support) {
+                    eventButton(
+                        event, null, context,
+                        onCancelPath = call.request.uri,
+                        onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
+                        onErrorPath = pathProvider.base,
+                    )
+                }
+            }
         }
 
         if (renderListDetails) {
@@ -150,7 +156,7 @@ private fun <C : KlerkContext, V> renderFilter(
     call: ApplicationCall,
     klerk: Klerk<C, V>,
     kClass: KClass<out Any>
-): HtmlBlockTag.() -> Unit =
+): FlowContent.() -> Unit =
     {
         val stateNames = klerk.config.managedModels
             .single { it.kClass == kClass }
@@ -261,7 +267,7 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
     support: WebSupport<C, V>,
     kClass: KClass<out Any>,
     columns: List<Column<T>>,
-): HtmlBlockTag.() -> Unit = {
+): FlowContent.() -> Unit = {
     fun classesFor(element: String, model: Model<*>? = null) =
         support.classProvider.attr(UiPart.ModelTable, element, model = model)
 
@@ -303,7 +309,7 @@ internal fun ReflectedProperty.renderNameNonBreakingHtml(): HTMLTag.() -> Unit =
     unsafe { +name().replace("-", NON_BREAKING_HYPHEN).replace(" ", NON_BREAKING_SPACE) }
 }
 
-internal fun addMermaidScript(): HtmlBlockTag.() -> Unit = {
+internal fun addMermaidScript(): FlowContent.() -> Unit = {
     script(type = "module") {
         unsafe {
             +"import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';\n"
@@ -380,7 +386,7 @@ private const val BUTTON_STYLE = "margin: 1rem;"
 private fun <T : Any> renderPagination(
     queryResponse: QueryResponse<T>,
     call: ApplicationCall
-): HtmlBlockTag.() -> Unit = {
+): FlowContent.() -> Unit = {
     div {
 
         queryResponse.cursorFirst?.let {
@@ -505,7 +511,7 @@ public class Table<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
     private val columns: List<Column<T>>,
 ) {
-    public fun render(): HtmlBlockTag.() -> Unit = {
+    internal fun content(): FlowContent.() -> Unit = {
         apply(renderFilter(call, klerk, kClass))
         if (queryResponse.items.isEmpty()) {
             p { +"The list is empty" }
@@ -516,9 +522,18 @@ public class Table<T : Any, C : KlerkContext, V>(
     }
 }
 
+/** Renders a built [Table]: the filter controls, the table itself and the pagination links. */
+public fun <T : Any, C : KlerkContext, V> FlowContent.modelTable(table: Table<T, C, V>) {
+    apply(table.content())
+}
+
 private val additionalFiltersExplanationText: String = """This field understands a few filter commands. Some examples:
                         |created>2023-03-10T20:23:13Z
                         |updated<2023-03-10T20:23:13Z
                         |contains=Bertil
                         |updated<2023-03-10T20:23:13Z contains=Anna
                     """.trimMargin()
+
+/** The list route for one model, plus its analysis route. */
+public fun <T : Any, C : KlerkContext, V> Route.modelListRoutes(page: ModelListPage<T, C, V>): Unit =
+    page.registerInto(this)

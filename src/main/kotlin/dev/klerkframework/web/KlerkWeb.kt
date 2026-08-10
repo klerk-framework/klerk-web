@@ -47,10 +47,10 @@ public class KlerkWeb<C : KlerkContext, V>(
         showOptionalParameters = { false },
     )
 
-    public fun generateNav(
-        translator: (ManagedModel<*, *, C, V>) -> String = { it.kClass.simpleName ?: "?" },
-        filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
-    ): HtmlBlockTag.() -> Unit = {
+    internal fun nav(
+        translator: (ManagedModel<*, *, C, V>) -> String,
+        filter: (ManagedModel<*, *, C, V>) -> Boolean,
+    ): FlowContent.() -> Unit = {
         nav {
             ul {
                 klerk.config.managedModels.filter(filter).sortedBy { it.kClass.simpleName }.forEach { model ->
@@ -62,31 +62,48 @@ public class KlerkWeb<C : KlerkContext, V>(
         }
     }
 
-    /**
-     * A list route and a detail route for every managed model that [filter] admits, plus the AutoButtons and Admin UI
-     * routes. Exclude a model to build its pages yourself; make [PathProvider.pathForItem] return null for it as
-     * well, so that nothing links to a page that no longer exists.
-     */
-    public fun generateRoutes(
-        filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
-    ): Routing.() -> Unit = {
-        apply(support.autoButtons.registerRoutes())
-        apply(adminUI.registerRoutes())
+    internal fun registerInto(route: Route, filter: (ManagedModel<*, *, C, V>) -> Boolean) {
+        route.autoButtonsRoutes(support.autoButtons)
+        route.adminUiRoutes(adminUI)
         klerk.config.managedModels.filter(filter).forEach { model ->
             val humanName = camelCaseToPretty(model.kClass.simpleName ?: "")
-            val listPage = ModelListPage<Any, C, V>(
-                model.kClass, support, pathProvider.pathForCollection(model.kClass), humanName,
-            )
             log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
-            apply(listPage.registerRoutes())
-
-            val detailPage = ModelDetailPage<Any, C, V>(
-                model.kClass, support, humanName, useTable = useTableForDetails,
+            route.modelListRoutes(
+                ModelListPage<Any, C, V>(
+                    model.kClass, support, pathProvider.pathForCollection(model.kClass), humanName,
+                )
             )
             pathProvider.pathForItem(model.kClass, "{id}")?.let {
                 log.info { "Registering route: $it" }
             }
-            apply(detailPage.registerRoutes())
+            route.modelDetailRoutes(
+                ModelDetailPage<Any, C, V>(model.kClass, support, humanName, useTable = useTableForDetails)
+            )
         }
     }
+}
+
+/**
+ * A list route and a detail route for every managed model that [filter] admits, plus the AutoButtons and Admin UI
+ * routes. Exclude a model to build its pages yourself; make [PathProvider.pathForItem] return null for it as well,
+ * so that nothing links to a page that no longer exists.
+ *
+ * ```kotlin
+ * routing {
+ *     klerkWebRoutes(klerkWeb)
+ * }
+ * ```
+ */
+public fun <C : KlerkContext, V> Route.klerkWebRoutes(
+    klerkWeb: KlerkWeb<C, V>,
+    filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
+): Unit = klerkWeb.registerInto(this, filter)
+
+/** A `<nav>` with a link to each managed model's list page. */
+public fun <C : KlerkContext, V> FlowContent.modelsNav(
+    klerkWeb: KlerkWeb<C, V>,
+    translator: (ManagedModel<*, *, C, V>) -> String = { it.kClass.simpleName ?: "?" },
+    filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
+) {
+    apply(klerkWeb.nav(translator, filter))
 }

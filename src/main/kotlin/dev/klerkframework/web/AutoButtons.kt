@@ -6,11 +6,11 @@ import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
 
-import io.ktor.server.routing.Routing
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import kotlinx.html.FormMethod
-import kotlinx.html.HtmlBlockTag
+import kotlinx.html.FlowContent
 import kotlinx.html.a
 import kotlinx.html.button
 import kotlinx.html.form
@@ -70,53 +70,76 @@ public class AutoButtons<C: KlerkContext, V>(
     /** The events that klerk-web has a form for. Anything else must be rendered by the application. */
     internal val renderableEvents: Set<EventReference> = createCommandsWithParams.map { it.eventReference }.toSet()
 
-    public fun registerRoutes(): Routing.() -> Unit = {
-        get(pathProvider.autoButtons) {
+    internal fun registerInto(route: Route) {
+        route.get(pathProvider.autoButtons) {
             LowCodeCreateEvent.renderCreateEventPage(call, createCommandsWithParams, support)
         }
-
-        post(pathProvider.autoButtons) {
+        route.post(pathProvider.autoButtons) {
             LowCodeCreateEvent.renderExecuteEvent(call, createCommandsWithParams, support)
         }
-
     }
 
-    public fun render(
-        event: Event<*, *>,
-        modelId: ModelID<*>?,
-        context: C,
-        onCancelPath: String? = null,
-        onSuccessAndModelExistPath: String? = null,
-        onErrorPath: String? = null,
-    ): HtmlBlockTag.() -> Unit = render(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
+    internal fun canRender(event: EventReference): Boolean =
+        klerk.config.getParameters(event) == null || event in renderableEvents
 
-    public fun render(
-        event: EventReference,
-        modelId: ModelID<*>?,
-        context: C,
-        onCancelPath: String? = null,
-        onSuccessAndModelExistPath: String? = null,
-        onErrorPath: String? = null,
-    ): HtmlBlockTag.() -> Unit = block@{
-        if (klerk.config.getParameters(event) != null && event !in renderableEvents) {
-            // Excluded by the caller, or klerk-web cannot render a form for it (reported at startup). Either way the
-            // application renders this event itself.
-            return@block
-        }
-        val completionPaths = CompletionPaths(cancel = onCancelPath ?: "/", model = onSuccessAndModelExistPath ?: "/", error = onErrorPath ?: "/")
+    internal fun urlFor(event: EventReference, modelId: ModelID<*>?, paths: CompletionPaths): String {
         var url =
-            "${pathProvider.autoButtons}?eventId=${event.urlEncode()}&_showOptionalParameters=true&${completionPaths.toQueryParamsString()}"
+            "${pathProvider.autoButtons}?eventId=${event.urlEncode()}&_showOptionalParameters=true&${paths.toQueryParamsString()}"
         if (modelId != null) {
             url = url.plus("&modelId=${modelId}")
         }
+        return url
+    }
+}
 
-        // Always a link to the AutoButtons page, also for events without parameters: that page renders the form,
-        // which is where the CSRF token is issued. An event is never triggered by the button itself.
-        a(url) {
-            button {
-                +context.translation.klerk.event(event)
-            }
+/**
+ * A button for an event. Clicking it leads to a page with a form; submitting that form issues the command.
+ *
+ * Renders nothing when klerk-web has no form for the event - either because it was excluded, or because it cannot
+ * be rendered (which is reported when the application starts). Render such events yourself.
+ *
+ * @param onCancelPath where to go if the user cancels the form. Defaults to "/".
+ * @param onSuccessAndModelExistPath where to go after a successful event, if the model still exists.
+ * @param onErrorPath where to go if the event fails.
+ */
+context(support: WebSupport<C, V>)
+public fun <C : KlerkContext, V> FlowContent.eventButton(
+    event: Event<*, *>,
+    modelId: ModelID<*>?,
+    context: C,
+    onCancelPath: String? = null,
+    onSuccessAndModelExistPath: String? = null,
+    onErrorPath: String? = null,
+): Unit = eventButton(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
+
+/** As [eventButton], but takes the event by reference - e.g. what `getPossibleEvents` returns. */
+context(support: WebSupport<C, V>)
+public fun <C : KlerkContext, V> FlowContent.eventButton(
+    event: EventReference,
+    modelId: ModelID<*>?,
+    context: C,
+    onCancelPath: String? = null,
+    onSuccessAndModelExistPath: String? = null,
+    onErrorPath: String? = null,
+) {
+    val autoButtons = support.autoButtons
+    if (!autoButtons.canRender(event)) {
+        return
+    }
+    val completionPaths = CompletionPaths(
+        cancel = onCancelPath ?: "/",
+        model = onSuccessAndModelExistPath ?: "/",
+        error = onErrorPath ?: "/",
+    )
+    // Always a link to the AutoButtons page, also for events without parameters: that page renders the form,
+    // which is where the CSRF token is issued. An event is never triggered by the button itself.
+    a(autoButtons.urlFor(event, modelId, completionPaths)) {
+        button {
+            +context.translation.klerk.event(event)
         }
     }
-
 }
+
+/** The routes that render an event's form and handle its submission. */
+public fun <C : KlerkContext, V> Route.autoButtonsRoutes(autoButtons: AutoButtons<C, V>): Unit =
+    autoButtons.registerInto(this)

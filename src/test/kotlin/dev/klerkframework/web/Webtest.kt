@@ -217,7 +217,7 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         )
 
     routing {
-        apply(klerkWeb.generateRoutes())
+        klerkWebRoutes(klerkWeb)
 
         route(pathProvider.base) {
             get(renderIndex(klerkWeb))
@@ -274,7 +274,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
                 +" for your application."
             }
             h2 { +"Item lists" }
-            apply(klerkWeb.generateNav())
+            modelsNav(klerkWeb)
         }
     }
 }
@@ -287,7 +287,7 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
     }
     call.respondHtml(block = layout.page("Klerk Web Test") {
         h1 { +"Here are the books" }
-        apply(table.render())
+        modelTable(table)
     })
 }
 

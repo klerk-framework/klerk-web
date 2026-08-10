@@ -1,6 +1,6 @@
 # Model pages
 
-A generated list page and detail page for one model. These are the pages `KlerkWeb.generateRoutes()` produces; you
+A generated list page and detail page for one model. These are the pages `klerkWebRoutes(klerkWeb)` produces; you
 can also use them one at a time.
 
 ```kotlin
@@ -10,15 +10,15 @@ val authors = ModelListPage<Author, Ctx, Views>(
 val author = ModelDetailPage<Author, Ctx, Views>(Author::class, support, humanName = "Author")
 
 routing {
-    apply(authors.registerRoutes())
-    apply(author.registerRoutes())
+    modelListRoutes(authors)
+    modelDetailRoutes(author)
 }
 ```
 
 Or call them from a route of your own, when you want to decide the path yourself:
 
 ```kotlin
-get("/writers") { authors.render(call) }
+get("/writers") { authors.respond(call) }
 ```
 
 ## The list page
@@ -53,4 +53,4 @@ class MyPaths : PathProvider by DefaultPathProvider() {
 }
 ```
 
-Use this together with `generateRoutes(filter = ...)` when you build some pages yourself.
+Use this together with `klerkWebRoutes(klerkWeb, filter = ...)` when you build some pages yourself.

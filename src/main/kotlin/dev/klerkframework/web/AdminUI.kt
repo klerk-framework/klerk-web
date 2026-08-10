@@ -71,9 +71,9 @@ public class AdminUI<C : KlerkContext, V>(
         AlgorithmDocumenter.setKnownAlgorithms(knownAlgorithms)
     }
 
-    public fun registerRoutes(): Routing.() -> Unit = {
-        listViews.forEach { apply(it.registerRoutes()) }
-        detailViews.forEach { apply(it.registerRoutes()) }
+    internal fun registerInto(route: Route): Unit = with(route) {
+        listViews.forEach { modelListRoutes(it) }
+        detailViews.forEach { modelDetailRoutes(it) }
 
         get(pathProvider.withPrefix()) {
             requireAdmin(call) {
@@ -179,7 +179,7 @@ public class AdminUI<C : KlerkContext, V>(
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
-        call.respondPage(support.layout, "Klerk Admin") {
+        support.respondPage(call, "Klerk Admin") {
                 header {
                     h1 { +"Klerk Admin" }
 
@@ -245,7 +245,7 @@ public class AdminUI<C : KlerkContext, V>(
     private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
         val context = contextProvider(call, klerk)
         if (!canSeeAdminUI(context)) {
-            call.respondPage(support.layout, "Not found", io.ktor.http.HttpStatusCode.NotFound) { +"Not found" }
+            support.respondPage(call, "Not found", io.ktor.http.HttpStatusCode.NotFound) { +"Not found" }
             return
         }
         block()
@@ -262,7 +262,7 @@ public interface AdminUIPluginIntegration<C : KlerkContext, V> : KlerkPlugin<C, 
     public val page: PluginPage<C, V>
 
     /** Called when the Admin UI registers its routes. Mount them under [PathProvider.withPrefix]. */
-    public fun registerExtraRoutes(routing: Routing, pathProvider: PathProvider)
+    public fun registerExtraRoutes(route: Route, pathProvider: PathProvider)
 
 }
 
@@ -271,11 +271,14 @@ public interface PluginPage<C : KlerkContext, V> {
     /** The text of the button in the Admin UI's navigation. */
     public val buttonText: String
 
-    /** Renders the page. Use [WebSupport.layout] so it matches the rest of the console. */
-    public suspend fun render(
+    /** Responds with the page. Use [WebSupport.layout] so it matches the rest of the console. */
+    public suspend fun respond(
         call: ApplicationCall,
         support: WebSupport<C, V>,
         klerk: Klerk<C, V>
     ): Unit
 
 }
+
+/** The Admin UI's routes. It is an internal tool - see [AdminUI]. */
+public fun <C : KlerkContext, V> Route.adminUiRoutes(adminUI: AdminUI<C, V>): Unit = adminUI.registerInto(this)

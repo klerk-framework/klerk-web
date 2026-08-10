@@ -11,7 +11,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
     support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
-    call.respondPage(support.layout, "Plugins") {
+    support.respondPage(call, "Plugins") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }

@@ -80,12 +80,12 @@ class DocExamplesTest {
 
         application {
             routing {
-                apply(support.autoButtons.registerRoutes())
-                apply(authors.registerRoutes())
-                apply(authorPage.registerRoutes())
+                autoButtonsRoutes(support.autoButtons)
+                modelListRoutes(authors)
+                modelDetailRoutes(authorPage)
 
                 // docs/model-pages.md - calling render from your own route
-                get("/writers") { authors.render(call) }
+                get("/writers") { authors.respond(call) }
 
                 // docs/tables.md
                 get("/authors") {
@@ -95,19 +95,30 @@ class DocExamplesTest {
                     }
                     call.respond(klerk.read(context) {
                         html {
-                            body { apply(built.render()) }
+                            body { modelTable(built) }
                         }
                     })
                 }
 
-                // docs/introduction.md - Ask Klerk
+                // docs/introduction.md - Ask Klerk, rendered as a whole page
                 get("/actions") {
                     val context = call.docCtx(klerk)
+                    val (model, events) = klerk.read(context) { Pair(get(author), getPossibleEvents(author)) }
+                    support.respondPage(call, "Actions") {
+                        h1 { +"Actions for ${model.props.firstName.value}" }
+                        events.forEach { event -> eventButton(event, author, context) }
+                    }
+                }
+
+                // docs/introduction.md and docs/auto-buttons.md - the same block in a fragment
+                get("/fragment") {
+                    val context = call.docCtx(klerk)
+                    val events = klerk.read(context) { getPossibleEvents(author) }
                     call.respond(klerk.read(context) {
                         html {
                             body {
-                                getPossibleEvents(author).forEach { event ->
-                                    apply(support.autoButtons.render(event, author, context))
+                                with(support) {
+                                    events.forEach { event -> eventButton(event, author, context) }
                                 }
                             }
                         }
@@ -124,7 +135,7 @@ class DocExamplesTest {
             }
         }
 
-        listOf("/author", "/writers", "/authors", "/actions", "/own").forEach { path ->
+        listOf("/author", "/writers", "/authors", "/actions", "/fragment", "/own").forEach { path ->
             assertTrue(client.get(path).status.value < 400, "$path failed")
         }
     }
@@ -141,7 +152,7 @@ class DocExamplesTest {
             canSeeAdminUI = { true },
         )
 
-        application { routing { apply(adminUI.registerRoutes()) } }
+        application { routing { adminUiRoutes(adminUI) } }
 
         assertTrue(client.get("/admin/").status.value < 400)
     }

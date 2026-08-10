@@ -12,7 +12,7 @@ get("/authors") {
     }
     call.respond(klerk.read(context) {
         html {
-            body { apply(table.render()) }
+            body { modelTable(table) }
         }
     })
 }

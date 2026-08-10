@@ -676,7 +676,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun labelId(propertyName: String): String = "$formId-label-$propertyName"
     private fun errorId(propertyName: String): String = "$formId-error-$propertyName"
 
-    private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
+    private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): FlowContent.() -> Unit = {
         label {
             id = labelId(prop.propertyName)
             attributes["data-label-for"] = prop.propertyName
@@ -711,7 +711,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             }
         }
     }
-    private fun renderEnumSelect(prop: EnumPropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
+    private fun renderEnumSelect(prop: EnumPropertyWithOptions, params: T?): FlowContent.() -> Unit = {
         label {
             id = labelId(prop.propertyName)
             attributes["data-label-for"] = prop.propertyName
@@ -749,7 +749,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         parameters: EventParameters<T>,
         params: T?,
         classProvider: CssClassProvider?,
-    ): HtmlBlockTag.() -> Unit =
+    ): FlowContent.() -> Unit =
         {
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
             val value: DataContainer<*> = if (params == null) {
@@ -836,7 +836,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         propertyName: String,
         //typeInstance: DataContainer<*>,
         //enabled: Boolean
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         //val elementData = UIElementData(propertyName, typeInstance, enabled)
         val description = translator.klerk.propertyDescription(propertyName)
         if (description != null) {
@@ -873,7 +873,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         //   br()
     }
 
-    private fun createErrorPlaceholder(propertyName: String): HtmlBlockTag.() -> Unit = {
+    private fun createErrorPlaceholder(propertyName: String): FlowContent.() -> Unit = {
         span(classes = "input-error-message") {
             style = "visibility: hidden; min-height: 1.2em; display: inline-block; padding-left: 10px;"
             id = errorId(propertyName)
@@ -886,7 +886,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderNullableToggle(
         propertyName: String,
         enabled: Boolean,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         val checkboxName = "null-toggle-$propertyName"
         input(checkBox) {
             id = elementId(checkboxName)
@@ -898,7 +898,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun renderHiddenInput(propertyName: String, theValue: String?): HtmlBlockTag.() -> Unit = {
+    private fun renderHiddenInput(propertyName: String, theValue: String?): FlowContent.() -> Unit = {
         input(InputType.hidden) {
             id = elementId(propertyName)
             name = propertyName
@@ -911,7 +911,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderCheckboxInput(
         propertyName: String,
         theValue: DataContainer<*>,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         theValue as BooleanContainer
         input(checkBox) {
@@ -931,7 +931,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderIntNumberInput(
         propertyName: String,
         theValue: IntContainer,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
             id = elementId(propertyName)
@@ -950,7 +950,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderLongNumberInput(
         propertyName: String,
         theValue: LongContainer,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {
             id = elementId(propertyName)
@@ -965,7 +965,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderFloatNumberInput(
         propertyName: String,
         theValue: FloatContainer,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {
             id = elementId(propertyName)
@@ -985,7 +985,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderInstantInput(
         propertyName: String,
         theValue: InstantContainer,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(InputType.dateTimeLocal) {
             id = elementId(propertyName)
@@ -1001,7 +1001,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderDurationInput(
         propertyName: String,
         theValue: DurationContainer,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {
             id = elementId(propertyName)
@@ -1020,7 +1020,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         theValue: DataContainer<*>,
         type: InputType,
         classes: String?,
-    ): HtmlBlockTag.() -> Unit = {
+    ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         theValue as StringContainer
         input(type, classes = classes) {
@@ -1058,10 +1058,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         return (prop.getter.call(params) as? Enum<*>)?.name
     }
 
-    /**
-     * Renders the form in the provided tag. Several forms may be rendered on the same page.
-     */
-    public fun render(tag: HtmlBlockTag, postPath: String? = null): Unit {
+    internal fun renderInto(tag: FlowContent, postPath: String? = null) {
         val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
         if (emptyNonNullableReferenceSelects.isNotEmpty()) {
             tag.p {
@@ -1076,7 +1073,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 it.suggestedEvents.forEach { event ->
                     template.autoButtons?.let { ab ->
                         tag.p {
-                            apply(ab.render(event, null, context, onCancelPath = currentUri, onSuccessAndModelExistPath = currentUri))
+                            with(ab.support) {
+                                eventButton(event, null, context, onCancelPath = currentUri, onSuccessAndModelExistPath = currentUri)
+                            }
                         }
                     }
                 }
@@ -1282,3 +1281,13 @@ public data class ValidationResponse(
     val formProblems: List<String>,
     val dryRunProblems: List<String>
 )
+
+/**
+ * Renders a form built by [FormTemplate.build]. Several forms may be rendered on the same page.
+ *
+ * @param postPath overrides where the form is submitted, if it was not given when the template was created.
+ */
+public fun <T : Any, C : KlerkContext, V> FlowContent.eventForm(
+    form: EventForm<T, C, V>,
+    postPath: String? = null,
+): Unit = form.renderInto(this, postPath)

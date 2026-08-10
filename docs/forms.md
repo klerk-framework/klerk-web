@@ -75,7 +75,7 @@ val form = template.build(
 ```kotlin
 call.respondHtml {
     body {
-        form.render(this)
+        eventForm(form)
     }
 }
 ```

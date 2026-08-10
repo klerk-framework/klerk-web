@@ -36,7 +36,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
         return if (params.isEmpty()) jobsPath else "$jobsPath?${params.joinToString("&")}"
     }
 
-    call.respondPage(support.layout, "Jobs", pageHead = if (autoRefresh) autoRefresh(15) else null) {
+    support.respondPage(call, "Jobs", pageHead = if (autoRefresh) autoRefresh(15) else null) {
             header {
                 nav {
                     div {
@@ -113,8 +113,8 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
     val job = klerk.jobs.getJob(id, context)
     val csrfToken = Csrf.issue(call)
 
-    call.respondPage(
-        support.layout,
+    support.respondPage(
+        call,
         "Job ${job.id}",
         pageHead = if (!job.status.isTerminal) autoRefresh(3) else null,
     ) {
@@ -218,7 +218,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
 ) {
     val jobsConfig = klerk.config.jobs
 
-    call.respondPage(support.layout, "Job types") {
+    support.respondPage(call, "Job types") {
             nav {
                 div {
                     a(href = support.pathProvider.withPrefix()) { +"Home" }
@@ -286,7 +286,7 @@ internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall
     call.respondRedirect(jobsPath)
 }
 
-private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsConfig<C, V>): HtmlBlockTag.() -> Unit = {
+private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsConfig<C, V>): FlowContent.() -> Unit = {
     h2 { +"Cron jobs" }
     if (jobsConfig.crons.isEmpty()) {
         p { +"No cron jobs configured" }

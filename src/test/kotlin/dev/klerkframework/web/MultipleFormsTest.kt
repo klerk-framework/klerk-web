@@ -62,7 +62,7 @@ class MultipleFormsTest {
                     call.respondHtml {
                         body {
                             h1 { +"Two forms" }
-                            forms.forEach { it.render(this) }
+                            forms.forEach { eventForm(it) }
                         }
                     }
                 }
@@ -108,7 +108,7 @@ class MultipleFormsTest {
                     val form = klerk.read(context) {
                         template.build(call, null, this, translator = context.translation, context = context)
                     }
-                    call.respondHtml { body { form.render(this) } }
+                    call.respondHtml { body { eventForm(form) } }
                 }
                 post("/submit") {
                     when (val result = template.parse(call, Context.system())) {

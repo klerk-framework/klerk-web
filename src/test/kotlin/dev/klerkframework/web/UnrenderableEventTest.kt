@@ -37,7 +37,7 @@ class UnrenderableEventTest {
         klerk.meta.start()
         val author = createAuthorJKRowling(klerk)
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         // A renderable event is still offered.
         val authorPage = client.get("/admin/author/${author.value}").bodyAsText()
@@ -55,7 +55,7 @@ class UnrenderableEventTest {
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
 
-        application { routing { apply(klerkWeb.generateRoutes()) } }
+        application { routing { klerkWebRoutes(klerkWeb) } }
 
         val response = client.get("/_autobuttons?eventId=${UpdateAuthor.id.urlEncode()}")
         assertEquals(HttpStatusCode.NotFound, response.status)
