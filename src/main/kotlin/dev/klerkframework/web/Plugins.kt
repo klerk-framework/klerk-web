@@ -8,14 +8,12 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderPlugins(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config))
-        body {
+    call.respondPage(support.layout, "Plugins") {
             header {
-                nav { div { a(href = config.pathProvider.withPrefix()) { +"Home" } } }
+                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
             h1 { +"Plugins" }
             main {
@@ -27,7 +25,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
                         plugins.forEach { plugin ->
                             li {
                                 if (plugin is AdminUIPluginIntegration<C, V>) {
-                                    a(href = "${config.pathProvider.withPrefix()}plugin?name=${plugin.name}") { +plugin.name }
+                                    a(href = "${support.pathProvider.withPrefix()}plugin?name=${plugin.name}") { +plugin.name }
                                 } else {
                                     +plugin.name
                                 }
@@ -40,6 +38,5 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
 
                 }
             }
-        }
     }
 }

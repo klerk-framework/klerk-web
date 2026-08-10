@@ -8,16 +8,14 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderMetrics(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
-    val actor = config.contextProvider(call, klerk)
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config))
-        body {
+    val actor = support.contextProvider(call, klerk)
+    call.respondPage(support.layout, "Metrics") {
             header {
-                nav { div { a(href = config.pathProvider.withPrefix()) { +"Home" } } }
+                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
             main {
                 h1 { +"Runtime" }
@@ -74,7 +72,6 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                                 }
                  */
             }
-        }
     }
 
 }

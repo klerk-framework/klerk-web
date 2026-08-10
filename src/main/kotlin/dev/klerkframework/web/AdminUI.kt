@@ -10,19 +10,33 @@ import kotlinx.html.*
 import java.util.*
 import kotlin.reflect.KClass
 
+/**
+ * An operations console: audit log, jobs, metrics, the application log, the configuration and plugin pages, plus a
+ * generated list and detail page for every managed model.
+ *
+ * The Admin UI is an **internal tool**. It is not a foundation for the UI your users see - build that from the
+ * building blocks instead. See
+ * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/admin-ui.md).
+ *
+ * @param support where the admin pages live and what they look like. Give it a [PathProvider] with a prefix, e.g.
+ * `DefaultPathProvider(prefix = "admin/")`.
+ * @param canSeeAdminUI decides whether the operations pages are shown at all; they answer 404 when it returns false.
+ * The pages themselves are additionally subject to Klerk's own authorization rules.
+ */
 public class AdminUI<C : KlerkContext, V>(
-    private val klerk: Klerk<C, V>,
-    internal val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+    internal val support: WebSupport<C, V>,
+    internal val canSeeAdminUI: suspend (C) -> Boolean,
     internal val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
     internal val showOptionalParameters: (EventReference) -> Boolean = {(eventReference) -> true},
     internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
     internal val createCommandPath: String = "/_createevent",
-    internal val canSeeAdminUI: suspend (C) -> Boolean,
-    internal val autoButtons: AutoButtons<C, V>,
-    internal val pathProvider: PathProvider,
 ) {
-    private val listViews: List<LowCodeList<out Any, C, V>>
-    private val detailViews: List<LowCodeItemDetails<out Any, C, V>>
+    private val klerk: Klerk<C, V> = support.klerk
+    private val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C = support.contextProvider
+    private val pathProvider: PathProvider = support.pathProvider
+    private val autoButtons: AutoButtons<C, V> = support.autoButtons
+    private val listViews: List<ModelListPage<out Any, C, V>>
+    private val detailViews: List<ModelDetailPage<out Any, C, V>>
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>>
 
     private val auditPath = "${pathProvider.withPrefix()}_audit"
@@ -34,11 +48,10 @@ public class AdminUI<C : KlerkContext, V>(
 
     init {
         // TODO: remove and use autobuttons instead
-        createCommandsWithParams = klerk.config.managedModels.flatMap { managed ->
-            managed.stateMachine.getAllEvents().filter { klerk.config.getParameters(it) != null }.map { event ->
-                LowCodeCreateEvent(klerk, createCommandPath, event, managed.kClass, autoButtons, pathProvider)
+        createCommandsWithParams =
+            buildCreateEvents(klerk, createCommandPath, autoButtons.eventFilter) { event, kClass ->
+                LowCodeCreateEvent(support, createCommandPath, event, kClass, autoButtons)
             }
-        }
 
         val pairs = klerk.config.getManagedClasses().map { managedClass ->
             val humanName =
@@ -46,12 +59,9 @@ public class AdminUI<C : KlerkContext, V>(
             val modelPathPart = managedClass.simpleName!!.lowercase()
             val pathToList = "${pathProvider.withPrefix()}$modelPathPart"
 
-            val listView = LowCodeList<Any, C, V>(
-                managedClass, this, createCommandsWithParams, pathToList, humanName, klerk,
-                pathProvider = pathProvider,
-            )
-            val detailView = LowCodeItemDetails<Any, C, V>(
-                managedClass, this, humanName, klerk, auditPath, pathProvider
+            val listView = ModelListPage<Any, C, V>(managedClass, support, pathToList, humanName)
+            val detailView = ModelDetailPage<Any, C, V>(
+                managedClass, support, humanName, auditPath, customAfterEventButtonsOnDetailView
             )
             Pair(listView, detailView)
         }
@@ -73,85 +83,85 @@ public class AdminUI<C : KlerkContext, V>(
 
         get(auditPath) {
             requireAdmin(call) {
-                renderAudit(call, this@AdminUI, pathProvider, klerk)
+                renderAudit(call, support, klerk)
             }
         }
 
         get("$auditPath/{id}") {
             requireAdmin(call) {
-                renderAuditDetails(call, this@AdminUI, klerk)
+                renderAuditDetails(call, support, klerk)
             }
         }
 
         get(jobsPath) {
             requireAdmin(call) {
-                renderJobs(call, this@AdminUI, jobsPath, klerk)
+                renderJobs(call, support, jobsPath, klerk)
             }
         }
 
         get("$jobsPath/types") {
             requireAdmin(call) {
-                renderJobTypes(call, this@AdminUI, jobsPath, klerk)
+                renderJobTypes(call, support, jobsPath, klerk)
             }
         }
 
         get("$jobsPath/{id}") {
             requireAdmin(call) {
-                renderJobDetails(call, this@AdminUI, jobsPath, klerk)
+                renderJobDetails(call, support, jobsPath, klerk)
             }
         }
 
         post("$jobsPath/{id}/cancel") {
             requireAdmin(call) {
-                handleJobCancel(call, this@AdminUI, jobsPath, klerk)
+                handleJobCancel(call, support, jobsPath, klerk)
             }
         }
 
         post("$jobsPath/{id}/resume") {
             requireAdmin(call) {
-                handleJobResume(call, this@AdminUI, jobsPath, klerk)
+                handleJobResume(call, support, jobsPath, klerk)
             }
         }
 
         post("$jobsPath/{id}/delete") {
             requireAdmin(call) {
-                handleJobDelete(call, this@AdminUI, jobsPath, klerk)
+                handleJobDelete(call, support, jobsPath, klerk)
             }
         }
 
         get(metricsPath) {
             requireAdmin(call) {
-                renderMetrics(call, this@AdminUI, metricsPath, klerk)
+                renderMetrics(call, support, metricsPath, klerk)
             }
         }
 
         get(documentationPath) {
             requireAdmin(call) {
-                renderDocumentation(call, this@AdminUI, klerk, documentationPath)
+                renderDocumentation(call, support, klerk, documentationPath)
             }
         }
 
         post("$documentationPath/functionInvocation") {
             requireAdmin(call) {
-                renderFunctionInvocation(call, this@AdminUI, klerk)
+                renderFunctionInvocation(call, support, klerk)
             }
         }
 
         get("$documentationPath/algorithms/{name}") {
             requireAdmin(call) {
-                renderAlgorithm(call, this@AdminUI, klerk)
+                renderAlgorithm(call, support, klerk)
             }
         }
 
         get(pluginsPath) {
             requireAdmin(call) {
-                renderPlugins(call, this@AdminUI, klerk)
+                renderPlugins(call, support, klerk)
             }
         }
 
         get("${pathProvider.withPrefix()}plugin") {
             requireAdmin(call) {
-                renderPluginPage(call, this@AdminUI, klerk)
+                renderPluginPage(call, support, klerk)
             }
         }
 
@@ -161,7 +171,7 @@ public class AdminUI<C : KlerkContext, V>(
 
         get(logPath) {
             requireAdmin(call) {
-                renderLog(call, this@AdminUI, klerk)
+                renderLog(call, support, klerk)
             }
         }
 
@@ -169,10 +179,7 @@ public class AdminUI<C : KlerkContext, V>(
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
-        val actor = contextProvider(call, klerk)
-        call.respondHtml {
-            apply(lowCodeHtmlHead(pathProvider))
-            body {
+        call.respondPage(support.layout, "Klerk Admin") {
                 header {
                     h1 { +"Klerk Admin" }
 
@@ -229,14 +236,16 @@ public class AdminUI<C : KlerkContext, V>(
                         }
                     }
                 }
-            }
         }
     }
 
+    /**
+     * Responds 404 rather than 403, so that the existence of the Admin UI is not revealed to those who may not see it.
+     */
     private suspend fun requireAdmin(call: ApplicationCall, block: suspend () -> Unit) {
         val context = contextProvider(call, klerk)
         if (!canSeeAdminUI(context)) {
-            call.respondHtml(status = io.ktor.http.HttpStatusCode.Forbidden) { body { +"Not authorized" } }
+            call.respondPage(support.layout, "Not found", io.ktor.http.HttpStatusCode.NotFound) { +"Not found" }
             return
         }
         block()
@@ -244,18 +253,28 @@ public class AdminUI<C : KlerkContext, V>(
 
 }
 
+/**
+ * A Klerk plugin that gives itself a page in the Admin UI and routes of its own. See
+ * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/plugins.md).
+ */
 public interface AdminUIPluginIntegration<C : KlerkContext, V> : KlerkPlugin<C, V> {
 
     public val page: PluginPage<C, V>
+
+    /** Called when the Admin UI registers its routes. Mount them under [PathProvider.withPrefix]. */
     public fun registerExtraRoutes(routing: Routing, pathProvider: PathProvider)
 
 }
 
+/** A plugin's own page in the Admin UI. */
 public interface PluginPage<C : KlerkContext, V> {
+    /** The text of the button in the Admin UI's navigation. */
     public val buttonText: String
+
+    /** Renders the page. Use [WebSupport.layout] so it matches the rest of the console. */
     public suspend fun render(
         call: ApplicationCall,
-        config: AdminUI<C, V>,
+        support: WebSupport<C, V>,
         klerk: Klerk<C, V>
     ): Unit
 

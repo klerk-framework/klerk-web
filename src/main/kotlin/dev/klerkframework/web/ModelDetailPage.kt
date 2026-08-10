@@ -1,0 +1,193 @@
+package dev.klerkframework.web
+
+import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.misc.ReflectedModel
+import dev.klerkframework.klerk.misc.ReflectedProperty
+import dev.klerkframework.klerk.misc.camelCaseToPretty
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.routing.*
+import kotlinx.html.*
+import kotlin.reflect.KClass
+
+/**
+ * A generated detail page for one model: its properties, its metadata, a button for every event that is possible in
+ * the model's current state, and the models that refer to it.
+ *
+ * Register its route, or call [render] from a route of your own.
+ *
+ * @param auditPath where the history of a model can be seen, if anywhere.
+ * @param useTable renders the properties in a `<table>` instead of a `<dl>`.
+ * @param extraContent rendered after the event buttons.
+ */
+public class ModelDetailPage<T : Any, C : KlerkContext, V>(
+    private val kClass: KClass<out Any>,
+    private val support: WebSupport<C, V>,
+    private val humanName: String,
+    private val auditPath: String? = null,
+    private val extraContent: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
+    private val useTable: Boolean = false,
+) {
+    private val klerk: Klerk<C, V> = support.klerk
+    private val pathProvider: PathProvider = support.pathProvider
+
+    public fun registerRoutes(): Routing.() -> Unit = {
+        // A null path means the PathProvider says this model has no detail view, so no route is registered.
+        pathProvider.pathForItem(kClass, "{id}")?.let { path ->
+            get(path) {
+                render(call)
+            }
+        }
+    }
+
+    /** Renders the page. */
+    public suspend fun render(call: ApplicationCall) {
+        val context = support.contextProvider(call, klerk)
+        val id = ModelID<Any>(call.parameters["id"]!!.toInt())
+        val (reflected, model) = klerk.read(context) {
+            val model = get(id)
+            val reflectedModel = ReflectedModel(model)
+            apply(reflectedModel.populateRelations())
+            Pair(reflectedModel, model)
+        }
+        val events = klerk.read(context) { getPossibleEvents(id) }
+
+        call.respondPage(support.layout, "$humanName ${model.id}") {
+            breadcrumbs(model.props::class, pathProvider, true)
+            h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
+
+            apply(renderProperties(reflected, context))
+            apply(renderMeta(reflected))
+
+            h3 { +"Commands" }
+            events.forEach { event ->
+                p {
+                    apply(
+                        support.autoButtons.render(
+                            event,
+                            reflected.id,
+                            context,
+                            onCancelPath = pathProvider.base,
+                            onSuccessAndModelExistPath = pathProvider.pathForItem(model.props::class, model.id),
+                            onErrorPath = pathProvider.base,
+                        )
+                    )
+                }
+            }
+
+            extraContent?.let { div { apply(it.invoke(kClass, reflected.original)) } }
+
+            auditPath?.let { p { a(href = "$it?model=${reflected.id}") { button { +"History" } } } }
+
+            apply(renderRelations(reflected))
+        }
+    }
+
+    private fun classesFor(element: String, property: String? = null) =
+        support.classProvider.attr(UiPart.ModelDetails, element, property)
+
+    /** The name, with the description as a tooltip when there is one. */
+    private fun propertyName(property: ReflectedProperty, context: C): FlowOrPhrasingContent.() -> Unit = {
+        val description = property.describe(context.translation.klerk)
+        if (description != null) {
+            span(classes = "tooltip") {
+                attributes["data-description"] = description
+                +property.name()
+            }
+        } else {
+            +property.name()
+        }
+    }
+
+    /** The value, linked to its own detail page when it is a reference. */
+    private fun propertyValue(property: ReflectedProperty): FlowOrPhrasingContent.() -> Unit = {
+        val modelId = property.value
+
+        @Suppress("UNCHECKED_CAST")
+        val propsClass = property.getRelatedModelPropsClass() as? KClass<out Any>
+        val href = if (modelId is ModelID<*> && propsClass != null) {
+            pathProvider.pathForItem(propsClass, modelId.value.toString())
+        } else null
+        if (href != null) a(href = href) { +property.toString() } else +property.toString()
+    }
+
+    private fun renderProperties(reflected: ReflectedModel<Any>, context: C): BODY.() -> Unit = {
+        if (useTable) {
+            table(classesFor("table")) {
+                tbody {
+                    reflected.getProperties().forEach { property ->
+                        tr(classesFor("tr", property.name())) {
+                            td(classesFor("td", property.name())) { apply(propertyName(property, context)) }
+                            td(classesFor("td", property.name())) { apply(propertyValue(property)) }
+                        }
+                    }
+                }
+            }
+        } else {
+            dl(classesFor("dl")) {
+                reflected.getProperties().forEach { property ->
+                    dt(classesFor("dt", property.name())) { apply(propertyName(property, context)) }
+                    dd(classesFor("dd", property.name())) { apply(propertyValue(property)) }
+                }
+            }
+        }
+    }
+
+    private fun renderMeta(reflected: ReflectedModel<Any>): BODY.() -> Unit = {
+        details {
+            summary { +"Meta" }
+            dl {
+                reflected.getMeta().forEach { property ->
+                    dt { apply(property.renderNameNonBreakingHtml()) }
+                    dd {
+                        property.description()?.let { title = it }
+                        +property.toString()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun renderRelations(reflected: ReflectedModel<Any>): BODY.() -> Unit = {
+        reflected.referencesPretty().forEach { relatedList ->
+            details {
+                summary { +relatedList.key }
+                relatedList.value.forEach { +it.toString() }
+            }
+        }
+
+        val referencesToThis = reflected.referencesToThis()
+        if (referencesToThis?.isNotEmpty() == true) {
+            details {
+                summary { +"Related" }
+                table {
+                    thead {
+                        tr {
+                            th { +"Type" }
+                            th { +"Name" }
+                        }
+                    }
+                    tbody {
+                        referencesToThis.forEach {
+                            val target = it.original.props::class
+                            val href = pathProvider.pathForItem(target, it.id)
+                            tr {
+                                td {
+                                    val name = target.simpleName ?: "Unknown"
+                                    if (href != null) a(href = href) { +name } else +name
+                                }
+                                td {
+                                    if (href != null) a(href = href) { +"$it" } else +"$it"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal fun EventReference.urlEncode(): String = id().encodeURLPathPart()
+
+internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = from(encoded.decodeURLPart())

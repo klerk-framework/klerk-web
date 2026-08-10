@@ -198,7 +198,8 @@ suspend fun canSeeAdminUI(context: Context): Boolean {
 
 val css = CssAsset("water.css")
 
-val pathProvider = DefaultPathProvider(css = css)
+val pathProvider = DefaultPathProvider()
+val layout = Layout(css = css, assetsBase = pathProvider.assetsBase)
 
 //val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
@@ -208,7 +209,9 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
     val klerkWeb = KlerkWeb(
         klerk,
         ApplicationCall::ctx,
+        canSeeAdminUI = { true },
         pathProvider = pathProvider,
+        layout = layout,
         classProvider = MyClassProvider,
         useTableForDetails = false
         )
@@ -231,7 +234,7 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
                 call.respondHtml {
                     head {
                         title { +"Test assets" }
-                        pathProvider.cssUrl()?.let { styleLink(it) }
+                        layout.cssUrl()?.let { styleLink(it) }
                     }
                     body {
                         h1 { +"Testing the assets. " }
@@ -258,7 +261,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
     call.respondHtml {
         head {
             title { +"Klerk Web Test" }
-            pathProvider.cssUrl()?.let { styleLink(it) }
+            layout.cssUrl()?.let { styleLink(it) }
             favicon()
         }
         body {
@@ -277,20 +280,15 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
 }
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
-    val queryResponse = klerk.read(call::ctx) {
-        query(views.books.all)
+    val context = call.ctx(klerk)
+    val support = WebSupport(klerk, ApplicationCall::ctx, pathProvider, layout, MyClassProvider)
+    val table = klerk.read(context) {
+        TableTemplate(klerk, Book::class, support, booksColumns).build(views.books.all, this, call)
     }
-    call.respondHtml {
-        head {
-            title { +"Klerk Web Test" }
-            pathProvider.cssUrl()?.let { styleLink(it) }
-        }
-        body {
-            h1 { +"Here are the books" }
-            renderTable(queryResponse, booksTableConfig)
-        }
-    }
-
+    call.respondHtml(block = layout.page("Klerk Web Test") {
+        h1 { +"Here are the books" }
+        apply(table.render())
+    })
 }
 
 
@@ -309,7 +307,7 @@ fun authorizeAllDatatypes(instance: Any) {
 //class MyInstant(value: Instant) : InstantContainer(value)
 
 object MyCssClassProvider : CssClassProvider {
-    override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
+    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> {
         return when (element) {
             "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
             else -> setOf()
@@ -317,31 +315,21 @@ object MyCssClassProvider : CssClassProvider {
     }
 }
 
-val authorsTableConfig = TableConfig<Author>(
-    caption = "Authors",
-    columns = listOf(
-        camelCaseToPretty(Author::firstName.name) to { m -> m.props.firstName.value },
-        camelCaseToPretty(Author::lastName.name) to { m -> m.props.lastName.value },
-        "Created" to { m -> dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
-        "State" to { m -> m.state },
-    ),
-    classProvider = MyCssClassProvider,
-    pathProvider = DefaultPathProvider()
+val authorsColumns: List<Column<Author>> = listOf(
+    Column(camelCaseToPretty(Author::firstName.name)) { m -> +m.props.firstName.value },
+    Column(camelCaseToPretty(Author::lastName.name)) { m -> +m.props.lastName.value },
+    Column("Created") { m -> +dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
+    Column("State") { m -> +m.state },
 )
 
-val booksTableConfig = TableConfig<Book>(
-    caption = "Books",
-    columns = listOf(
-        camelCaseToPretty(Book::title.name) to { m -> m.props.title.value },
-        "Created" to { m -> dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
-        "State" to { m -> m.state },
-    ),
-    classProvider = MyClassProvider,
-    pathProvider = DefaultPathProvider()
+val booksColumns: List<Column<Book>> = listOf(
+    Column(camelCaseToPretty(Book::title.name)) { m -> +m.props.title.value },
+    Column("Created") { m -> +dateFormatter.format(m.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) },
+    Column("State") { m -> +m.state },
 )
 
 object MyClassProvider : CssClassProvider {
-    override fun tableOfModels(element: String, model: Model<*>?): Set<String> {
+    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> {
         return when (element) {
             "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
             else -> setOf()

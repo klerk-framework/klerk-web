@@ -1,0 +1,56 @@
+# Model pages
+
+A generated list page and detail page for one model. These are the pages `KlerkWeb.generateRoutes()` produces; you
+can also use them one at a time.
+
+```kotlin
+val authors = ModelListPage<Author, Ctx, Views>(
+    Author::class, support, pathToList = "/author", humanName = "Authors",
+)
+val author = ModelDetailPage<Author, Ctx, Views>(Author::class, support, humanName = "Author")
+
+routing {
+    apply(authors.registerRoutes())
+    apply(author.registerRoutes())
+}
+```
+
+Or call them from a route of your own, when you want to decide the path yourself:
+
+```kotlin
+get("/writers") { authors.render(call) }
+```
+
+## The list page
+
+A [table](tables.md) of every model in the collection, plus a button for each event that can create one.
+
+## The detail page
+
+The model's properties (a reference is a link to that model's own page), its metadata, a button for every event
+that is possible in the model's current state, and the models that refer to it.
+
+```kotlin
+ModelDetailPage(
+    Author::class,
+    support,
+    humanName = "Author",
+    auditPath = "/admin/_audit",   // adds a "History" button
+    useTable = true,               // <table> instead of <dl>
+    extraContent = { kClass, model -> { p { +"Anything you like" } } },
+)
+```
+
+## Models without a detail page
+
+`PathProvider.pathForItem` returns null for a model that has no detail page. Then no route is registered for it, and
+nothing links to it - lists render plain text instead of links, and so do references from other models' pages.
+
+```kotlin
+class MyPaths : PathProvider by DefaultPathProvider() {
+    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String? =
+        if (kClass == Secret::class) null else "/${kClass.simpleName?.lowercase()}/${id.value}"
+}
+```
+
+Use this together with `generateRoutes(filter = ...)` when you build some pages yourself.

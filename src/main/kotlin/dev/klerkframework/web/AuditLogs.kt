@@ -11,11 +11,10 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderAudit(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
-    pathProvider: PathProvider,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
 
     val forModel = call.request.queryParameters["model"]
     val id = forModel?.let { ModelID<Any>(it.toInt()) }
@@ -23,11 +22,9 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
 
     val events = klerk.events.getEventsInAuditLog(context, id)
 
-    call.respondHtml {
-        apply(lowCodeHtmlHead(pathProvider))
-        body {
+    call.respondPage(support.layout, "Audit log") {
             header {
-                nav { div { a(href = pathProvider.withPrefix()) { +"Home" } } }
+                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
             h1 { +"Events" }
             if (forModel != null) {
@@ -55,29 +52,26 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
                     }
                 }
             }
-        }
     }
 }
 
 internal suspend fun <C : KlerkContext, V> renderAuditDetails(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
     val instantString = requireNotNull(call.parameters["id"])
     val time = decode64bitMicroseconds(instantString.toLong())
     val event = klerk.events.getEventsInAuditLog(context, after = time, before = time).single()
 
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config.pathProvider))
-        body {
+    call.respondPage(support.layout, "Audit entry") {
             header {
                 nav {
                     div {
-                        a(href = config.pathProvider.withPrefix()) { +"Home" }
+                        a(href = support.pathProvider.withPrefix()) { +"Home" }
                         +" / "
-                        a(href = "${config.pathProvider.withPrefix()}_audit") { +"Audit log" }
+                        a(href = "${support.pathProvider.withPrefix()}_audit") { +"Audit log" }
                     }
                 }
             }
@@ -108,7 +102,6 @@ internal suspend fun <C : KlerkContext, V> renderAuditDetails(
                 rows = jsonPretty.lines().size.toString()
                 +jsonPretty
             }
-        }
     }
 }
 

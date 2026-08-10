@@ -1,7 +1,8 @@
 # Klerk-web
 
-Klerk-web is a set of tools that helps you build a server-side rendered (SSR) web application with
-[Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io).
+Klerk-web is a set of building blocks for server-side rendered (SSR) web applications built with
+[Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io). Pick the blocks you want; replace one with your
+own code when it no longer fits.
 
 ## Installation
 
@@ -15,4 +16,15 @@ implementation("dev.klerkframework:klerk")
 implementation("dev.klerkframework:klerk-web")
 ```
 
-See the [documentation](/docs/introduction.md) for details on how to use the plugin.
+## Documentation
+
+Start with the [introduction](docs/introduction.md).
+
+* [Model pages](docs/model-pages.md) - a generated list and detail page for a model
+* [Tables](docs/tables.md) - a paginated, filterable table; columns are values
+* [Forms](docs/forms.md) - generate a form for an event and parse what is submitted
+* [Auto buttons](docs/auto-buttons.md) - a button that renders the form and issues the command
+* [Admin UI](docs/admin-ui.md) - an operations console; an internal tool
+* [Appearance](docs/appearance.md) - layout, semantic HTML and CSS classes
+* [Assets](docs/assets.md) - serving CSS and JavaScript
+* [Plugins](docs/plugins.md) - giving a Klerk plugin its own admin page

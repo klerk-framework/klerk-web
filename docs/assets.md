@@ -17,22 +17,22 @@ Follow these steps:
    ```
 3. Add the AssetsPlugin when creating the Klerk configuration, e.g:
    ```kotlin
-   ConfigBuilder<Context, Collections>(collections).build {
+   ConfigBuilder<Ctx, Views>(views).build {
    // lots of stuff here
    }.withPlugin(AssetsPlugin(setOf(css, myScript)))
    ```
-4. Asset URLs (which include a content hash for cache busting) are resolved through a `PathProvider`. Give it the
-   `CssAsset` so it can build the `<link>` URL, and use `assetPath` for any `JsAsset`:
+4. Give the `CssAsset` to the [Layout](appearance.md), which renders the `<link>`. Asset URLs include a content hash
+   for cache busting; `PathProvider.assetPath` builds them for anything else, such as a `JsAsset`:
    ```kotlin
-   val pathProvider = DefaultPathProvider(css = css)
+   val pathProvider = DefaultPathProvider()
+   val layout = Layout(css = css, assetsBase = pathProvider.assetsBase)
    ```
    ```kotlin
-   call.respondHtml {
-       head {
-           pathProvider.cssUrl()?.let { styleLink(it) }
-       }
-       body {
-           script(pathProvider.assetPath(myScript.getPathAndHash())) { defer = true }
-       }
-   }
+   call.respondHtml(block = layout.page("My page") {
+       h1 { +"Hello" }
+       script(pathProvider.assetPath(myScript.getPathAndHash())) { defer = true }
+   })
    ```
+
+The Admin UI lists the served assets with their compressed and uncompressed sizes on its
+[plugins](plugins.md) page.

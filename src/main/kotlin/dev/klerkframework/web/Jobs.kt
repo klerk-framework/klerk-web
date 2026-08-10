@@ -16,11 +16,11 @@ import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderJobs(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
     val statusFilter = call.request.queryParameters["status"]?.let { name ->
         JobStatus.entries.firstOrNull { it.name == name }
     }
@@ -36,18 +36,11 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
         return if (params.isEmpty()) jobsPath else "$jobsPath?${params.joinToString("&")}"
     }
 
-    call.respondHtml {
-        head {
-            if (autoRefresh) {
-                meta { httpEquiv = "refresh"; content = "15" }
-            }
-            config.pathProvider.cssUrl()?.let { styleLink(it) }
-        }
-        body {
+    call.respondPage(support.layout, "Jobs", pageHead = if (autoRefresh) autoRefresh(15) else null) {
             header {
                 nav {
                     div {
-                        a(href = config.pathProvider.base) { +"Home" }
+                        a(href = support.pathProvider.base) { +"Home" }
                         +" / "
                         a(href = "$jobsPath/types") { +"Job types" }
                     }
@@ -106,31 +99,28 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
 
                 apply(cronSchedulesTable(klerk.config.jobs))
             }
-        }
     }
 }
 
 internal suspend fun <C : KlerkContext, V> renderJobDetails(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
     val id = JobId(requireNotNull(call.parameters["id"]).toInt())
     val job = klerk.jobs.getJob(id, context)
+    val csrfToken = Csrf.issue(call)
 
-    call.respondHtml {
-        head {
-            if (!job.status.isTerminal) {
-                meta { httpEquiv = "refresh"; content = "3" }
-            }
-            config.pathProvider.cssUrl()?.let { styleLink(it) }
-        }
-        body {
+    call.respondPage(
+        support.layout,
+        "Job ${job.id}",
+        pageHead = if (!job.status.isTerminal) autoRefresh(3) else null,
+    ) {
             nav {
                 div {
-                    a(href = config.pathProvider.withPrefix()) { +"Home" }
+                    a(href = support.pathProvider.withPrefix()) { +"Home" }
                     +" / "
                     a(href = jobsPath) { +"Jobs" }
                 }
@@ -184,16 +174,19 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
             div {
                 if (!job.status.isTerminal) {
                     form(action = "$jobsPath/${job.id}/cancel", method = FormMethod.post) {
+                        with(Csrf) { tokenInput(csrfToken) }
                         button { +"Cancel" }
                     }
                 }
                 if (job.status == JobStatus.DeadLettered) {
                     form(action = "$jobsPath/${job.id}/resume", method = FormMethod.post) {
+                        with(Csrf) { tokenInput(csrfToken) }
                         button { +"Resume" }
                     }
                 }
                 if (job.status.isTerminal) {
                     form(action = "$jobsPath/${job.id}/delete", method = FormMethod.post) {
+                        with(Csrf) { tokenInput(csrfToken) }
                         button { +"Delete" }
                     }
                 }
@@ -214,24 +207,21 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     }
                 }
             }
-        }
     }
 }
 
 internal suspend fun <C : KlerkContext, V> renderJobTypes(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
     val jobsConfig = klerk.config.jobs
 
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config))
-        body {
+    call.respondPage(support.layout, "Job types") {
             nav {
                 div {
-                    a(href = config.pathProvider.withPrefix()) { +"Home" }
+                    a(href = support.pathProvider.withPrefix()) { +"Home" }
                     +" / "
                     a(href = jobsPath) { +"Jobs" }
                 }
@@ -269,26 +259,28 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
             }
 
             apply(cronSchedulesTable(jobsConfig))
-        }
     }
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobCancel(call: ApplicationCall, config: AdminUI<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
-    val context = config.contextProvider(call, klerk)
+internal suspend fun <C : KlerkContext, V> handleJobCancel(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+    Csrf.receiveVerifiedParameters(call) ?: return
+    val context = support.contextProvider(call, klerk)
     val id = JobId(requireNotNull(call.parameters["id"]).toInt())
     klerk.jobs.cancel(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobResume(call: ApplicationCall, config: AdminUI<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
-    val context = config.contextProvider(call, klerk)
+internal suspend fun <C : KlerkContext, V> handleJobResume(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+    Csrf.receiveVerifiedParameters(call) ?: return
+    val context = support.contextProvider(call, klerk)
     val id = JobId(requireNotNull(call.parameters["id"]).toInt())
     klerk.jobs.resume(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall, config: AdminUI<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
-    val context = config.contextProvider(call, klerk)
+internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+    Csrf.receiveVerifiedParameters(call) ?: return
+    val context = support.contextProvider(call, klerk)
     val id = JobId(requireNotNull(call.parameters["id"]).toInt())
     klerk.jobs.delete(id, context)
     call.respondRedirect(jobsPath)

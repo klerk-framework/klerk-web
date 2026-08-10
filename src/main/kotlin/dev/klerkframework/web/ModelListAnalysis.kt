@@ -9,17 +9,16 @@ import kotlin.reflect.KClass
 
 internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>,
     kClass: KClass<out Any>
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
     val modelView = klerk.config.getView<T>(kClass)
 
     call.respond(klerk.read(context) {
         html {
-            apply(lowCodeHtmlHead(config))
-            body {
+            apply(support.layout.page("Analysis") {
                 h1 { +"Details" }
                 +kClass.toString()
                 h2 { +"Collections" }
@@ -34,7 +33,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                         }
                     }
                 }
-            }
+            })
         }
     })
 }

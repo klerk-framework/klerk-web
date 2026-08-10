@@ -9,14 +9,12 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderLog(
-    call: ApplicationCall, config: AdminUI<C, V>, klerk: Klerk<C, V>
+    call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider.invoke(call, klerk)
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config))
-        body {
+    val context = support.contextProvider.invoke(call, klerk)
+    call.respondPage(support.layout, "Log") {
             header {
-                nav { div { a(href = config.pathProvider.withPrefix()) { +"Home" } } }
+                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
             main {
                 h1 { +"Log" }
@@ -58,6 +56,5 @@ internal suspend fun <C : KlerkContext, V> renderLog(
 
 
             }
-        }
     }
 }

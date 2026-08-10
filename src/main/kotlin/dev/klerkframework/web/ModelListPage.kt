@@ -27,26 +27,29 @@ import kotlin.reflect.full.declaredMemberProperties
 internal const val NON_BREAKING_SPACE = "&nbsp;"
 internal const val NON_BREAKING_HYPHEN = "&#8209;"
 
-internal class LowCodeList<T : Any, C : KlerkContext, V>(
+/**
+ * A generated list page for one model: a table of every instance, plus a button for each event that can create one.
+ *
+ * Register its route, or call [render] from a route of your own.
+ */
+public class ModelListPage<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
-    private val config: AdminUI<C, V>,
-    private val createCommandPages: List<LowCodeCreateEvent<C, V>>,
-    //private val modelPathPart: String,
-    val pathToList: String,
-    val humanName: String,
-    private val klerk: Klerk<C, V>,
+    private val support: WebSupport<C, V>,
+    public val pathToList: String,
+    public val humanName: String,
     private val renderListDetails: Boolean = false,
-    private val pathProvider: PathProvider,
 ) {
-    private val tableTemplate = TableTemplate(klerk, kClass, pathProvider = pathProvider)
+    private val klerk: Klerk<C, V> = support.klerk
+    private val pathProvider: PathProvider = support.pathProvider
+    private val tableTemplate = TableTemplate<T, C, V>(klerk, kClass, support = support)
 
-    fun registerRoutes(): Routing.() -> Unit = {
+    public fun registerRoutes(): Routing.() -> Unit = {
         get(pathProvider.pathForCollection(kClass)) {
-            renderModelList(call, config)
+            render(call)
         }
 
         get("${pathProvider.pathForCollection(kClass)}/analysis") {
-            renderListAnalysis<T, V, C>(call, config, klerk, kClass)
+            renderListAnalysis<T, V, C>(call, support, klerk, kClass)
         }
     }
 
@@ -54,8 +57,9 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
 
     // ------------ List ------------------------------------------------------
 
-    internal suspend fun renderModelList(call: ApplicationCall, config: AdminUI<C, V>) {
-        val context = config.contextProvider(call, klerk)
+    /** Renders the page. */
+    public suspend fun render(call: ApplicationCall) {
+        val context = support.contextProvider(call, klerk)
         val modelView = klerk.config.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
 
@@ -66,29 +70,12 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
             )
         }
 
-        call.respondHtml {
-            apply(lowCodeHtmlHead(pathProvider))
-            body {
-                breadcrumbs(kClass, pathProvider)
-                h2 { +humanName }
-                ul {
-                    /*klerk.config.getView<T>(kClass).getCollections().forEach {
-                        it.getId().let { id ->
-                            val encodedId = URLEncoder.encode(id, Charset.forName("utf-8"))
-                            li {
-                                a(href = "${basePath}/${modelPathPart}?listsource=$encodedId") {
-                                    +(it.getId())
-                                }
-                            }
+        call.respondPage(support.layout, humanName) {
+            breadcrumbs(kClass, pathProvider)
+            h2 { +humanName }
 
-                        }
-                    }
-                     */
-                }
-
-                div {
-                    apply(renderModelList2(table, voidEvents, call, modelView, context))
-                }
+            div {
+                apply(renderModelList2(table, voidEvents, call, modelView, context))
             }
         }
     }
@@ -146,7 +133,7 @@ internal class LowCodeList<T : Any, C : KlerkContext, V>(
 
         h3 { +"Events" }
         voidEventReferences.forEach { event ->
-            p { apply(config.autoButtons.render(event, null, context,
+            p { apply(support.autoButtons.render(event, null, context,
                 onCancelPath = call.request.uri,
                 onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
                 onErrorPath = pathProvider.base)) }
@@ -269,50 +256,33 @@ private fun <C : KlerkContext, V> renderFilter(
     }
 
 
-private fun <T : Any> renderTable(
+private fun <T : Any, C : KlerkContext, V> renderTable(
     models: List<Model<T>>,
-    pathProvider: PathProvider,
+    support: WebSupport<C, V>,
     kClass: KClass<out Any>,
+    columns: List<Column<T>>,
 ): HtmlBlockTag.() -> Unit = {
+    fun classesFor(element: String, model: Model<*>? = null) =
+        support.classProvider.attr(UiPart.ModelTable, element, model = model)
 
-    table(classes = "indicator table") {
-        id = "table"
-        thead {
-            tr {
-                th { +"Created" }
-                th { +"Updated" }
-                th { +"State" }
-                th { +"Properties" }
+    table(classes = classesFor("table")) {
+        thead(classesFor("thead")) {
+            tr(classesFor("tr")) {
+                columns.forEach { column -> th { +column.header } }
             }
         }
-        tbody {
-            models
-                .forEach { model ->
-                    //val path = "$basePath/$modelPathPart/items/${model.id}"
-                    val path = pathProvider.pathForItem(kClass, model.id)
-                    tr {
+        tbody(classesFor("tbody")) {
+            models.forEach { model ->
+                val path = support.pathProvider.pathForItem(kClass, model.id)
+                tr(classesFor("tr", model)) {
+                    if (path != null) {
                         onClick = """window.location = '$path';"""
-                        td {
-                            a(path) {
-                                unsafe {
-                                    +dateFormatter.format(model.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()))
-                                        .replace("-", NON_BREAKING_HYPHEN)
-                                }
-                            }
-                        }
-                        td {
-                            unsafe {
-                                +dateFormatter.format(model.lastModifiedAt.toLocalDateTime(TimeZone.currentSystemDefault()))
-                                    .replace("-", NON_BREAKING_HYPHEN)
-                            }
-                        }
-                        td { +model.state }
-                        td {
-                            +(if (model.props.toString().length < 100) model.props.toString() else model.props.toString()
-                                .take(100).plus("..."))
-                        }
+                    }
+                    columns.forEach { column ->
+                        td(classesFor("td", model)) { column.cell(this, model) }
                     }
                 }
+            }
         }
     }
 }
@@ -466,13 +436,54 @@ internal fun withQueryParam(url: String, paramName: String, paramValue: String):
     return url.replace(oldValue, paramValue)
 }
 
-public open class TableTemplate<C : KlerkContext, V>(
+/**
+ * One column of a [TableTemplate]. A column is a value, so adding one is `columns + Column(...)` rather than a
+ * setting on the table.
+ *
+ * @param header the text in the `<th>`.
+ * @param cell renders the `<td>` contents for one model.
+ */
+public class Column<T : Any>(
+    public val header: String,
+    public val cell: TD.(Model<T>) -> Unit,
+) {
+    public companion object {
+        /** Created, Updated, State and a summary of the properties. */
+        public fun <T : Any> defaults(): List<Column<T>> = listOf(
+            Column("Created") { model ->
+                unsafe {
+                    +dateFormatter.format(model.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()))
+                        .replace("-", NON_BREAKING_HYPHEN)
+                }
+            },
+            Column("Updated") { model ->
+                unsafe {
+                    +dateFormatter.format(model.lastModifiedAt.toLocalDateTime(TimeZone.currentSystemDefault()))
+                        .replace("-", NON_BREAKING_HYPHEN)
+                }
+            },
+            Column("State") { model -> +model.state },
+            Column("Properties") { model ->
+                val text = model.props.toString()
+                +(if (text.length < 100) text else text.take(100).plus("..."))
+            },
+        )
+    }
+}
+
+/**
+ * A paginated, filterable table of the models in a collection.
+ *
+ * @param columns what to show. Start from [Column.defaults] and map over it to change, add or drop a column.
+ */
+public class TableTemplate<T : Any, C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     private val kClass: KClass<out Any>,
-    private val pathProvider: PathProvider = DefaultPathProvider()
+    private val support: WebSupport<C, V>,
+    private val columns: List<Column<T>> = Column.defaults(),
 ) {
 
-    public fun <T : Any> build(
+    public fun build(
         source: ModelView<T, C>,
         reader: Reader<C, V>,
         call: ApplicationCall,
@@ -480,24 +491,26 @@ public open class TableTemplate<C : KlerkContext, V>(
         val queryOptions = createQueryOptions(call.request.queryParameters)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
         val queryResponse = reader.query(source.filter(filter = metaFilter), queryOptions)
-        return Table(queryResponse, pathProvider, call, klerk, kClass)
+        return Table(queryResponse, support, call, klerk, kClass, columns)
     }
 
 }
 
+/** A built table, ready to be rendered. Produced by [TableTemplate.build]. */
 public class Table<T : Any, C : KlerkContext, V>(
     private val queryResponse: QueryResponse<T>,
-    private val pathProvider: PathProvider,
+    private val support: WebSupport<C, V>,
     private val call: ApplicationCall,
     private val klerk: Klerk<C, V>,
     private val kClass: KClass<out Any>,
+    private val columns: List<Column<T>>,
 ) {
     public fun render(): HtmlBlockTag.() -> Unit = {
         apply(renderFilter(call, klerk, kClass))
         if (queryResponse.items.isEmpty()) {
             p { +"The list is empty" }
         } else {
-            apply(renderTable(queryResponse.items, pathProvider, kClass))
+            apply(renderTable(queryResponse.items, support, kClass, columns))
             apply(renderPagination(queryResponse, call))
         }
     }

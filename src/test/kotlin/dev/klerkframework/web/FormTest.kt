@@ -111,8 +111,10 @@ fun main() {
 
                         when (val result = template.parse(
                             call,
+                            Context.swedishUnauthenticated(),
                             mapOf(TestParams::populatedLater to PhoneNumber("After post")),
                         )) {
+                            is ParseResult.Forbidden -> FormTemplate.respondForbidden(call)
                             is Invalid -> FormTemplate.respondInvalid(result, call)
                             is DryRun -> call.respond(HttpStatusCode.OK)
                             is Parsed -> {

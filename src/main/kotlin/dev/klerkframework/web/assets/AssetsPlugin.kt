@@ -6,6 +6,8 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
+import dev.klerkframework.web.WebSupport
+import dev.klerkframework.web.respondPage
 import dev.klerkframework.web.AdminUI
 import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.PluginPage
@@ -25,6 +27,10 @@ import java.io.ByteArrayOutputStream
 private const val contentEncodingBrotli = "br"
 private val log = KotlinLogging.logger {}
 
+/**
+ * Serves static assets with cache-busting URLs, long cache headers and Brotli compression when available. See
+ * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/assets.md).
+ */
 public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
 
     private lateinit var assets: Set<KlerkAsset>
@@ -236,55 +242,52 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
 }
 
+/** Lists the served assets and their sizes in the Admin UI. */
 public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelViews<TextAsset, C>) :
     PluginPage<C, V> {
     override val buttonText: String = "Assets"
 
     override suspend fun render(
         call: ApplicationCall,
-        config: AdminUI<C, V>,
+        support: WebSupport<C, V>,
         klerk: Klerk<C, V>
     ) {
-        val context = config.contextProvider(call, klerk)
+        val context = support.contextProvider(call, klerk)
         val textAssets = klerk.read(context) {
             list(textAssetCollections.all)
         }
 
-        data class AssetDetails(val path: String, val original: Int, val brotli: Int?)
-
-        val sizes = textAssets.map {
+        val sizes = textAssets.map { asset ->
             AssetDetails(
-                it.props.path.value,
-                ResourceReader.readResource(it.props.path.value)?.length ?: 0,
-                it.props.brotli?.let { blobId -> klerk.attachedData.get(blobId, context).readBytes().size })
+                asset.props.path.value,
+                ResourceReader.readResource(asset.props.path.value)?.length ?: 0,
+                asset.props.brotli?.let { blobId -> klerk.attachedData.get(blobId, context).readBytes().size })
         }
 
-        call.respondHtml {
-            head {
-                config.pathProvider.cssUrl()?.let { styleLink(it) }
-            }
-            body {
-                h1 { +"Assets" }
-                table {
+        call.respondPage(support.layout, "Assets") {
+            h1 { +"Assets" }
+            table {
+                tr {
+                    th { +"Resource Path" }
+                    th { +"Original size" }
+                    th { +"Brotli size" }
+                }
+                sizes.forEach { s ->
                     tr {
-                        th { +"Resource Path" }
-                        th { +"Original size" }
-                        th { +"Brotli size" }
-                    }
-                    sizes.forEach { s ->
-                        tr {
-                            td { +s.path }
-                            td { +s.original.toString() }
-                            td { +(s.brotli ?: "-").toString() }
-                        }
+                        td { +s.path }
+                        td { +s.original.toString() }
+                        td { +(s.brotli ?: "-").toString() }
                     }
                 }
             }
         }
     }
+
+    private data class AssetDetails(val path: String, val original: Int, val brotli: Int?)
 }
 
 
+/** A file under `src/main/resources/assets`, addressed by its path relative to that directory. */
 public abstract class KlerkAsset(public val resourcePath: String) {
     internal var _hash: Base64hash? = null
 
@@ -300,8 +303,10 @@ public abstract class KlerkAsset(public val resourcePath: String) {
     }
 }
 
+/** A stylesheet. Give it to [dev.klerkframework.web.Layout] to have the `<link>` rendered for you. */
 public class CssAsset(resourcePath: String) : KlerkAsset(resourcePath)
 
+/** A script. Build its URL with [dev.klerkframework.web.PathProvider.assetPath]. */
 public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath) // TODO: Subresource Integrity? nonce?
 
 

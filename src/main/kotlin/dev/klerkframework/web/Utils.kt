@@ -1,84 +1,20 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.EventReference
-import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.collection.QueryResponse
 import dev.klerkframework.klerk.misc.ReflectedModel
-import kotlinx.html.Entities
-import kotlinx.html.FormMethod
-import kotlinx.html.HtmlBlockTag
-import kotlinx.html.a
-import kotlinx.html.button
-import kotlinx.html.caption
-import kotlinx.html.details
-import kotlinx.html.div
-import kotlinx.html.form
-import kotlinx.html.onClick
-import kotlinx.html.p
-import kotlinx.html.summary
-import kotlinx.html.table
-import kotlinx.html.tbody
-import kotlinx.html.td
-import kotlinx.html.th
-import kotlinx.html.thead
-import kotlinx.html.title
-import kotlinx.html.tr
+import kotlinx.html.*
 import kotlin.reflect.full.memberProperties
 
-public data class TableConfig<M : Any>(
-    val columns: List<Pair<String, (Model<M>) -> String>>,
-    val pathProvider: PathProvider,
-    val caption: String? = null,
-    val classProvider: CssClassProvider?,
-    val ifEmptyText: String = "The list is empty"
-)
-
-// public fun <M : Any> renderTable(queryResponse: QueryResponse<M>, config: TableConfig<M>): HtmlBlockTag.() -> Unit = {
-public fun <M : Any> HtmlBlockTag.renderTable(queryResponse: QueryResponse<M>, config: TableConfig<M>): Unit = div {
-    fun classesFor(element: String, model: Model<M>? = null) =
-        config.classProvider?.tableOfModels(element, model)?.joinToString(" ")?.takeIf { it.isNotEmpty() }
-
-    if (queryResponse.items.isEmpty()) {
-        p(classesFor("p")) { +config.ifEmptyText }
-    } else {
-        table(classesFor("table")) {
-            config.caption?.let { caption(classesFor("caption")) { +it } }
-            thead(classesFor("thead")) {
-                tr(classesFor("tr")) {
-                    config.columns.forEach { column ->
-                        th { +column.first }
-                    }
-                }
-            }
-            tbody(classesFor("tbody")) {
-                queryResponse.items.forEach { model ->
-                    val path = config.pathProvider.pathForItem(model.props::class, model.id)
-                    tr(classesFor("tr", model)) {
-                        onClick = """window.location = '$path';"""
-                        config.columns.forEach { column ->
-                            td(classesFor("td", model)) {
-                                a(path) {
-                                    +column.second(model)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
+/**
+ * Renders the properties of one model as a table. Use [ModelDetailPage] instead when you also want event buttons and
+ * links to related models.
+ */
 public fun <M : Any> renderModel(
     model: Model<M>,
     classProvider: CssClassProvider? = null,
     includeMetadata: Boolean = true,
 ): HtmlBlockTag.() -> Unit = {
-    fun classesFor(element: String) =
-        classProvider?.modelDetails(element)?.joinToString(" ")?.takeIf { it.isNotEmpty() }
+    fun classesFor(element: String) = classProvider.attr(UiPart.ModelDetails, element, model = model)
 
     val reflected = ReflectedModel(model)
     table(classesFor("table")) {
@@ -113,14 +49,39 @@ public fun <M : Any> renderModel(
 
 
 /**
- * Functions that return a set of CSS classes. Used to adapt the HTML output to your CSS.
+ * Where in the generated HTML an element sits. Passed to [CssClassProvider] so that one provider can style
+ * everything klerk-web renders.
  */
-public interface CssClassProvider {
-    public fun tableOfModels(element: String, model: Model<*>?): Set<String> {
-        return setOf()
-    }
+public enum class UiPart {
+    /** A table listing models. */
+    ModelTable,
 
-    public fun modelDetails(element: String): Set<String> {
-        return setOf()
-    }
+    /** The properties of a single model. */
+    ModelDetails,
+
+    /** A generated form. */
+    Form,
 }
+
+/**
+ * Returns the CSS classes to put on an element that klerk-web renders. Return an empty set to leave it unstyled,
+ * which is what a classless CSS expects.
+ *
+ * The same provider is used by every building block; [part] says which one is asking.
+ *
+ * @param part where the element sits.
+ * @param element the HTML element name, e.g. "table", "td" or "input".
+ * @param property the name of the model or parameter property the element belongs to, if any.
+ * @param model the model being rendered, if any.
+ */
+public fun interface CssClassProvider {
+    public fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String>
+}
+
+/** The classes as an HTML class attribute value, or null when there are none. */
+internal fun CssClassProvider?.attr(
+    part: UiPart,
+    element: String,
+    property: String? = null,
+    model: Model<*>? = null,
+): String? = this?.classes(part, element, property, model)?.joinToString(" ")?.takeIf { it.isNotEmpty() }

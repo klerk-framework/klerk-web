@@ -28,7 +28,11 @@ fun main() {
                 get("/") {
 
                     val table = klerk.read(Context.system()) {
-                        TableTemplate(klerk, Author::class).build(
+                        TableTemplate<Author, Context, MyCollections>(
+                            klerk,
+                            Author::class,
+                            WebSupport(klerk, { _, _ -> Context.system() }),
+                        ).build(
                             klerk.config.views.authors.all,
                             this,
                             call

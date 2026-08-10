@@ -22,11 +22,11 @@ internal const val DATA_CONTAINER_CLASS = "data-container-class"
  */
 internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
-    val context = config.contextProvider(call, klerk)
-    val requestParams = call.receiveParameters()
+    val context = support.contextProvider(call, klerk)
+    val requestParams = Csrf.receiveVerifiedParameters(call) ?: return
     val type = requestParams[FUNCTION_KIND] ?: throw IllegalArgumentException("No function-kind provided")
     if (type == DATA_CONTAINER_VALIDATION) {
         val property = requestParams[DATA_CONTAINER_CLASS] ?: throw IllegalArgumentException("No class provided")
@@ -35,9 +35,7 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         val prop = klerk.config.managedModels.flatMap { it.kClass.memberProperties }
             .firstOrNull { it.returnType.toString() == property }
         if (prop == null) {
-            call.respondHtml {
-                body { +"No property found with name $property" }
-            }
+            call.respondPage(support.layout, "Function") { +"No property found with name $property" }
             return
         }
 
@@ -46,18 +44,14 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
                 (prop.returnType.classifier as KClass<*>).constructors.single { it.parameters.size == 1 }.call(value) as DataContainer<*>
             val problem = container.validate(name, context.translation)
             if (problem != null) {
-                call.respondHtml {
-                    body { +"Validation problem: $problem" }
-                }
+                call.respondPage(support.layout, "Function") { +"Validation problem: $problem" }
                 return
             }
-            call.respondHtml {
-                body { +"Validation successful" }
-            }
+            call.respondPage(support.layout, "Function") { +"Validation successful" }
             return
         }
 
     }
-    call.respondHtml { body { +"Not implemented" } }
+    call.respondPage(support.layout, "Function") { +"Not implemented" }
 
 }

@@ -12,8 +12,12 @@ import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.html.*
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import mu.KotlinLogging
 import kotlin.io.encoding.Base64
+import kotlin.time.Duration.Companion.seconds
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.reflect.full.isSubtypeOf
@@ -24,15 +28,20 @@ import kotlin.reflect.jvm.jvmErasure
 private val logger = KotlinLogging.logger {}
 
 internal class LowCodeCreateEvent<C : KlerkContext, V>(
-    private val klerk: Klerk<C, V>,
+    private val support: WebSupport<C, V>,
     private val path: String,
     internal val eventReference: EventReference,
     internal val modelClass: KClass<out Any>,
     autoButtons: AutoButtons<C, V>,
-    pathProvider: PathProvider,
 ) {
     private val logger = KotlinLogging.logger {}
-    private var template: FormTemplate<out Any, C, V>? = null
+    private val klerk: Klerk<C, V> = support.klerk
+
+    /**
+     * Built eagerly so that an event klerk-web cannot render fails when the application starts, rather than when a
+     * user clicks the button.
+     */
+    private val template: FormTemplate<out Any, C, V>
 
     init {
         val parameters = requireNotNull(klerk.config.getParameters(eventReference))
@@ -42,20 +51,22 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 //eventWithParameters.parameters.raw,
                 klerk,
                 getUrl(),
-                classProvider = null,
+                classProvider = support.classProvider,
                 autoButtons = autoButtons,
-                pathProvider = pathProvider
+                pathProvider = support.pathProvider,
+                layout = support.layout,
             ) {
                 remaining()
             }
         } catch (e: NotImplementedError) {
-            logger.warn { "AutoUI will not be able to create the event '${eventReference}' (${e.message})" }
+            throw IllegalStateException(
+                "klerk-web cannot build a form for the event '$eventReference': ${e.message}. " +
+                        "Either add support for the data type, or exclude the event from the generated UI.", e
+            )
         }
     }
 
     override fun toString(): String = eventReference.toString()
-
-    internal fun hasTemplate() = template != null
 
     internal fun getUrl(): String {
         return "$path?eventId=${eventReference.id().encodeURLPathPart()}"
@@ -65,24 +76,36 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
         internal suspend fun <C : KlerkContext, V> renderCreateEventPage(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
-            klerk: Klerk<C, V>,
-            contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-            pathProvider: PathProvider,
-            ) {
-            val context = contextProvider(call, klerk)
+            support: WebSupport<C, V>,
+        ) {
+            val klerk = support.klerk
+            val pathProvider = support.pathProvider
+            val context = support.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             val completionPaths = CompletionPaths.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
-            val eventWithParameters =
-                EventWithParameters(eventReference, requireNotNull(klerk.config.getParameters(eventReference)))
+            val parameters = klerk.config.getParameters(eventReference)
 
-            requireNotNull(eventWithParameters.parameters)
-            val possibleReferenceValues = getPossibleReferenceValues(eventWithParameters.parameters, context.actor)
+            val eventHeading = headingFor(eventReference)
+            if (parameters == null) {
+                // The event takes no parameters, so there is nothing to fill in. A form is still rendered, because
+                // that is what carries the CSRF token - an event is never triggered by a link.
+                renderParameterlessEventForm(call, eventReference, id, completionPaths, support, eventHeading)
+                return
+            }
+            val eventWithParameters = EventWithParameters(eventReference, parameters)
+
+            val lowCodeCreateEvent =
+                createCommandsWithParams.singleOrNull { it.eventReference == eventWithParameters.eventReference }
+            if (lowCodeCreateEvent == null) {
+                // Either excluded by the application, or klerk-web cannot render a form for it (reported at startup).
+                call.respondPage(support.layout, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+                return
+            }
 
             @Suppress("UNCHECKED_CAST")
-            val template =
-                requireNotNull(createCommandsWithParams.single { it.eventReference == eventWithParameters.eventReference }.template) { "AutoUI not available for this event (as earlier mentioned in the log)" } as FormTemplate<Any, C, V>
+            val template = lowCodeCreateEvent.template as FormTemplate<Any, C, V>
 
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
@@ -98,22 +121,53 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                 )
             }
 
+            call.respondPage(support.layout, eventHeading) {
+                main {
+                    h1 { +eventHeading }
+                    form.render(this)
+                    a(completionPaths.cancel) {
+                        button {
+                            +"Cancel"
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun headingFor(eventReference: EventReference): String {
             val eventName = camelCaseToPretty(eventReference.eventName)
             val modelName = camelCaseToPretty(eventReference.modelName)
-            val heading =
-                if (eventName.lowercase().contains(modelName.lowercase())) eventName else "$eventName ($modelName)"
+            return if (eventName.lowercase().contains(modelName.lowercase())) eventName else "$eventName ($modelName)"
+        }
 
-            call.respondHtml {
-                apply(lowCodeHtmlHead(pathProvider))
-                body {
-                    main {
-                        h1 { +heading }
-                        form.render(this)
-                        a(completionPaths.cancel) {
-                            button {
-                                +"Cancel"
-                            }
-                        }
+        /**
+         * A confirmation form for an event without parameters. Its only purpose is to carry the CSRF token and the
+         * idempotence key.
+         */
+        private suspend fun <C : KlerkContext, V> renderParameterlessEventForm(
+            call: ApplicationCall,
+            eventReference: EventReference,
+            id: ModelID<Any>?,
+            completionPaths: CompletionPaths,
+            support: WebSupport<C, V>,
+            heading: String,
+        ) {
+            val csrfToken = Csrf.issue(call)
+            val queryParams = completionPaths.toQueryParams()
+                .plus("eventId" to eventReference.urlEncode())
+                .plus(if (id != null) mapOf("modelId" to id.toString()) else emptyMap())
+            val action =
+                "${support.pathProvider.autoButtons}?${queryParams.map { "${it.key}=${it.value}" }.joinToString("&")}"
+            call.respondPage(support.layout, heading) {
+                main {
+                    h1 { +heading }
+                    form(action = action, method = FormMethod.post) {
+                        with(Csrf) { tokenInput(csrfToken) }
+                        hiddenInput(name = IDEMPOTENCE_KEY) { value = CommandToken.simple().toString() }
+                        submitInput { value = "Ok" }
+                    }
+                    a(completionPaths.cancel) {
+                        button { +"Cancel" }
                     }
                 }
             }
@@ -122,11 +176,11 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
         internal suspend fun <C : KlerkContext, V> renderExecuteEvent(
             call: ApplicationCall,
             createCommandsWithParams: List<LowCodeCreateEvent<C, V>>,
-            klerk: Klerk<C, V>,
-            contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
-            pathProvider: PathProvider,
+            support: WebSupport<C, V>,
         ) {
-            val context = contextProvider(call, klerk)
+            val klerk = support.klerk
+            val pathProvider = support.pathProvider
+            val context = support.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
@@ -137,19 +191,29 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             val template = createCommandsWithParams.singleOrNull { it.eventReference == eventReference }?.template
 
+            if (parameters != null && template == null) {
+                // Either excluded by the application, or klerk-web cannot render a form for it (reported at startup).
+                call.respondPage(support.layout, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+                return
+            }
+
             if (template == null) {
+                // An event without parameters: no form was parsed, so the CSRF token is verified here.
+                val params = Csrf.receiveVerifiedParameters(call) ?: return
+                val key = params[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) } ?: CommandToken.simple()
                 executeEvent(
                     event,
                     id,
                     klerk,
                     context,
                     call,
-                    pathProvider,
-                    CommandToken.simple(),
+                    support,
+                    key,
                     null
                 )
             } else {
-                when (val parseResult = template.parse(call)) {
+                when (val parseResult = template.parse(call, context)) {
+                    is ParseResult.Forbidden -> FormTemplate.respondForbidden(call)
                     is ParseResult.Invalid -> FormTemplate.respondInvalid(parseResult, call)
                     is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
                     is ParseResult.Parsed -> {
@@ -159,7 +223,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                             klerk,
                             context,
                             call,
-                            pathProvider,
+                            support,
                             parseResult.key,
                             parseResult.params
                         )
@@ -174,7 +238,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             klerk: Klerk<C, V>,
             context: C,
             call: ApplicationCall,
-            pathProvider: PathProvider,
+            support: WebSupport<C, V>,
             key: CommandToken,
             params: Any?
         ) {
@@ -188,18 +252,15 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             when (val eventResult = klerk.handle(command, context, options)) {
                 is CommandResult.Failure -> {
-                    call.respondHtml {
-                        apply(lowCodeHtmlHead(pathProvider))
-                        body {
-                            h1 { +"Bad request" }
-                            val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
-                            if (violatedRule != null) {
-                                div {
-                                    +"$violatedRule (${violatedRule.type})"
-                                }
-                            } else {
-                                div { +(eventResult.problems.firstOrNull()?.endUserTranslatedMessage ?: "Unknown error") }
+                    call.respondPage(support.layout, "Bad request") {
+                        h1 { +"Bad request" }
+                        val violatedRule = eventResult.problems.firstNotNullOfOrNull { it.violatedRule }
+                        if (violatedRule != null) {
+                            div {
+                                +"$violatedRule (${violatedRule.type})"
                             }
+                        } else {
+                            div { +(eventResult.problems.firstOrNull()?.endUserTranslatedMessage ?: "Unknown error") }
                         }
                     }
                 }
@@ -208,15 +269,12 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     val modelId = id ?: eventResult.createdModels.firstOrNull()
                     val modelWasDeleted = eventResult.deletedModels.contains(modelId)
                     val completionPaths = CompletionPaths.parse(call, modelId)
-                    call.respondHtml {
-                        apply(lowCodeHtmlHead(pathProvider))
-                        body {
-                            h3 { +"Event was executed" }
-                            apply(renderSuccess(eventResult))
-                            br
-                            a(href = if (modelId == null || modelWasDeleted) completionPaths.cancel else completionPaths.model) {
-                                button { +"Ok" }
-                            }
+                    call.respondPage(support.layout, "Done") {
+                        h3 { +"Event was executed" }
+                        apply(renderSuccess(eventResult))
+                        br
+                        a(href = if (modelId == null || modelWasDeleted) completionPaths.cancel else completionPaths.model) {
+                            button { +"Ok" }
                         }
                     }
                 }
@@ -284,6 +342,21 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(true))
     ) {
         return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toFloat())
+    }
+
+    if (type.isSubtypeOf(InstantContainer::class.starProjectedType.withNullability(false)) ||
+        type.isSubtypeOf(InstantContainer::class.starProjectedType.withNullability(true))
+    ) {
+        // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
+        val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }
+            .call(local.toInstant(TimeZone.currentSystemDefault()))
+    }
+
+    if (type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(false)) ||
+        type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(true))
+    ) {
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toLong().seconds)
     }
 
     if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||

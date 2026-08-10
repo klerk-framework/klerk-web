@@ -1,32 +1,72 @@
 # Admin UI
 
-The Admin-UI provides a web-interface to manage your system.
+The Admin UI is an operations console for the people who run your system.
+
+**It is an internal tool.** It is not a foundation for the UI your end users see, and it is not meant to be themed or
+grown into your product. Build that from the [building blocks](introduction.md) instead.
+
+## What it gives you
+
+* A list and a detail page for every managed model, with a button for every possible event.
+* [Audit log](#audit-log) - every event that has been executed.
+* [Jobs](#jobs) - what is scheduled, running or dead-lettered, and cancel/resume/delete.
+* [Documentation](#documentation) - your configuration: models, state diagrams, authorization rules, plugins.
+* [Log](#log) - Klerk's own log.
+* Metrics - JVM memory and processors.
+* [Plugins](plugins.md) - a page per plugin that provides one.
 
 ## Initializing
-First you need to:
-1. create a context provider (see [Introduction](introduction.md))
-2. create an AutoButtons instance (see [AutoButtons](auto-buttons.md))
 
-Then you can initialize the AdminUI:
 ```kotlin
-val pathProvider = DefaultPathProvider(prefix = "admin/")
-adminUI = AdminUI(
-    klerk,
-    ApplicationCall::ctx,
+val adminUI = AdminUI(
+    support.withPathProvider(DefaultPathProvider(prefix = "admin/")),
     canSeeAdminUI = ::canSeeAdminUI,
-    autoButtons = autoButtons,
-    pathProvider = pathProvider,
 )
-```
-`pathProvider` controls where the admin routes are mounted (here, under `/admin/`) and where CSS/JS assets are
-resolved from (see [Assets](assets.md)). `canSeeAdminUI` is called on every request to authorize access.
 
-Then you use the config to register the routes:
-```kotlin
-    routing {
-        apply(adminUI.registerRoutes())
-        // other routes
-    }
+routing {
+    apply(adminUI.registerRoutes())
+}
 ```
 
-When you run your application, you can access the admin-ui at `/admin`.
+The `PathProvider` decides where the pages are mounted; with the prefix above they are at `/admin/`. Use
+`support.withPathProvider` so the Admin UI shares the application's `Layout` and `CssClassProvider`.
+
+`KlerkWeb` does all of this for you - see [Quick start](introduction.md#quick-start).
+
+## Authorization
+
+`canSeeAdminUI` is called on every request to an operations page. When it returns false the page answers **404**, not
+403, so the existence of the Admin UI is not revealed.
+
+It is not a second permission system. Klerk's own rules still apply to everything behind it:
+
+* which events a user may execute (`getPossibleEvents`),
+* which models a user may read,
+* the audit log (`eventLogPositiveRules`),
+* which jobs a user may see or control.
+
+So `canSeeAdminUI` decides whether the console is shown at all - not what may be done in it.
+
+> Note: the documentation page has no Klerk rules, so if you want to prevent someone from reading it, you must not allow
+> `canSeeAdminUI` for them.
+
+## Audit log
+
+Every executed event, with its parameters and actor. Reached from a model's detail page with the "History" button,
+or in full at `_audit`.
+
+## Jobs
+
+Lists jobs with status, priority, parent and progress, and refreshes itself while a job is running. A job's detail
+page can cancel it, resume a dead-lettered one, or delete a terminal one. Each of those is authorized by Klerk's
+jobs rules.
+
+## Documentation
+
+Renders your configuration: the properties and validation rules of every model, a state diagram per state machine,
+the authorization rules, the registered algorithms as flow charts, and the plugins. For a `String` property you can
+try a value against its validators.
+
+## Log
+
+Klerk's own log: what was read and written, by whom, with the facts behind each entry.

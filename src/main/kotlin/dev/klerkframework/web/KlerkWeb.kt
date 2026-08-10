@@ -1,13 +1,11 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ManagedModel
-import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.misc.ReflectedModel
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import io.ktor.server.application.*
-import io.ktor.server.html.*
 import io.ktor.server.routing.*
 import kotlinx.html.*
 import mu.KotlinLogging
@@ -15,29 +13,39 @@ import kotlin.reflect.KClass
 
 private val log = KotlinLogging.logger {}
 
+/**
+ * Wires the building blocks together: a list page and a detail page for every managed model, plus AutoButtons and the
+ * Admin UI. The fastest way to get a working UI - see
+ * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/introduction.md).
+ *
+ * Every part of this can be assembled by hand instead; see [WebSupport], [ModelListPage], [ModelDetailPage],
+ * [TableTemplate], [FormTemplate] and [AutoButtons].
+ *
+ * @param canSeeAdminUI gates the Admin UI's operations pages. It is an internal tool - see [AdminUI].
+ * @param eventFilter which events to generate forms for, see [AutoButtons].
+ */
 public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
-    private val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+    contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+    canSeeAdminUI: suspend (C) -> Boolean,
     public val pathProvider: PathProvider = DefaultPathProvider(),
-    public val adminPathProvider: PathProvider = DefaultPathProvider(
-        pathProvider.base,
-        "admin/",
-        css = pathProvider.css,
-        externalCssPath = pathProvider.externalCssPath
-    ),
-    private val classProvider: CssClassProvider? = null,
-    public val autoButtons: AutoButtons<C, V> = AutoButtons(klerk, contextProvider, pathProvider),
-    private val adminUI: AdminUI<C, V> = AdminUI(
-        klerk,
-        contextProvider,
-        showOptionalParameters = { eventReference -> false },
-        knownAlgorithms = setOf(),
-        canSeeAdminUI = { true },   // TODO
-        autoButtons = autoButtons,
-        pathProvider = adminPathProvider
-    ),
+    public val adminPathProvider: PathProvider = DefaultPathProvider(pathProvider.base, "admin/"),
+    layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
+    classProvider: CssClassProvider? = null,
+    eventFilter: (EventReference) -> Boolean = { true },
     private val useTableForDetails: Boolean = false,
 ) {
+    /** What every generated page is built from. Pass it to your own blocks so they match. */
+    public val support: WebSupport<C, V> =
+        WebSupport(klerk, contextProvider, pathProvider, layout, classProvider, eventFilter)
+
+    public val autoButtons: AutoButtons<C, V> get() = support.autoButtons
+
+    private val adminUI: AdminUI<C, V> = AdminUI(
+        support.withPathProvider(adminPathProvider),
+        canSeeAdminUI = canSeeAdminUI,
+        showOptionalParameters = { false },
+    )
 
     public fun generateNav(
         translator: (ManagedModel<*, *, C, V>) -> String = { it.kClass.simpleName ?: "?" },
@@ -54,274 +62,31 @@ public class KlerkWeb<C : KlerkContext, V>(
         }
     }
 
-    public fun generateRoutes(): Routing.() -> Unit = {
-        apply(autoButtons.registerRoutes())
+    /**
+     * A list route and a detail route for every managed model that [filter] admits, plus the AutoButtons and Admin UI
+     * routes. Exclude a model to build its pages yourself; make [PathProvider.pathForItem] return null for it as
+     * well, so that nothing links to a page that no longer exists.
+     */
+    public fun generateRoutes(
+        filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
+    ): Routing.() -> Unit = {
+        apply(support.autoButtons.registerRoutes())
         apply(adminUI.registerRoutes())
-        klerk.config.managedModels.forEach { model ->
+        klerk.config.managedModels.filter(filter).forEach { model ->
+            val humanName = camelCaseToPretty(model.kClass.simpleName ?: "")
+            val listPage = ModelListPage<Any, C, V>(
+                model.kClass, support, pathProvider.pathForCollection(model.kClass), humanName,
+            )
             log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
-            get(pathProvider.pathForCollection(model.kClass)) {
-                val lcl = LowCodeList<Any, C, V>(
-                    model.kClass, adminUI, emptyList(),
-                    pathProvider.pathForCollection(model.kClass),
-                    humanName = camelCaseToPretty(model.kClass.simpleName ?: ""),
-                    klerk,
-                    pathProvider = pathProvider,
-                )
-                lcl.renderModelList(call, adminUI)
-            }
+            apply(listPage.registerRoutes())
 
-            log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}/{id}" }
-            get("${pathProvider.pathForCollection(model.kClass)}/{id}") {
-                yetAnotherCopyOfRenderDetails(call)
+            val detailPage = ModelDetailPage<Any, C, V>(
+                model.kClass, support, humanName, useTable = useTableForDetails,
+            )
+            pathProvider.pathForItem(model.kClass, "{id}")?.let {
+                log.info { "Registering route: $it" }
             }
+            apply(detailPage.registerRoutes())
         }
     }
-
-    private suspend fun yetAnotherCopyOfRenderDetails(call: RoutingCall) {
-        val context = contextProvider(call, klerk)
-        val id = ModelID<Any>(call.parameters["id"]!!.toInt())
-        val (reflectedModelPopulated, model) = klerk.read(context) {
-            val model = get(id)
-            val reflectedModel = ReflectedModel(model)
-            apply(reflectedModel.populateRelations())
-            Pair(reflectedModel, model)
-        }
-        val events = klerk.read(context) { getPossibleEvents(id) }
-        call.respondHtml {
-            head {
-                pathProvider.cssUrl()?.let { styleLink(it) }
-            }
-            body {
-                breadcrumbs(model.props::class, pathProvider, true)
-                h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
-
-                if (useTableForDetails) {
-                    table {
-                        tbody {
-                            reflectedModelPopulated.getProperties().forEach {
-                                val description = it.describe(context.translation.klerk)
-                                tr {
-                                    td {
-                                        if (description != null) {
-                                            span(classes = "tooltip") {
-                                                attributes["data-description"] = description
-                                                +it.name()
-                                            }
-                                        } else {
-                                            +it.name()
-                                        }
-                                    }
-                                    td {
-                                        val modelId = it.value
-
-                                        @Suppress("UNCHECKED_CAST")
-                                        val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
-                                        if (modelId is ModelID<*> && propsClass != null) {
-                                            a(
-                                                href = pathProvider.pathForItem(
-                                                    propsClass,
-                                                    modelId.value.toString()
-                                                )
-                                            ) { +it.toString() }
-                                        } else {
-                                            +it.toString()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    dl {
-                        reflectedModelPopulated.getProperties().forEach {
-                            val description = it.describe(context.translation.klerk)
-                            dt {
-                                if (description != null) {
-                                    span(classes = "tooltip") {
-                                        attributes["data-description"] = description
-                                        +it.name()
-                                    }
-                                } else {
-                                    +it.name()
-                                }
-                            }
-                            dd {
-                                val modelId = it.value
-
-                                @Suppress("UNCHECKED_CAST")
-                                val propsClass = it.getRelatedModelPropsClass() as? KClass<out Any>
-                                if (modelId is ModelID<*> && propsClass != null) {
-                                    a(
-                                        href = pathProvider.pathForItem(
-                                            propsClass,
-                                            modelId.value.toString()
-                                        )
-                                    ) { +it.toString() }
-                                } else {
-                                    +it.toString()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                details {
-                    summary { +"Meta" }
-
-                    if (useTableForDetails) {
-
-                        table {
-                            tbody {
-                                reflectedModelPopulated.getMeta().forEach { property ->
-                                    tr {
-                                        td { apply(property.renderNameNonBreakingHtml()) }
-                                        td {
-                                            property.description()?.let { title = it }
-                                            +property.toString()
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        dl {
-                            reflectedModelPopulated.getMeta().forEach { property ->
-                                dt { apply(property.renderNameNonBreakingHtml()) }
-                                dd {
-                                    property.description()?.let { title = it }
-                                    +property.toString()
-                                }
-                            }
-                        }
-                    }
-                }
-
-
-                h3 { +"Commands" }
-
-                events.forEach { event ->
-                    p {
-                        apply(
-                            autoButtons.render(
-                                event,
-                                reflectedModelPopulated.id,
-                                context,
-                                onCancelPath = "/",
-                                onSuccessAndModelExistPath = pathProvider.pathForItem(model.props::class, model.id),
-                                onErrorPath = "/"
-                            )
-                        )
-
-
-                    }
-                }
-
-                reflectedModelPopulated.referencesPretty().forEach { relatedList ->
-                    details {
-                        summary { +relatedList.key }
-                        relatedList.value.forEach {
-                            +it.toString()
-                        }
-                    }
-                }
-
-                val referencesToThis = reflectedModelPopulated.referencesToThis()
-                if (referencesToThis?.isNotEmpty() == true) {
-                    details {
-                        summary { +"Related" }
-                        table {
-                            thead {
-                                tr {
-                                    th { +"Type" }
-                                    th { +"Name" }
-                                }
-                            }
-                            tbody {
-                                referencesToThis.forEach {
-                                    val target = it.original.props::class
-                                    tr {
-                                        td {
-                                            a(href = pathProvider.pathForItem(target, it.id)) {
-                                                +(target.simpleName ?: "Unknown")
-                                            }
-                                        }
-                                        td {
-                                            a(href = pathProvider.pathForItem(target, it.id)) {
-                                                +"$it"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /*    private suspend fun yetAnotherRenderModelCollection(
-
-            model: ManagedModel<*, *, C, V>,
-            call: ApplicationCall
-        ) {
-            fun classesFor(element: String, model: Model<*>? = null) =
-                classProvider?.tableOfModels(element, model)?.joinToString(" ")?.takeIf { it.isNotEmpty() }
-
-
-            val ctx = contextProvider.invoke(call, klerk)
-
-            val query = klerk.read(ctx) {
-                query(model.collections.all)
-            }
-
-            call.respondHtml {
-                body {
-                    if (query.items.isEmpty()) {
-                        p(classesFor("p")) { +"Empty" }
-                    } else {
-                        table(classesFor("table")) {
-                            thead(classesFor("thead")) {
-                                tr(classesFor("tr")) {
-                                    config.columns.forEach { column ->
-                                        th { +column.first }
-                                    }
-                                }
-                            }
-                            tbody(classesFor("tbody")) {
-                                query.items.forEach { model ->
-                                    val path = config.pathProvider(model)
-                                    tr(classesFor("tr", model)) {
-                                        onClick = """window.location = '$path';"""
-                                        config.columns.forEach { column ->
-                                            td(classesFor("td", model)) {
-                                                a(path) {
-                                                    +column.second(model)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-     */
-
-    /*    private val adminUI = AdminUI(
-            klerk,
-            basePath = "/admin",
-            contextProvider = contextProvider,
-            cssPath = cssPath,
-            canSeeAdminUI = { true },
-            autoButtons = autoButtons,
-            pathProvider = DefaultPathProvider("/admin/"),
-        )
-
-     */
-
 }

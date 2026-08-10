@@ -5,16 +5,27 @@ import dev.klerkframework.klerk.job.JobExecution
 import dev.klerkframework.klerk.job.JobStatus
 import dev.klerkframework.klerk.collection.ModelViews
 import dev.klerkframework.web.config.*
+import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private suspend fun ApplicationCall.systemCtx(klerk: Klerk<Context, MyCollections>): Context = Context.system()
+
+/** The hidden CSRF input of the first form on the page. */
+private fun csrfTokenIn(html: String): String {
+    val marker = """name="${Csrf.TOKEN_NAME}" value=""""
+    val start = html.indexOf(marker).also { check(it >= 0) { "No CSRF token in the page" } } + marker.length
+    return html.substring(start, html.indexOf('"', start))
+}
 
 class JobsAdminTest {
 
@@ -22,7 +33,9 @@ class JobsAdminTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val klerk = Klerk.create(createConfig(collections, jobExecution = JobExecution.Manual))
-        val klerkWeb = KlerkWeb(klerk, ApplicationCall::systemCtx)
+        // Note that CreateBook, UpdateAuthor and CreateTextAsset have parameter shapes klerk-web cannot render.
+        // They are reported at startup and skipped, so no exclusion is needed here.
+        val klerkWeb = KlerkWeb(klerk, ApplicationCall::systemCtx, canSeeAdminUI = { true })
         return Pair(klerk, klerkWeb)
     }
 
@@ -54,12 +67,22 @@ class JobsAdminTest {
         val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
 
         application { routing { apply(klerkWeb.generateRoutes()) } }
+        val client = createClient { install(HttpCookies) }
 
         val detail = client.get("/admin/_jobs/$jobId").bodyAsText()
         assertTrue(detail.contains("my-job"))
         assertTrue(detail.contains("Cancel"))
 
-        val cancelResponse = client.post("/admin/_jobs/$jobId/cancel")
+        val wrongToken = client.submitForm(
+            url = "/admin/_jobs/$jobId/cancel",
+            formParameters = parameters { append(Csrf.TOKEN_NAME, "not-the-token") },
+        )
+        assertEquals(HttpStatusCode.Forbidden, wrongToken.status)
+
+        val cancelResponse = client.submitForm(
+            url = "/admin/_jobs/$jobId/cancel",
+            formParameters = parameters { append(Csrf.TOKEN_NAME, csrfTokenIn(detail)) },
+        )
         assertTrue(cancelResponse.status.value in 200..399)
 
         klerk.jobs.runUntilIdle()
@@ -77,8 +100,13 @@ class JobsAdminTest {
         assertTrue(klerk.jobs.getJob(jobId, Context.system()).status == JobStatus.Succeeded)
 
         application { routing { apply(klerkWeb.generateRoutes()) } }
+        val client = createClient { install(HttpCookies) }
 
-        val deleteResponse = client.post("/admin/_jobs/$jobId/delete")
+        val detail = client.get("/admin/_jobs/$jobId").bodyAsText()
+        val deleteResponse = client.submitForm(
+            url = "/admin/_jobs/$jobId/delete",
+            formParameters = parameters { append(Csrf.TOKEN_NAME, csrfTokenIn(detail)) },
+        )
         assertTrue(deleteResponse.status.value in 200..399)
 
         val remaining = klerk.jobs.getAllJobs(Context.system())

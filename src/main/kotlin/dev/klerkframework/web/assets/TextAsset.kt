@@ -8,6 +8,7 @@ import dev.klerkframework.web.assets.TextAssetStates.Updatable
 import java.security.MessageDigest
 import java.util.*
 
+/** An asset served by [AssetsPlugin]. Managed by the plugin; you do not create these yourself. */
 public data class TextAsset(
     val path: AssetPath,
     val contentType: AssetContentType,
@@ -15,6 +16,7 @@ public data class TextAsset(
     val brotli: AttachedBlobID?,
 )
 
+/** The states of a [TextAsset]. */
 public enum class TextAssetStates {
     Updatable,
 }
@@ -40,14 +42,17 @@ internal fun <C : KlerkContext, V> createTextResourceStatemachine(): StateMachin
 
     }
 
+/** Issued by [AssetsPlugin] at startup for each asset. Not meant to be rendered by klerk-web. */
 public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(
     TextAsset::class,
     EventVisibility.CODE,
     CreateTextAssetParams::class
 )
 
+/** Issued by [AssetsPlugin] when an asset is no longer part of the application. */
 public object DeleteTextAsset : InstanceEventNoParameters<TextAsset>(TextAsset::class, EventVisibility.CODE)
 
+/** Parameters of [CreateTextAsset]. */
 public data class CreateTextAssetParams(
     val path: AssetPath,
     val contentType: AssetContentType,
@@ -60,12 +65,14 @@ private fun <C : KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, 
     return TextAsset(params.path, params.contentType, params.hash, params.brotli)
 }
 
+/** The path of an asset, relative to `src/main/resources/assets`. */
 public class AssetPath(value: String) : StringContainer(value) {
     override val minLength: Int = 1
     override val maxLength: Int = 200
     override val maxLines: Int = 1
 }
 
+/** The MIME type an asset is served with. */
 public class AssetContentType(value: String) : StringContainer(value) {
     override val minLength: Int = 1
     override val maxLength: Int = 50

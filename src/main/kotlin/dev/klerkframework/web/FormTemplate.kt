@@ -23,6 +23,9 @@ import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.format
 import kotlinx.html.*
 import kotlinx.html.InputType.*
 import mu.KotlinLogging
@@ -35,12 +38,15 @@ import kotlin.reflect.KProperty1
 import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.*
 
-private val CSRF_TOKEN = if (isDevelopmentMode()) "csrf-token" else "__Host-csrf-token"
-private val IDEMPOTENCE_KEY = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
+private val fileLog = KotlinLogging.logger {}
+
+private val CSRF_TOKEN = Csrf.TOKEN_NAME
+internal val IDEMPOTENCE_KEY: String = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
 
 
 
 
+/** Passed to a form's label provider. */
 public data class UIElementData(val propertyName: String, val dataContainer: DataContainer<*>, val enabled: Boolean)
 
 /**
@@ -50,9 +56,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     internal val defaultValues: EventWithParameters<T>,
     internal val klerk: Klerk<C, V>,
     private val postPath: String? = null,
-    internal val classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)? = null,
+    internal val classProvider: CssClassProvider? = null,
     internal val autoButtons: AutoButtons<C, V>? = null,
     internal val pathProvider: PathProvider,
+    internal val layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
     init: FormTemplate<T, C, V>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
@@ -108,6 +115,20 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     private fun checkbox(parameter: EventParameter) = inputs.add(Pair(parameter.name, checkBox))
 
+    /** A `datetime-local` input. The value is interpreted in the browser's time zone. */
+    public fun dateTime(property: KProperty1<*, InstantContainer?>): Unit {
+        inputs.add(Pair(property.name, dateTimeLocal))
+    }
+
+    private fun dateTime(parameter: EventParameter) = inputs.add(Pair(parameter.name, dateTimeLocal))
+
+    /** A number of seconds. */
+    public fun duration(property: KProperty1<*, DurationContainer?>): Unit {
+        inputs.add(Pair(property.name, number))
+    }
+
+    private fun duration(parameter: EventParameter) = inputs.add(Pair(parameter.name, number))
+
     public fun hidden(property: KProperty1<*, Any?>): Unit {
         inputs.add(Pair(property.name, hidden))
     }
@@ -150,7 +171,13 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Float -> number(p)
                     PropertyType.Ref -> selectReference(p)
                     PropertyType.Enum -> selectEnum(p)
-                    else -> TODO(p.type?.name ?: "Cannot handle this")
+                    PropertyType.Instant -> dateTime(p)
+                    PropertyType.Duration -> duration(p)
+                    else -> throw IllegalStateException(
+                        "klerk-web cannot render the property '${p.name}' of type '${p.type?.name ?: "unknown"}'." +
+                                " If you are writing the form yourself, declare that property with hidden() or" +
+                                " populatedAfterSubmit() instead of leaving it to remaining()."
+                    )
                 }
             }
     }
@@ -166,27 +193,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         translator: Translation,
         context: C
     ): EventForm<T, C, V> {
-        val csrfToken = generateRandomString()
-        try {
-            call.response.cookies.append(
-                Cookie(
-                    name = CSRF_TOKEN,
-                    value = csrfToken,
-                    secure = !isDevelopmentMode(),
-                    httpOnly = true,
-                    path = "/",
-                    maxAge = 3600,
-                    extensions = mapOf("SameSite" to "Strict"),
-                )
-            )
-        } catch (e: UnsupportedOperationException) {
-            log.error { "The form must be built before call.respond is called" }
-        } catch (e: IllegalArgumentException) {
-            if (e.message?.contains("HTTPS") == true) {
-                log.error { "Did you forget to set the property/environment variable DEVELOPMENT_MODE=true ?" }
-            }
-            throw e
-        }
+        val csrfToken = Csrf.issue(call)
 
         return EventForm(
             csrfToken,
@@ -297,16 +304,24 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         }
     }
 
+    /**
+     * Parses a submitted form.
+     *
+     * Validation happens in levels and stops at the first level that produces problems, since validating the
+     * parameters together is meaningless until each parameter is valid on its own. All problems within a level are
+     * reported, so the user gets every offending field marked at once. The remaining level - the authorization and
+     * business rules - is evaluated by Klerk when the command is issued.
+     *
+     * @param context the caller's context. Used to translate the messages the user will read.
+     */
     public suspend fun parse(
         call: ApplicationCall,
+        context: C,
         populatedAfterSubmit: Map<KProperty1<*, Any?>, DataContainer<*>> = emptyMap(),      // not only DataContainer, also references. Collections?
     ): ParseResult<T> {
-        val csrfCookie = call.request.cookies[CSRF_TOKEN]
         val callParams = call.receiveParameters()
-        val csrfHiddenInput = callParams[CSRF_TOKEN]
-        if (csrfCookie == null || csrfHiddenInput == null || csrfCookie != csrfHiddenInput) {
-            log.info { "CSRF check failed" }
-            throw IllegalArgumentException("CSRF check failed")
+        if (!Csrf.isValid(call, callParams[CSRF_TOKEN])) {
+            return ParseResult.Forbidden()
         }
         val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) }
             ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
@@ -329,7 +344,23 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             @Suppress("UNCHECKED_CAST")
             val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
 
-            // validate the collection of parameters
+            // Level 1: each property on its own.
+            val propertyValidationProblems = mutableSetOf<InvalidPropertyProblem>()
+            paramsClass::class.memberProperties.forEach { property ->
+                if (property.returnType.isSubtypeOf(DataContainer::class.starProjectedType)) {
+                    val problem =
+                        (property.getter.call(paramsClass) as DataContainer<*>).validate(property.name, context.translation)
+                    if (problem != null) {
+                        propertyValidationProblems.add(problem)
+                    }
+                }
+            }
+
+            if (propertyValidationProblems.isNotEmpty()) {
+                return ParseResult.Invalid(propertyValidationProblems.toSet())
+            }
+
+            // Level 2: the properties together.
             val validationProblems: MutableSet<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
                 paramsClass.validators()
                     .mapNotNull {
@@ -344,22 +375,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
             if (validationProblems.isNotEmpty()) {
                 return ParseResult.Invalid(validationProblems.map { it.toProblem() }.toSet())
-            }
-
-            val context = klerk.config.systemContextProvider.invoke(SystemIdentity) // TODO: should use other contextProvider
-            val propertyValidationProblems = mutableSetOf<InvalidPropertyProblem>()
-                paramsClass::class.memberProperties.forEach { property ->
-                if (property.returnType.isSubtypeOf(DataContainer::class.starProjectedType)) {
-                    val problem =
-                        (property.getter.call(paramsClass) as DataContainer<*>).validate(property.name, context.translation)
-                    if (problem != null) {
-                        propertyValidationProblems.add(problem)
-                    }
-                }
-            }
-
-            if (propertyValidationProblems.isNotEmpty()) {
-                return ParseResult.Invalid(propertyValidationProblems.toSet())
             }
 
 
@@ -558,6 +573,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     public companion object {
+
+        /** Responds 403. Use when [parse] returns [ParseResult.Forbidden]. */
+        public suspend fun respondForbidden(call: ApplicationCall) {
+            call.respondHtml(status = HttpStatusCode.Forbidden) {
+                body { +"The request could not be verified. Please reload the page and try again." }
+            }
+        }
+
         public suspend fun respondInvalid(result: ParseResult.Invalid<*>, call: ApplicationCall) {
             if (call.request.queryParameters["onlyErrors"]?.equals("true") == true) {
                 call.respond(HttpStatusCode.BadRequest, createBody(result.problems))
@@ -621,8 +644,10 @@ internal data class ValResponse(
     val fieldsMustNotBeNull: Set<String>
 )
 
+/** One problem in a validation response. [field] is null when the problem is not tied to a single input. */
 public data class ValidationProblemResponse(public val field: String?, public val humanReadable: String)
 
+/** A form built from a [FormTemplate], ready to be rendered. Several may be rendered on the same page. */
 public class EventForm<T : Any, C : KlerkContext, V>(
     private val csrfToken: String,
     private val inputs: List<Pair<String, InputType>>,
@@ -641,10 +666,21 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ) {
     private val log = KotlinLogging.logger {}
 
+    /**
+     * Every id is prefixed with this so that several forms can be rendered on the same page without colliding.
+     * The JavaScript never looks an element up globally; it scopes every lookup to the form element.
+     */
+    private val formId: String = "klerk-form-${generateRandomString().take(10)}"
+
+    private fun elementId(propertyName: String): String = "$formId-$propertyName"
+    private fun labelId(propertyName: String): String = "$formId-label-$propertyName"
+    private fun errorId(propertyName: String): String = "$formId-error-$propertyName"
+
     private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
         label {
-            id = "label-${prop.propertyName}"
-            htmlFor = prop.propertyName
+            id = labelId(prop.propertyName)
+            attributes["data-label-for"] = prop.propertyName
+            htmlFor = elementId(prop.propertyName)
             /*    if (!enabled) {
                     style = "opacity: 0.5;"
                 }
@@ -653,6 +689,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         }
         br()
         select {
+            id = elementId(prop.propertyName)
             name = prop.propertyName
             if (prop.propertyNullable) {
                 option {
@@ -676,12 +713,14 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     }
     private fun renderEnumSelect(prop: EnumPropertyWithOptions, params: T?): HtmlBlockTag.() -> Unit = {
         label {
-            id = "label-${prop.propertyName}"
-            htmlFor = prop.propertyName
+            id = labelId(prop.propertyName)
+            attributes["data-label-for"] = prop.propertyName
+            htmlFor = elementId(prop.propertyName)
             +camelCaseToPretty(prop.propertyName)
         }
         br()
         select {
+            id = elementId(prop.propertyName)
             name = prop.propertyName
             if (prop.propertyNullable) {
                 option {
@@ -709,7 +748,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         type: InputType,
         parameters: EventParameters<T>,
         params: T?,
-        classProvider: ((elementKind: String, elementType: String?, propertyName: String, parameterValue: String?) -> Set<String>)?,
+        classProvider: CssClassProvider?,
     ): HtmlBlockTag.() -> Unit =
         {
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
@@ -729,14 +768,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         text,
-                        classProvider?.let { cp ->
-                            cp(
-                                "input",
-                                type.name,
-                                propertyName,
-                                value?.valueWithoutAuthorization.toString()
-                            ).joinToString(" ").takeIf { it.isNotEmpty() }
-                        }
+                        classProvider.attr(UiPart.Form, "input", propertyName)
                     )
                 )
 
@@ -745,14 +777,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         email,
-                        classProvider?.let { cp ->
-                            cp(
-                                "input",
-                                type.name,
-                                propertyName,
-                                value?.valueWithoutAuthorization.toString()
-                            ).joinToString(" ").takeIf { it.isNotEmpty() }
-                        }
+                        classProvider.attr(UiPart.Form, "input", propertyName)
                     )
                 )
 
@@ -761,14 +786,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         propertyName,
                         value,
                         password,
-                        classProvider?.let { cp ->
-                            cp(
-                                "input",
-                                type.name,
-                                propertyName,
-                                value?.valueWithoutAuthorization.toString()
-                            ).joinToString(" ").takeIf { it.isNotEmpty() }
-                        }
+                        classProvider.attr(UiPart.Form, "input", propertyName)
                     )
                 )
 
@@ -777,8 +795,14 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                         is IntContainer -> this.apply(renderIntNumberInput(propertyName, value))
                         is LongContainer -> this.apply(renderLongNumberInput(propertyName, value))
                         is FloatContainer -> this.apply(renderFloatNumberInput(propertyName, value))
+                        is DurationContainer -> this.apply(renderDurationInput(propertyName, value))
+                        else -> throw IllegalStateException(
+                            "Cannot render '$propertyName' as a number: it is a ${value::class.simpleName}"
+                        )
                     }
                 }
+
+                dateTimeLocal -> this.apply(renderInstantInput(propertyName, value as InstantContainer))
 
                 checkBox -> this.apply(
                     renderCheckboxInput(
@@ -818,8 +842,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         if (description != null) {
             label(classes = "tooltip") {
                 attributes["data-description"] = description
-                id = "label-$propertyName"
-                htmlFor = propertyName
+                id = labelId(propertyName)
+                attributes["data-label-for"] = propertyName
+                htmlFor = elementId(propertyName)
                 //if (!enabled) {
                 //  style = "opacity: 0.5;"
                 //}
@@ -832,8 +857,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             } else {
 
         label {
-            id = "label-$propertyName"
-            htmlFor = propertyName
+            id = labelId(propertyName)
+            attributes["data-label-for"] = propertyName
+            htmlFor = elementId(propertyName)
             //if (!enabled) {
             //  style = "opacity: 0.5;"
             //}
@@ -850,7 +876,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun createErrorPlaceholder(propertyName: String): HtmlBlockTag.() -> Unit = {
         span(classes = "input-error-message") {
             style = "visibility: hidden; min-height: 1.2em; display: inline-block; padding-left: 10px;"
-            id = "error-$propertyName"
+            id = errorId(propertyName)
+            attributes["data-error-for"] = propertyName
             role = "alert"
             +""
         }
@@ -860,20 +887,20 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         propertyName: String,
         enabled: Boolean,
     ): HtmlBlockTag.() -> Unit = {
-        val checkboxId = "null-toggle-$propertyName"
+        val checkboxName = "null-toggle-$propertyName"
         input(checkBox) {
-            id = checkboxId
-            name = checkboxId
+            id = elementId(checkboxName)
+            name = checkboxName
             value = "on"
             checked = enabled
             autoComplete = "off"
-            attributes["onchange"] = """let e = document.getElementById('$propertyName'); e.style.display = this.checked ? null : "none"; e.disabled = !this.checked;"""
+            attributes["onchange"] = """let e = document.getElementById('${elementId(propertyName)}'); e.style.display = this.checked ? null : "none"; e.disabled = !this.checked;"""
         }
     }
 
     private fun renderHiddenInput(propertyName: String, theValue: String?): HtmlBlockTag.() -> Unit = {
         input(InputType.hidden) {
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             theValue?.let {
                 value = theValue
@@ -888,7 +915,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         apply(createLabel(propertyName))
         theValue as BooleanContainer
         input(checkBox) {
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             value = "true"
             checked = theValue.boolean
@@ -907,11 +934,11 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): HtmlBlockTag.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             value = theValue.toString()
             attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = "error-$propertyName"
+            attributes["aria-errormessage"] = errorId(propertyName)
             // required = !property.returnType.isMarkedNullable
             theValue.min?.apply { min = this.toString() }
             theValue.max?.apply { max = this.toString() }
@@ -926,7 +953,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): HtmlBlockTag.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             value = theValue.toString()
             // required = !property.returnType.isMarkedNullable
@@ -941,7 +968,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): HtmlBlockTag.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             value = theValue.toString()
             // required = !property.returnType.isMarkedNullable
@@ -949,6 +976,43 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             theValue.max?.apply { max = this.toString() }
             step = "any"
         }
+    }
+
+    /**
+     * A `datetime-local` input. The browser sends local time without a zone, so the submitted value is interpreted
+     * in the server's time zone (see valueWithCorrectType).
+     */
+    private fun renderInstantInput(
+        propertyName: String,
+        theValue: InstantContainer,
+    ): HtmlBlockTag.() -> Unit = {
+        apply(createLabel(propertyName))
+        input(InputType.dateTimeLocal) {
+            id = elementId(propertyName)
+            name = propertyName
+            value = theValue.instant.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat)
+            attributes["aria-invalid"] = "false"
+            attributes["aria-errormessage"] = errorId(propertyName)
+        }
+        apply(createErrorPlaceholder(propertyName))
+    }
+
+    /** A duration, expressed as a number of seconds. */
+    private fun renderDurationInput(
+        propertyName: String,
+        theValue: DurationContainer,
+    ): HtmlBlockTag.() -> Unit = {
+        apply(createLabel(propertyName))
+        input(number) {
+            id = elementId(propertyName)
+            name = propertyName
+            value = theValue.duration.inWholeSeconds.toString()
+            step = "1"
+            attributes["aria-invalid"] = "false"
+            attributes["aria-errormessage"] = errorId(propertyName)
+        }
+        +" seconds"
+        apply(createErrorPlaceholder(propertyName))
     }
 
     private fun renderTextInput(
@@ -960,11 +1024,11 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         apply(createLabel(propertyName))
         theValue as StringContainer
         input(type, classes = classes) {
-            id = propertyName
+            id = elementId(propertyName)
             name = propertyName
             value = theValue.string
             attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = "error-$propertyName"
+            attributes["aria-errormessage"] = errorId(propertyName)
             //
             // disabled = theValue == null
             theValue.minLength?.let {
@@ -995,8 +1059,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     }
 
     /**
-     * Renders the form in the provided tag.
-     * Note that only one form may be rendered per page (otherwise you will get a CSRF-token problem).
+     * Renders the form in the provided tag. Several forms may be rendered on the same page.
      */
     public fun render(tag: HtmlBlockTag, postPath: String? = null): Unit {
         val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
@@ -1020,15 +1083,15 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             }
             return
         }
-        try {
-            val path = getPath(postPath, queryParams)
-            tag.script {
-                src = template.pathProvider.assetPath(formJs.getPathAndHash()) // "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
-                defer = true
-            }
-            tag.form(path, method = FormMethod.post) {
-                id = "eventForm"
-                onChange = "validate()"
+        val path = getPath(postPath, queryParams)
+        tag.script {
+            src = template.pathProvider.assetPath(formJs.getPathAndHash()) // "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
+            defer = true
+        }
+        tag.form(path, method = FormMethod.post) {
+                id = formId
+                // The script binds itself to every form carrying this attribute, so no global handler is needed.
+                attributes["data-klerk-form"] = "true"
                 +System.lineSeparator()
 
                 // csrf-token should be placed before non-hidden inputs (see https://portswigger.net/web-security/csrf/preventing#how-should-csrf-tokens-be-transmitted)
@@ -1075,7 +1138,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 }
                 p {
                     span(classes = "errormessages") {
-                        id = "errormessages"
+                        id = "$formId-errormessages"
+                        attributes["data-klerk-errormessages"] = "true"
                         role = "alert"
                         attributesMapOf(key = "aria-live", value = "assertive")
                     }
@@ -1083,12 +1147,10 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
                 submitInput {
                     value = "Ok"
-                    id = "submitButton"
+                    id = "$formId-submit"
+                    attributes["data-klerk-submit"] = "true"
                 }
             }
-        } catch (e: Exception) {
-            log.error(e) { "Could not render template" }
-        }
     }
 
     private fun getPath(postPath: String?, queryParams: Map<String, String>): String {
@@ -1105,12 +1167,19 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
 }
 
+/** The outcome of [FormTemplate.parse]. */
 public sealed class ParseResult<T> {
+    /** The request failed the CSRF check and must not be acted on. Respond with [FormTemplate.respondForbidden]. */
+    public class Forbidden<T> : ParseResult<T>()
+    /** The submitted data is not valid. Respond with [FormTemplate.respondInvalid]. */
     public data class Invalid<T>(val problems: Set<Problem>) : ParseResult<T>()
+    /** The request was a dry run, so respond without issuing the command. */
     public data class DryRun<T>(val params: T, val key: CommandToken) : ParseResult<T>()
+    /** Valid parameters. Pass [key] as the [dev.klerkframework.klerk.command.ProcessingOptions] token. */
     public data class Parsed<T>(val params: T, val key: CommandToken) : ParseResult<T>()
 }
 
+/** A reference parameter and the models that may be selected for it. */
 public data class ReferencePropertyWithOptions(
     val propertyName: String,
     val propertyNullable: Boolean,
@@ -1118,6 +1187,7 @@ public data class ReferencePropertyWithOptions(
     val suggestedEvents: Collection<EventReference>
 )
 
+/** An enum parameter and the values that may be selected for it. */
 public data class EnumPropertyWithOptions(
     val propertyName: String,
     val propertyNullable: Boolean,
@@ -1151,6 +1221,10 @@ internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callP
     return constructors.first().callBy(parameters)
 }
 
+/**
+ * Runs the command as a dry run and responds with the problems, in the shape the bundled form validation script
+ * expects. Use it when [FormTemplate.parse] returns [ParseResult.DryRun].
+ */
 public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
     params: P,
     key: CommandToken,
@@ -1168,11 +1242,18 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
         is CommandResult.Failure -> {
             val fieldProblems = result.problems
                 .filterIsInstance<InvalidPropertyProblem>()
-                .associate { p -> Pair(p.propertyName, (p.endUserTranslatedMessage ?: "?")) }
+                .map { ValidationProblemResponse(it.propertyName, it.endUserTranslatedMessage ?: "?") }
 
             val propertyCollectionProblems = result.problems
                 .filterIsInstance<InvalidPropertyCollectionProblem>()
                 .map { it.endUserTranslatedMessage ?: "Unknown problem" }
+
+            // The details of a failure (violated rule names, model contents) stay on the server. The user is only
+            // told that the event is not possible.
+            fileLog.info { "Dry run failed: $result" }
+            val remainingProblems = result.problems
+                .filterNot { it is InvalidPropertyProblem || it is InvalidPropertyCollectionProblem }
+            val dryRunProblems = if (remainingProblems.isEmpty()) emptyList() else listOf("Not allowed")
 
             call.respondText(
                 contentType = ContentType.Application.Json,
@@ -1182,7 +1263,7 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
                         propertyProblems = fieldProblems,
                         propertyCollectionProblems = propertyCollectionProblems,
                         formProblems = emptyList(),
-                        dryRunProblems = listOf(result.toString())
+                        dryRunProblems = dryRunProblems
                     )
                 )
             )
@@ -1192,8 +1273,11 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
     }
 }
 
+/**
+ * The JSON that the bundled form validation script expects. Note that [ValResponse] must have the same shape.
+ */
 public data class ValidationResponse(
-    val propertyProblems: Map<String, String>,
+    val propertyProblems: List<ValidationProblemResponse>,
     val propertyCollectionProblems: List<String>,
     val formProblems: List<String>,
     val dryRunProblems: List<String>

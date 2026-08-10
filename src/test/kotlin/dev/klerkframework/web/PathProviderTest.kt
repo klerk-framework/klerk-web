@@ -12,7 +12,6 @@ class PathProviderTest {
         assertEquals("/book", dpp.pathForCollection(Book::class))
         assertEquals("/book/123", dpp.pathForItem(Book::class, "123"))
         assertEquals("/_assets/test", dpp.assetPath("test"))
-        assertEquals(null, dpp.cssUrl())
         assertEquals("/_autobuttons", dpp.autoButtons)
 
         dpp = DefaultPathProvider("/base/")

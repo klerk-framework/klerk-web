@@ -1,9 +1,12 @@
 # Introduction
 
-Klerk-web is a collection of tools that help you build SSR (server-side rendered) web applications using [Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io). 
-You don't have to use all tools, e.g. if you want to use client-side rendering for the users but an SSR admin-UI, you can use Klerk-web for
-only that part.
+Klerk-web is a set of building blocks for SSR (server-side rendered) web applications built with
+[Klerk](https://klerkframework.dev/) and [Ktor](https://ktor.io).
 
+Pick the blocks you want. When one no longer fits, replace that block with your own code; the rest keep working. If
+you want an SPA, you can still use klerk-web for the admin UI if you want.
+
+The blocks produce semantic HTML, with progressive enhancement, stylable with CSS classes.
 
 ## Installation
 
@@ -18,6 +21,7 @@ implementation("dev.klerkframework:klerk-web")
 ```
 
 # Context
+
 Interactions with Klerk almost always require a context. We therefore need a way to create a context
 from a Ktor call. The recommended way is to create an extension function that returns a context:
 ```kotlin
@@ -26,16 +30,41 @@ suspend fun ApplicationCall.ctx(klerk: Klerk<Ctx, Views>): Ctx {
 }
 ```
 
-# Building with Klerk
+# WebSupport
 
-Assuming you already have a Klerk configuration, the tools and building blocks in klerk-web can be used to quickly
-turn the configuration into a fully functional web application.
+Every building block takes a `WebSupport`. It carries what they all need: Klerk, the context provider, where pages
+live, what they look like and how they are styled.
 
-While it is possible to tweak and configure the building blocks, it is likely that you
-at some point will replace some or all parts with custom code to better fit your needs.
+```kotlin
+val support = WebSupport(
+    klerk,
+    ApplicationCall::ctx,
+    pathProvider = DefaultPathProvider(),
+    layout = Layout(css = css),
+    classProvider = null,
+)
+```
 
-It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) to produce the HTML. Klerk-web comes with an extension function `Reader.html`
-that makes it easy to do so:
+Pass the same instance to every block, so the pages link to each other and look alike.
+
+* `PathProvider` builds the URLs klerk-web links to. Override `pathForItem` to return null for a model that has no
+  detail page - nothing will link to it, and no route is registered for it.
+* `Layout` produces whole documents: `lang`, `<title>`, viewport, the stylesheet and anything else you want in
+  `<head>`. See [Appearance](appearance.md).
+* `CssClassProvider` supplies CSS classes. Leave it out when using a classless CSS.
+
+# Building blocks
+
+* [ModelListPage and ModelDetailPage](model-pages.md): a generated list and detail page for one model.
+* [TableTemplate](tables.md): a paginated, filterable table of a collection. Columns are values you can replace.
+* [FormTemplate](forms.md): generate a form for an event and parse what is submitted.
+* [AutoButtons](auto-buttons.md): a button for an event; clicking it renders the form and issues the command.
+* [Admin UI](admin-ui.md): an operations console. An **internal tool** - not a foundation for your users' UI.
+* [Assets](assets.md): serve CSS and JavaScript with cache busting and compression.
+* [Plugins](plugins.md): give a Klerk plugin its own page in the Admin UI.
+
+It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) to produce the HTML. Klerk-web comes
+with an extension function `Reader.html` that makes it easy to do so:
 ```kotlin
 val context = call.ctx(klerk)
 call.respond(klerk.read(context) {
@@ -47,22 +76,12 @@ call.respond(klerk.read(context) {
 })
 ```
 
-## Building blocks
-Klerk-web provides a set of building blocks that can be used to build a UI for Klerk:
-* KlerkWeb: A facade that wires up AutoButtons and AdminUI, and generates list and detail routes for every managed model. The fastest way to get a working UI (see [Quick start](#quick-start) below).
-* TableTemplate: Build and render a paginated, filterable table for a collection.
-* FormTemplate: Generate forms and parse submitted data (see [Forms](forms.md)).
-* AutoButtons: Generate a button for an event. When the button is clicked, a form is rendered. When the form is
-submitted, the data is parsed and a Klerk command is issued (see [AutoButtons](auto-buttons.md)).
-* AdminUI: Manage your application (see [Admin UI](admin-ui.md)).
-
 ## Quick start
 
-If you want routes for every managed model (a list page and a detail page each) without assembling the building
-blocks yourself, use `KlerkWeb`:
+If you want routes for every managed model without assembling the blocks yourself, use `KlerkWeb`:
 
 ```kotlin
-val klerkWeb = KlerkWeb(klerk, ApplicationCall::ctx)
+val klerkWeb = KlerkWeb(klerk, ApplicationCall::ctx, canSeeAdminUI = ::canSeeAdminUI)
 
 routing {
     apply(klerkWeb.generateRoutes())
@@ -71,6 +90,17 @@ routing {
 
 This registers a list and a detail route for each managed model, plus the AutoButtons and Admin UI routes.
 `klerkWeb.generateNav()` renders a `<nav>` with a link to each model's list page.
+
+`canSeeAdminUI` has no default: the Admin UI exposes the log, the configuration and job control, so you must decide
+who may see it.
+
+To build some pages yourself, exclude those models:
+
+```kotlin
+apply(klerkWeb.generateRoutes(filter = { it.kClass != Game::class }))
+```
+
+`klerkWeb.support` is the `WebSupport` the generated pages use. Pass it to your own blocks so they match.
 
 ## Ask Klerk
 
@@ -85,28 +115,22 @@ follows the configuration. So if the Klerk configuration changes, your UI will a
 
 ```kotlin
 val context = call.ctx(klerk)
- {
-    val model = get(id)
-    call.respond(klerk.read(context) {
+call.respond(klerk.read(context) {
+    html {
         body {
-            h1 { +"Actions for ${model.props.name}" }
-            getPossibleEvents(model.id).forEach { event ->
-                apply(autoButtons.render(event, model.id, context))
+            h1 { +"Actions for ${get(id).props.name}" }
+            getPossibleEvents(id).forEach { event ->
+                apply(autoButtons.render(event, id, context))
             }
         }
-    })
-}
+    }
+})
 ```
 
-## Appearance
-
-It is recommended to start with a classless CSS. When you are ready to add some styling, you can provide your own
-class provider function to customize the CSS classes applied to form elements.
-
 ## How to build a basic web UI
-Putting it all together, here is a rough guide how to build a basic UI:
-* Start with a classless CSS. Use the [assets](assets.md) tools provided by klerk-web to serve it.
-* Call `KlerkWeb(klerk, contextProvider).generateRoutes()` (see [Quick start](#quick-start)) to get a list page and a
-  detail page for every managed model, with buttons for every possible event already wired up.
-* If you need a custom list or detail page for a specific model, build it with `TableTemplate`/`FormTemplate`/`AutoButtons`
-  directly instead of relying on the generated route for that model. Or build it yourself from scratch without klerk-web.
+
+* Start with a classless CSS. Use the [assets](assets.md) tools to serve it, and give it to the `Layout`.
+* Create a `KlerkWeb(klerk, ::ctx, canSeeAdminUI)`, call `generateRoutes()` and `generateNav()` to get a list page and a detail page for every
+  managed model, with buttons for every possible event already wired up.
+* When you need something else for a specific model, exclude it from `generateRoutes` and build that page with
+  `TableTemplate`/`FormTemplate`/`AutoButtons` - or from scratch. The other models keep their generated pages.

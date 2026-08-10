@@ -4,7 +4,7 @@ import org.jetbrains.dokka.gradle.formats.DokkaFormatPlugin
 import org.jetbrains.dokka.gradle.internal.InternalDokkaGradlePluginApi
 
 plugins {
-    kotlin("jvm") version "2.3.10"
+    kotlin("jvm") version "2.4.10"
     `java-library`
     `maven-publish`
     id("org.jetbrains.dokka") version "2.2.0"

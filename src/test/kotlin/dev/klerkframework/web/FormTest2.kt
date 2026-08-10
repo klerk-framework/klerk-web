@@ -35,7 +35,7 @@ fun main() {
         ),
         klerk,
         "/",
-        classProvider = ::myClassProvider,
+        classProvider = myClassProvider,
         pathProvider = DefaultPathProvider(),
     ) {
         text(CreateAuthorParams::firstName)
@@ -74,8 +74,10 @@ fun main() {
             post("/") {
                 when (val result = template.parse(
                     call,
+                    Context.swedishUnauthenticated(),
                     mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
                 )) {
+                    is Forbidden -> FormTemplate.respondForbidden(call)
                     is Invalid -> FormTemplate.respondInvalid(result, call)
                     is DryRun -> respondDryRun(
                         result.params,
@@ -141,11 +143,8 @@ private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdenti
     return true
 }
 
-fun myClassProvider(elementKind: String, elementType: String?, propertyName: String, value: String?): Set<String> {
-    if (elementKind == "input" && elementType == "text" && propertyName == "firstName") {
-        return setOf("testing")
-    }
-    return emptySet()
+val myClassProvider: CssClassProvider = CssClassProvider { part, element, property, _ ->
+    if (part == UiPart.Form && element == "input" && property == "firstName") setOf("testing") else emptySet()
 }
 
 fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {

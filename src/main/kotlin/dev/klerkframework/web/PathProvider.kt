@@ -1,50 +1,53 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.web.assets.CssAsset
 import kotlin.reflect.KClass
 
 /**
- * This interface provides path generation for collections and individual items. Used by various klerk-web
- * components to generate URLs for navigation and linking within the application.
+ * Builds the URLs klerk-web uses to link between pages. It says nothing about what a page looks like - that is
+ * [Layout].
+ *
  * @param base Base path for the application, typically "/"
  * @param prefix Prefix for collections, e.g. "admin/"
- * @param css Optional CSS asset to embed in the HTML, e.g. CssAsset("myapp.css")
- * @param externalCssPath Optional external CSS path, e.g. "https://example.com/beautiful.css"
  */
 public interface PathProvider {
     public val base: String
     public val prefix: String
     public val assetsBase: String
-    public val css: CssAsset?
-    public val externalCssPath: String?
     public val autoButtons: String
     public fun pathForCollection(kClass: KClass<out Any>): String {
         return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
     }
-    public fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String
-    public fun pathForItem(kClass: KClass<out Any>, id: String): String
-    public fun cssUrl(): String? = externalCssPath ?: if (css != null) "$assetsBase/${css!!.getPathAndHash()}" else null
+
+    /**
+     * The path to the detail view of a single model, or null if there is no detail view for [kClass]. Callers must
+     * render plain text instead of a link when this returns null, and must not register a route for it.
+     */
+    public fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String?
+
+    /**
+     * As [pathForItem], but takes the id as a string so that a route pattern (e.g. "{id}") can be built.
+     */
+    public fun pathForItem(kClass: KClass<out Any>, id: String): String?
     public fun assetPath(resource: String): String = "$assetsBase/$resource"
     public fun withPrefix(): String = "$base$prefix"
 }
 
+/** Paths of the form `base + prefix + modelname` and `base + prefix + modelname/id`. */
 public data class DefaultPathProvider(
     public override val base: String = "/",
     public override val prefix: String = "",
-    override val externalCssPath: String? = null,
-    override val css: CssAsset? = null
 ) : PathProvider {
 
     override val assetsBase: String = "${base}_assets"
 
     override val autoButtons: String = "${base}_autobuttons"
 
-    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String {
+    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String? {
         return "${pathForCollection(kClass)}/${id.value}"
     }
 
-    override fun pathForItem(kClass: KClass<out Any>, id: String): String {
+    override fun pathForItem(kClass: KClass<out Any>, id: String): String? {
         return "${pathForCollection(kClass)}/$id"
     }
 
@@ -53,7 +56,5 @@ public data class DefaultPathProvider(
         require(base.endsWith("/")) { "Base path must end with /" }
         require(prefix.isEmpty() || !prefix.startsWith("/")) { "Prefix must not start with /" }
         require(prefix.isEmpty() || prefix.endsWith("/")) { "Prefix must end with /" }
-        require(externalCssPath == null || externalCssPath.startsWith("https://")) { "CSS path must start with https://" }
-        require(!(css != null && externalCssPath != null)) { "Cannot specify both externalCssPath and cssResource" }
     }
 }

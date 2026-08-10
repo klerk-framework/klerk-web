@@ -19,23 +19,22 @@ import kotlin.reflect.KClass
 
 internal suspend fun <C : KlerkContext, V> renderDocumentation(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<C, V>,
     documentationPath: String
 ) {
-    val context = config.contextProvider(call, klerk)
+    val context = support.contextProvider(call, klerk)
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
+    val csrfToken = Csrf.issue(call)
 
-    call.respondHtml {
-        apply(lowCodeHtmlHead(config.pathProvider))
-        body {
+    call.respondPage(support.layout, "Documentation") {
             header {
-                nav { div { a(href = config.pathProvider.base) { +"Home" } } }
+                nav { div { a(href = support.pathProvider.base) { +"Home" } } }
             }
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
                 h1 { +"Documentation" }
-                apply(renderModels(klerk.config.managedModels, klerk, documentationPath, context.translation.klerk))
+                apply(renderModels(klerk.config.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
                 apply(renderAuthorizationRules(klerk.config.authorization))
                 apply(renderCollections(klerk.config.views))
                 apply(renderPluginsDocumentation(klerk.config.plugins))
@@ -67,7 +66,6 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
 
             }
             apply(renderAlgorithms(documentationPath))
-        }
     }
 }
 
@@ -85,12 +83,13 @@ private fun <C : KlerkContext, V> renderModels(
     klerk: Klerk<C, V>,
     documentationPath: String,
     translation: KlerkTranslation,
+    csrfToken: String,
 ): BODY.() -> Unit = {
     apply(addMermaidScript())
     h2 { +"Models" }
     models.forEach { model ->
         h3 { +(model.kClass.simpleName ?: "") }
-        apply(renderModelProperties(model.kClass, documentationPath))
+        apply(renderModelProperties(model.kClass, documentationPath, csrfToken))
         apply(renderStatemachine(model.stateMachine, klerk, translation))
     }
 }
@@ -110,7 +109,7 @@ private fun <C : KlerkContext, V> renderStatemachine(
 
 }
 
-private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String): BODY.() -> Unit = {
+private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String, csrfToken: String): BODY.() -> Unit = {
     h4 { +"Properties" }
     ul {
         EventParameters(kClass).all.forEach { prop ->
@@ -144,6 +143,7 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
             val propClass = prop.qualifiedName
             if (prop.type == PropertyType.String) {
                 form("$documentationPath/functionInvocation", method = FormMethod.post) {
+                    with(Csrf) { tokenInput(csrfToken) }
                     hiddenInput(name = FUNCTION_KIND) { value = DATA_CONTAINER_VALIDATION }
                     hiddenInput(name = DATA_CONTAINER_CLASS) { value = propClass }
                     hiddenInput(name = "name") { value = prop.name }
@@ -314,22 +314,19 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): BO
 
 internal suspend fun <C : KlerkContext, V> renderAlgorithm(
     call: ApplicationCall,
-    config: AdminUI<C, V>,
+    support: WebSupport<C, V>,
     klerk: Klerk<*, V>
 ) {
     val algorithmName =
         URLDecoder.decode(call.parameters["name"], Charset.defaultCharset()) ?: throw IllegalArgumentException()
     val algorithm = AlgorithmDocumenter.getAlgorithm(algorithmName)
 
-    call.respondHtml {
-        head {}
-        body {
-            apply(addMermaidScript())
-            h1 { +algorithm.name }
-            pre(classes = "mermaid") {
-                unsafe {
-                    +generateFlowChart(algorithm)
-                }
+    call.respondPage(support.layout, algorithm.name) {
+        apply(addMermaidScript())
+        h1 { +algorithm.name }
+        pre(classes = "mermaid") {
+            unsafe {
+                +generateFlowChart(algorithm)
             }
         }
     }
