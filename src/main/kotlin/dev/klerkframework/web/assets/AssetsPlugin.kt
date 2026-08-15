@@ -66,7 +66,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
         val brotliAvailable = isBrotliAvailable()
 
-        assets = userAssetResources.plus(formJs)
+        assets = userAssetResources.plus(formJs).plus(uploadJs)
         assets.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)
                 ?: throw IllegalStateException("Resource not found: ${asset.resourcePath}")
@@ -325,3 +325,8 @@ private object ResourceReader {
 internal val klerkFormValidationJsFile = "klerkFormValidation.js"
 
 internal val formJs = JsAsset(klerkFormValidationJsFile)
+
+internal val klerkUploadJsFile = "klerkUpload.js"
+
+/** The uploader used by `FormTemplate.file()`. Always served, like the form validation script. */
+public val uploadJs: JsAsset = JsAsset(klerkUploadJsFile)

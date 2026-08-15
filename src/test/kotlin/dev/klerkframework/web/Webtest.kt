@@ -15,6 +15,16 @@ import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.config.*
+import dev.klerkframework.web.upload.UploadPlugin
+import dev.klerkframework.web.upload.uploadRoutes
+import dev.klerkframework.klerk.EventWithParameters
+import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.command.Command
+import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.misc.EventParameters
+import io.ktor.http.*
+import io.ktor.server.response.*
+import java.nio.file.Path
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
@@ -99,7 +109,7 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
             )
         }
 
-        return when (Random.nextInt(5)) {
+        return when (Random.nextInt(4)) {   // set to 5 if you want to test throwing an uncaught exception
             0 -> {
                 log += args.info("Succeeding")
                 JobResult.Success(log = log)
@@ -147,7 +157,11 @@ fun main() {
     ds.url = "jdbc:sqlite:$dbFilePath"
     //val persistence = SqlPersistence(ds)
     val persistence = RamStorage()
-    val klerk = Klerk.create(createConfig(collections, persistence, extraJobs = { register(PeriodicPingJob) }))
+    // A fixed directory rather than a temporary one, so that an upload interrupted by a restart can be resumed.
+    val uploads = UploadPlugin<Context, MyCollections>(Path.of("/tmp/klerk-webtest-uploads"))
+    val klerk = Klerk.create(
+        createConfig(collections, persistence, extraJobs = { register(PeriodicPingJob) }).withPlugin(uploads)
+    )
     runBlocking {
 
         klerk.meta.start()
@@ -162,7 +176,7 @@ fun main() {
         }
 
         val embeddedServer = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-            configureRouting(klerk)
+            configureRouting(klerk, uploads)
             //        configureSecurity()
             //      configureHTTP()
             install(Compression)
@@ -205,7 +219,7 @@ val layout = Layout(css = css, assetsBase = pathProvider.assetsBase)
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("other/my-script.js")
 
-fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
+fun Application.configureRouting(klerk: Klerk<Context, MyCollections>, uploads: UploadPlugin<Context, MyCollections>) {
     val klerkWeb = KlerkWeb(
         klerk,
         ApplicationCall::ctx,
@@ -215,12 +229,20 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>) {
         classProvider = MyClassProvider,
         useTableForDetails = false
         )
+    val support = WebSupport(klerk, ApplicationCall::ctx, pathProvider, layout, MyClassProvider)
+    val flowerForm = flowerFormTemplate(klerk, uploads)
 
     routing {
         klerkWebRoutes(klerkWeb)
+        uploadRoutes(support, uploads)
 
         route(pathProvider.base) {
             get(renderIndex(klerkWeb))
+
+            get("/flowers", renderFlowers(klerk))
+            get("/flowers/new", renderNewFlower(klerk, flowerForm))
+            post("/flowers", createFlower(klerk, flowerForm))
+            get("/flowers/{id}/image", serveFlowerImage(klerk))
 
 
             /*        get("/authors", renderAuthors(klerk))
@@ -277,6 +299,117 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
             modelsNav(klerkWeb)
         }
     }
+}
+
+/**
+ * The form for creating a flower. Built once, at startup, so a mistake in it is a startup failure rather than a
+ * surprise on the first request.
+ *
+ * `file()` is what makes the image field an upload: the browser sends the bytes to the Uploads plugin while the user
+ * is still typing the name, and the form itself carries only the id of that upload.
+ */
+private fun flowerFormTemplate(
+    klerk: Klerk<Context, MyCollections>,
+    uploads: UploadPlugin<Context, MyCollections>,
+) = FormTemplate(
+    EventWithParameters(CreateFlower.id, EventParameters(CreateFlowerParams::class)),
+    klerk,
+    postPath = "${pathProvider.base}flowers",
+    pathProvider = pathProvider,
+    layout = layout,
+    uploads = uploads,
+) {
+    text(CreateFlowerParams::name)
+    file(CreateFlowerParams::image)
+}
+
+private fun renderNewFlower(
+    klerk: Klerk<Context, MyCollections>,
+    template: FormTemplate<CreateFlowerParams, Context, MyCollections>,
+): suspend RoutingContext.() -> Unit = {
+    val context = call.ctx(klerk)
+    val form = klerk.read(context) {
+        template.build(call, null, this, translator = context.translation, context = context)
+    }
+    call.respondHtml(block = layout.page("New flower") {
+        h1 { +"Plant a flower" }
+        p { +"Pick an image and it starts uploading straight away." }
+        eventForm(form)
+    })
+}
+
+private fun createFlower(
+    klerk: Klerk<Context, MyCollections>,
+    template: FormTemplate<CreateFlowerParams, Context, MyCollections>,
+): suspend RoutingContext.() -> Unit = {
+    val context = call.ctx(klerk)
+    when (val parsed = template.parse(call, context)) {
+        is ParseResult.Forbidden -> FormTemplate.respondForbidden(call)
+        is ParseResult.Invalid -> FormTemplate.respondInvalid(parsed, call)
+        is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
+        is ParseResult.Parsed -> {
+            klerk.handle(
+                Command(event = CreateFlower, model = null, params = parsed.params),
+                context,
+                ProcessingOptions(parsed.key),
+            ).orThrow()
+            call.respondRedirect("${pathProvider.base}flowers")
+        }
+    }
+}
+
+private fun renderFlowers(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
+    val context = call.ctx(klerk)
+    val flowers = klerk.read(context) { list(views.flowers.all) }
+    call.respondHtml(block = layout.page("Flowers") {
+        h1 { +"Flowers" }
+        p { a(href = "${pathProvider.base}flowers/new") { +"Plant another one" } }
+        if (flowers.isEmpty()) {
+            p { +"Nothing planted yet." }
+        }
+        flowers.forEach { flower ->
+            figure {
+                img(alt = flower.props.name.value, src = "${pathProvider.base}flowers/${flower.id}/image") {
+                    width = "300"
+                }
+                figcaption { +flower.props.name.value }
+            }
+        }
+    })
+}
+
+/**
+ * Serves a flower's image.
+ *
+ * The content type stored with the upload is what the *client* claimed, so it is only honoured for image types that
+ * are safe to render inline. Anything else is sent as a download — an HTML or SVG file served inline from this origin
+ * would be a script running as the application.
+ */
+private fun serveFlowerImage(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = rc@{
+    val context = call.ctx(klerk)
+    val id = call.parameters["id"]?.toIntOrNull()
+    if (id == null) {
+        call.respond(HttpStatusCode.NotFound)
+        return@rc
+    }
+    val blob = klerk.read(context) { getOrNull(ModelID<Flower>(id))?.props?.image }
+    if (blob == null) {
+        call.respond(HttpStatusCode.NotFound)
+        return@rc
+    }
+
+    val metadata = klerk.attachedData.getMetadata(blob, context)
+    val claimed = metadata.custom["declaredContentType"]
+    val inlineSafe = claimed in setOf("image/png", "image/jpeg", "image/gif", "image/webp")
+
+    call.response.header("X-Content-Type-Options", "nosniff")
+    if (!inlineSafe) {
+        call.response.header(HttpHeaders.ContentDisposition, "attachment")
+    }
+    call.respondBytes(
+        bytes = klerk.attachedData.get(blob, context).readAllBytes(),
+        contentType = if (inlineSafe) ContentType.parse(claimed!!) else ContentType.Application.OctetStream,
+    )
 }
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {

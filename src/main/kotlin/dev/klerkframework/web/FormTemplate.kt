@@ -17,12 +17,20 @@ import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.formJs
+import dev.klerkframework.web.assets.uploadJs
+import dev.klerkframework.web.upload.Upload
+import dev.klerkframework.web.upload.UploadPlugin
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
 import dev.klerkframework.web.assets.klerkFormValidationJsFile
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.utils.io.jvm.javaio.toInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.format
@@ -37,10 +45,14 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.*
+import kotlin.time.Duration.Companion.minutes
 
 private val fileLog = KotlinLogging.logger {}
 
 private val CSRF_TOKEN = Csrf.TOKEN_NAME
+/** How long a blob prepared from an upload waits for its command. Long enough to fix a form and submit again. */
+private val UPLOAD_BLOB_LEASE = 15.minutes
+
 internal val IDEMPOTENCE_KEY: String = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
 
 
@@ -60,6 +72,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     internal val autoButtons: AutoButtons<C, V>? = null,
     internal val pathProvider: PathProvider,
     internal val layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
+    /** Required for [file]: the plugin that received the bytes, so that [parse] can turn an upload into a blob. */
+    internal val uploads: UploadPlugin<C, V>? = null,
     init: FormTemplate<T, C, V>.() -> Unit
 ) {
     private val log = KotlinLogging.logger {}
@@ -75,6 +89,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     // private val emailInputs = mutableListOf<String>()
     private val propsPopulatedAfterSubmit = mutableListOf<String>()
+    private val fileInputs = mutableListOf<String>()
     private var htmlDetailsSummary: String? = null
     private val htmlDetailsContents = mutableSetOf<String>()
     internal var labelProvider: ((UIElementData) -> String?)? = null
@@ -133,6 +148,21 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         inputs.add(Pair(property.name, hidden))
     }
 
+    /**
+     * A file input for an [AttachedBlobID] parameter.
+     *
+     * The bytes do not travel with the form. The browser uploads them to [UploadPlugin]'s routes first — resumably,
+     * in chunks — and the form carries only the id of the resulting [dev.klerkframework.web.upload.Upload] in a
+     * hidden field. [parse] turns that into attached data and puts the [AttachedBlobID] in the parameters, so the
+     * command that stores it is as quick as any other.
+     *
+     * Requires an `uploads` plugin on the template. Without JavaScript the field still works: the file is posted with
+     * the form and uploaded in one request before the parameters are parsed.
+     */
+    public fun file(property: KProperty1<*, AttachedBlobID?>): Unit {
+        fileInputs.add(property.name)
+    }
+
     public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit {
         selectReferences.add(property.name)
     }
@@ -156,6 +186,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .filter { p -> selectReferences.none { select -> select == p.name } }
             .filter { p -> selectEnums.none { select -> select == p.name } }
             .filter { p -> propsPopulatedAfterSubmit.none { it == p.name } }
+            .filter { p -> fileInputs.none { it == p.name } }
 
         if (inHtmlDetails != null) {
             htmlDetailsContents.addAll(remaining.map { it.name })
@@ -173,6 +204,13 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Enum -> selectEnum(p)
                     PropertyType.Instant -> dateTime(p)
                     PropertyType.Duration -> duration(p)
+                    PropertyType.AttachedDataRef -> throw IllegalStateException(
+                        "The property '${p.name}' refers to attached data. Declare it with file() if it is an " +
+                                "AttachedBlobID the user should upload, or with hidden()/populatedAfterSubmit() if " +
+                                "your own code supplies it. remaining() never renders one by itself, since uploading " +
+                                "requires the Uploads plugin."
+                    )
+
                     else -> throw IllegalStateException(
                         "klerk-web cannot render the property '${p.name}' of type '${p.type?.name ?: "unknown"}'." +
                                 " If you are writing the form yourself, declare that property with hidden() or" +
@@ -201,6 +239,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             populateMissingReferenceSelects(modelIDSelects, reader, inputs, context),
             populateEnumSelects(),
             propsPopulatedAfterSubmit,
+            fileInputs,
             params,
             path ?: postPath,
             queryParams,
@@ -278,11 +317,19 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             it.validate()
         }
 
+        if (fileInputs.isNotEmpty() && uploads == null) {
+            throw IllegalStateException(
+                "The form declares file(${fileInputs.joinToString(", ")}) but has no 'uploads' plugin. Pass the " +
+                        "UploadPlugin to the FormTemplate, and register its routes."
+            )
+        }
+
         val missing = parameters.all
             .filterNot { prop -> inputs.map { i -> i.first }.contains(prop.name) }
             .filterNot { prop -> selectReferences.contains(prop.name) }
             .filterNot { prop -> selectEnums.contains(prop.name) }
             .filterNot { prop -> propsPopulatedAfterSubmit.contains(prop.name) }
+            .filterNot { prop -> fileInputs.contains(prop.name) }
         if (missing.isNotEmpty()) {
             throw IllegalStateException(
                 "Form for class ${parameters.raw} is missing declaration for ${
@@ -319,7 +366,20 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         context: C,
         populatedAfterSubmit: Map<KProperty1<*, Any?>, DataContainer<*>> = emptyMap(),      // not only DataContainer, also references. Collections?
     ): ParseResult<T> {
-        val callParams = call.receiveParameters()
+        // A form with a file field posts as multipart when there is no JavaScript, and as an ordinary form when the
+        // browser has already uploaded the bytes. Either way, what reaches the parameters below is a blob id.
+        //
+        // Nothing is resolved before the CSRF check: turning an upload into attached data is real work on behalf of a
+        // real actor, and a request that fails the check must not cause any of it.
+        val callParams = if (call.request.contentType().match(ContentType.MultiPart.FormData)) {
+            receiveMultipartAsParameters(call, context)
+        } else {
+            val submitted = call.receiveParameters()
+            if (!Csrf.isValid(call, submitted[CSRF_TOKEN])) {
+                return ParseResult.Forbidden()
+            }
+            resolveUploads(submitted, context)
+        }
         if (!Csrf.isValid(call, callParams[CSRF_TOKEN])) {
             return ParseResult.Forbidden()
         }
@@ -327,7 +387,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         callParams.forEach { name, _ ->
-            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && !name.startsWith(
+            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && fileInputs.none { it == name } && !name.startsWith(
                     "null-toggle-"
                 )) {
                 throw IllegalArgumentException("Parameter $name is not expected to be present in request")
@@ -392,6 +452,104 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 )
             )
         }
+    }
+
+    /**
+     * Replaces each file field's upload id with the id of the attached data it became.
+     *
+     * The browser uploaded the bytes before submitting, so all that happens here is a lookup, a hand-over to attached
+     * data and a substitution. With a file blob store on the staging filesystem the hand-over is a rename, so the
+     * size of the file stops mattering here.
+     *
+     * The blob is leased for a few minutes rather than the usual one: a user may sit on a form with problems in it
+     * for a while, and every attempt should not have to upload the file again.
+     */
+    private suspend fun resolveUploads(submitted: Parameters, context: C): Parameters {
+        if (fileInputs.isEmpty()) {
+            return submitted
+        }
+        val plugin = requireNotNull(uploads) { "The form has a file field but no uploads plugin" }
+        val builder = ParametersBuilder()
+        // A plain loop rather than forEach: resolving an upload suspends, and StringValues.forEach is not inline.
+        for (name in submitted.names()) {
+            val values = submitted.getAll(name) ?: continue
+            if (!fileInputs.contains(name)) {
+                values.forEach { builder.append(name, it) }
+                continue
+            }
+            val uploadId = values.firstOrNull()?.takeIf { it.isNotBlank() }?.toIntOrNull() ?: continue
+            val blob = withContext(Dispatchers.IO) {
+                plugin.toAttachedData(context, ModelID<Upload>(uploadId), lease = UPLOAD_BLOB_LEASE)
+            }
+            builder.appendBlob(name, blob)
+        }
+        return builder.build()
+    }
+
+    /**
+     * A form carrying a file field, which is how a browser submits one whether or not the script ran.
+     *
+     * A file field arrives in one of two shapes, and both end as a blob id in the parameters:
+     *
+     * * as a **file part**, when the script never ran. There is nothing to resume in a single request, so the part is
+     *   streamed straight into attached data rather than through the staging area — an upload that cannot be
+     *   interrupted needs no [dev.klerkframework.web.upload.Upload] to track it.
+     * * as a **form field holding an upload id**, when the script uploaded the bytes beforehand. The enctype is on the
+     *   form either way, so this is the ordinary case, not the exception.
+     */
+    private suspend fun receiveMultipartAsParameters(call: ApplicationCall, context: C): Parameters {
+        val builder = ParametersBuilder()
+        // File fields submitted as an id rather than as bytes. Resolved after the parts, so that the CSRF token is
+        // known to be valid first — it may be the very last field for all this code knows.
+        val submittedUploads = mutableMapOf<String, String>()
+        val fromFileParts = mutableSetOf<String>()
+
+        call.receiveMultipart().forEachPart { part ->
+            when (part) {
+                is PartData.FormItem -> {
+                    val name = part.name
+                    if (name != null && fileInputs.contains(name)) {
+                        if (part.value.isNotBlank()) {
+                            submittedUploads[name] = part.value
+                        }
+                    } else {
+                        builder.append(name ?: "", part.value)
+                    }
+                }
+
+                is PartData.FileItem -> {
+                    val name = part.name
+                    // The token is rendered before the file input, so by the time a file part arrives it has been
+                    // seen. A request that puts the file first is refused rather than uploaded and then rejected.
+                    val authorized = Csrf.isValid(call, builder[CSRF_TOKEN])
+                    if (authorized && name != null && fileInputs.contains(name) &&
+                        part.originalFileName?.isNotBlank() == true
+                    ) {
+                        val blob = withContext(Dispatchers.IO) {
+                            klerk.attachedData.prepare(part.provider().toInputStream(), context)
+                        }
+                        builder.appendBlob(name, blob)
+                        fromFileParts.add(name)
+                    }
+                }
+
+                else -> Unit
+            }
+            part.dispose()
+        }
+
+        if (submittedUploads.isNotEmpty() && Csrf.isValid(call, builder[CSRF_TOKEN])) {
+            val plugin = requireNotNull(uploads) { "The form has a file field but no uploads plugin" }
+            submittedUploads.forEach { (name, uploadId) ->
+                // A field that also arrived as bytes has already been dealt with; the bytes win.
+                val id = uploadId.toIntOrNull()?.takeIf { !fromFileParts.contains(name) } ?: return@forEach
+                val blob = withContext(Dispatchers.IO) {
+                    plugin.toAttachedData(context, ModelID<Upload>(id), lease = UPLOAD_BLOB_LEASE)
+                }
+                builder.appendBlob(name, blob)
+            }
+        }
+        return builder.build()
     }
 
     public fun labelProvider(labelProvider: (UIElementData) -> String?) {
@@ -654,6 +812,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private val referenceSelects: Set<ReferencePropertyWithOptions>,
     private val enumSelects: Set<EnumPropertyWithOptions>,
     private val propsPopulatedAfterSubmit: List<String>,
+    private val fileInputs: List<String>,
     private val params: T?,
     private val postPath: String?,
     private val queryParams: Map<String, String>,
@@ -675,6 +834,45 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun elementId(propertyName: String): String = "$formId-$propertyName"
     private fun labelId(propertyName: String): String = "$formId-label-$propertyName"
     private fun errorId(propertyName: String): String = "$formId-error-$propertyName"
+
+    /**
+     * A file input plus the hidden field that carries the upload's id.
+     *
+     * The script uploads the chosen file to the plugin's routes and fills in the hidden field; if it never runs, the
+     * file input posts with the form instead and the server does the upload in one go. The `name` is on the hidden
+     * field either way, so the parameter is called the same thing whichever path was taken — except without
+     * JavaScript, where the file input has to carry the name itself.
+     */
+    private fun renderFileInput(propertyName: String): FlowContent.() -> Unit = {
+        label {
+            id = labelId(propertyName)
+            attributes["data-label-for"] = propertyName
+            htmlFor = elementId(propertyName)
+            val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
+            +(template.labelProvider?.invoke(
+                UIElementData(propertyName, dummyContainerFor(propertyName), true)
+            ) ?: translator.klerk.property(property))
+        }
+        input(InputType.file) {
+            id = elementId(propertyName)
+            // Named so that a submit without JavaScript still carries the file. The script removes the name when it
+            // takes over, so the bytes are not sent twice.
+            name = propertyName
+            attributes["data-klerk-file"] = propertyName
+            required = !template.parameters.all.single { it.name == propertyName }.isNullable
+        }
+        hiddenInput {
+            id = "${elementId(propertyName)}-upload"
+            attributes["data-klerk-upload-id"] = propertyName
+        }
+        span(classes = "upload-progress") {
+            id = "${elementId(propertyName)}-progress"
+            attributes["data-klerk-upload-progress"] = propertyName
+        }
+    }
+
+    private fun dummyContainerFor(propertyName: String): DataContainer<*> =
+        template.parameters.all.single { it.name == propertyName }.getDummyInstance()
 
     private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): FlowContent.() -> Unit = {
         label {
@@ -1087,10 +1285,23 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             src = template.pathProvider.assetPath(formJs.getPathAndHash()) // "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
             defer = true
         }
-        tag.form(path, method = FormMethod.post) {
+        if (fileInputs.isNotEmpty()) {
+            tag.script {
+                src = template.pathProvider.assetPath(uploadJs.getPathAndHash())
+                defer = true
+            }
+        }
+        // multipart only when there is a file to send: it is the encoding a submit without JavaScript needs, and
+        // costs nothing when the script has already uploaded the bytes and cleared the file input's name.
+        val encoding = if (fileInputs.isEmpty()) null else FormEncType.multipartFormData
+        tag.form(path, method = FormMethod.post, encType = encoding) {
                 id = formId
                 // The script binds itself to every form carrying this attribute, so no global handler is needed.
                 attributes["data-klerk-form"] = "true"
+                if (fileInputs.isNotEmpty()) {
+                    attributes["data-klerk-upload-path"] = template.uploads?.mountedAt
+                        ?: error("The form has a file field but the uploads plugin has no routes registered")
+                }
                 +System.lineSeparator()
 
                 // csrf-token should be placed before non-hidden inputs (see https://portswigger.net/web-security/csrf/preventing#how-should-csrf-tokens-be-transmitted)
@@ -1111,6 +1322,10 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                             )
                         )
                     }
+                    +System.lineSeparator()
+                }
+                fileInputs.forEach { propertyName ->
+                    p { tag.apply(renderFileInput(propertyName)) }
                     +System.lineSeparator()
                 }
                 referenceSelects.forEach { refSelect ->
@@ -1192,6 +1407,19 @@ public data class EnumPropertyWithOptions(
     val propertyNullable: Boolean,
     val options: Set<Enum<*>>
 )
+
+/**
+ * Puts a resolved blob into the parameters a form submission produced.
+ *
+ * `toString` is the id, which is all klerk-web is allowed to see of a blob. The null-toggle is what the other inputs
+ * use to say "this nullable field has a value": without it, a nullable parameter is read as null no matter what was
+ * submitted, and a chosen file would silently not be attached. There is no visible toggle for a file field — choosing
+ * a file is the toggle.
+ */
+private fun ParametersBuilder.appendBlob(name: String, blob: AttachedBlobID) {
+    append(name, blob.toString())
+    append("null-toggle-$name", "on")
+}
 
 internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {
     val constructors = parameterClass.constructors

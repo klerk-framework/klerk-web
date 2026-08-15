@@ -94,3 +94,11 @@ abstract class DokkaMarkdownPlugin : DokkaFormatPlugin(formatName = "markdown") 
 }
 // Applies the plugin
 apply<DokkaMarkdownPlugin>()
+
+// Runs the Webtest demo server: ./gradlew runWebtest
+tasks.register<JavaExec>("runWebtest") {
+    group = "application"
+    description = "Starts the klerk-web demo server on port 8080"
+    mainClass.set("dev.klerkframework.web.WebtestKt")
+    classpath = sourceSets["test"].runtimeClasspath
+}

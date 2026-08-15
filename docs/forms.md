@@ -82,6 +82,31 @@ call.respondHtml {
 
 Several forms may be rendered on the same page.
 
+## Files
+
+A parameter of type `AttachedBlobID` is declared with `file()`, and needs the [Uploads](uploads.md) plugin:
+
+```kotlin
+val template = FormTemplate(
+    EventWithParameters(CreateDocument.id, EventParameters(CreateDocumentParams::class)),
+    klerk,
+    postPath = "/documents",
+    pathProvider = support.pathProvider,
+    uploads = uploadPlugin,
+) {
+    file(CreateDocumentParams::content)
+    remaining()
+}
+```
+
+The bytes never travel with the form. The browser uploads them while the user fills in the rest, and the form carries
+only the id of the upload; `parse` turns that into attached data, so the command that stores it is as quick as any
+other. Without JavaScript the file posts with the form and the server does the upload in one request.
+
+The upload id is transport, like the CSRF token and the idempotence key — the parameter class is still the form's only
+source of truth. `remaining()` never renders a file field by itself: uploading needs the plugin, so it has to be
+declared.
+
 ## Handle the submission
 
 When the form is submitted, the server will receive a POST request to the specified path.

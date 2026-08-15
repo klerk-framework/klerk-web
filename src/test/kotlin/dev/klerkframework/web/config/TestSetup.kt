@@ -24,6 +24,7 @@ import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
+import dev.klerkframework.klerk.storage.AttachedBlobStore
 import dev.klerkframework.klerk.storage.Persistence
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
@@ -61,11 +62,15 @@ fun createConfig(
 ): Config<Context, MyCollections> {
     return ConfigBuilder<Context, MyCollections>(collections).build {
         persistence(storage)
+        // AssetsPlugin's TextAsset holds the Brotli-compressed asset as a blob, so a store is required.
+        attachedBlobStore(AttachedBlobStore.Database)
         managedModels {
             model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
             model(Author::class, authorStateMachine(collections), collections.authors)
             model(Publisher::class, publisherStateMachine(collections), collections.publishers)
             model(City::class, cityStateMachine(collections), collections.cities)
+            model(Document::class, documentStateMachine(), collections.documents)
+            model(Flower::class, flowerStateMachine(), collections.flowers)
             //model(Shop::class, cudStateMachine(Shop::class), views.shops)
         }
         jobs {
@@ -114,6 +119,18 @@ fun createConfig(
                 }
                 negative {}
             }
+            readAttachedData {
+                positive {
+                    rule(::`Everybody can read attached data`)
+                }
+                negative {}
+            }
+            writeAttachedData {
+                positive {
+                    rule(::`Everybody can prepare attached data`)
+                }
+                negative {}
+            }
         }
         systemContextProvider(::myContextProvider)
     }.withPlugin(AssetsPlugin(setOf(css, myScript)))
@@ -146,6 +163,15 @@ fun `Everybody can read event log`(args: ArgContextReader<Context, MyCollections
 }
 
 fun `Everybody can read jobs`(args: ArgsForJobRead<Context, MyCollections>): PositiveAuthorization {
+    return PositiveAuthorization.Allow
+}
+
+fun `Everybody can read attached data`(args: ArgsForAttachedDataRead<Context, MyCollections>): PositiveAuthorization {
+    return PositiveAuthorization.Allow
+}
+
+/** An upload becomes attached data, so an application with file uploads needs a rule like this one. */
+fun `Everybody can prepare attached data`(args: ArgsForAttachedDataWrite<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
@@ -524,6 +550,8 @@ data class MyCollections(
     val authors: AuthorCollections<MyCollections>,
     val publishers: ModelViews<Publisher, Context> = ModelViews(),
     val cities: ModelViews<City, Context> = ModelViews(),
+    val documents: ModelViews<Document, Context> = ModelViews(),
+    val flowers: ModelViews<Flower, Context> = ModelViews(),
 ) //, val shops: ModelView<Shop, Context>)
 
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
@@ -1096,3 +1124,71 @@ class NumberOfOffices(value: Int) : IntContainer(value) {
     override val min: Int = 2
     override val max: Int = Int.MAX_VALUE
 }
+
+// A model with a blob, so that FormTemplate.file() has something to render and parse. Deliberately separate from the
+// other test models: adding a blob to those would change what remaining() renders for every existing form test.
+data class Document(val title: DocumentTitle, val content: AttachedBlobID?)
+
+enum class DocumentStates { Created }
+
+class DocumentTitle(value: String) : StringContainer(value) {
+    override val minLength: Int = 1
+    override val maxLength: Int = 100
+    override val maxLines: Int = 1
+}
+
+data class CreateDocumentParams(val title: DocumentTitle, val content: AttachedBlobID?)
+
+object CreateDocument : VoidEventWithParameters<Document, CreateDocumentParams>(
+    Document::class, EventVisibility.EXTERNAL, CreateDocumentParams::class
+)
+
+object DeleteDocument : InstanceEventNoParameters<Document>(Document::class, EventVisibility.EXTERNAL)
+
+fun documentStateMachine(): StateMachine<Document, DocumentStates, Context, MyCollections> = stateMachine {
+    event(CreateDocument) {}
+    event(DeleteDocument) {}
+    voidState {
+        onEvent(CreateDocument) { createModel(DocumentStates.Created, ::newDocument) }
+    }
+    state(DocumentStates.Created) {
+        onEvent(DeleteDocument) { delete() }
+    }
+}
+
+private fun newDocument(args: ArgForVoidEvent<Document, CreateDocumentParams, Context, MyCollections>): Document =
+    Document(args.command.params.title, args.command.params.content)
+
+// A flower has a name and a picture of it. The image is required: a flower without one is not much of an entry, and
+// it also exercises the non-nullable side of FormTemplate.file().
+data class Flower(val name: FlowerName, val image: AttachedBlobID)
+
+enum class FlowerStates { Planted }
+
+class FlowerName(value: String) : StringContainer(value) {
+    override val minLength: Int = 1
+    override val maxLength: Int = 60
+    override val maxLines: Int = 1
+}
+
+data class CreateFlowerParams(val name: FlowerName, val image: AttachedBlobID)
+
+object CreateFlower : VoidEventWithParameters<Flower, CreateFlowerParams>(
+    Flower::class, EventVisibility.EXTERNAL, CreateFlowerParams::class
+)
+
+object DeleteFlower : InstanceEventNoParameters<Flower>(Flower::class, EventVisibility.EXTERNAL)
+
+fun flowerStateMachine(): StateMachine<Flower, FlowerStates, Context, MyCollections> = stateMachine {
+    event(CreateFlower) {}
+    event(DeleteFlower) {}
+    voidState {
+        onEvent(CreateFlower) { createModel(FlowerStates.Planted, ::newFlower) }
+    }
+    state(FlowerStates.Planted) {
+        onEvent(DeleteFlower) { delete() }
+    }
+}
+
+private fun newFlower(args: ArgForVoidEvent<Flower, CreateFlowerParams, Context, MyCollections>): Flower =
+    Flower(args.command.params.name, args.command.params.image)

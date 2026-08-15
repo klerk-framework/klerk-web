@@ -306,6 +306,9 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         return null
     }
 
+    if (type.isSubtypeOf(AttachedBlobID::class.starProjectedType.withNullability(true))) {
+        return if (value.isEmpty()) null else AttachedBlobID(value.toInt())
+    }
     if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false))) {
         return ModelID<Any>(value.toInt())
     }
