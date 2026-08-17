@@ -107,6 +107,11 @@ The upload id is transport, like the CSRF token and the idempotence key — the 
 source of truth. `remaining()` never renders a file field by itself: uploading needs the plugin, so it has to be
 declared.
 
+The validation described below never touches the file: a dry run stands the file field in with a placeholder blob so
+that every other field is still checked, and neither uploads the bytes again nor consumes the upload. That means a
+form with a file field should answer `ParseResult.DryRun` with `200 OK`, as in the example below, rather than with
+`respondDryRun` — issuing the command would report the placeholder as attached data that does not exist.
+
 What the property's container declares is rendered the same way `maxLength` is rendered for a string: `accept` becomes
 the file input's `accept` attribute, and `maxSize` stops a too-large file before it is uploaded and is applied by the
 upload endpoint as well. As always the browser's version of a rule is a convenience — the one that decides is the

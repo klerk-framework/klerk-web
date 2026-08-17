@@ -93,9 +93,25 @@
         messages.appendChild(line);
     }
 
+    // The form as the server should see it for validation: everything except the files.
+    //
+    // A file is either on its way to the upload endpoint already or will travel with the submit, so sending it here
+    // would upload it a second time - on every change, at that. The upload's id is an ordinary hidden field and is
+    // sent as usual, which is what the server needs to know that a file is there.
+    function withoutFiles(form) {
+        var data = new FormData();
+        new FormData(form).forEach(function (value, key) {
+            if (typeof File !== "undefined" && value instanceof File) {
+                return;
+            }
+            data.append(key, value);
+        });
+        return data;
+    }
+
     function validate(form) {
         var XHR = new XMLHttpRequest();
-        var FD = new FormData(form);
+        var FD = withoutFiles(form);
         var button = submitButton(form);
 
         XHR.addEventListener("load", function (event) {

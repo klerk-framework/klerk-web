@@ -25,6 +25,7 @@ import dev.klerkframework.klerk.AttachedBlobID
 import dev.klerkframework.klerk.CommandResult
 import dev.klerkframework.klerk.Problem
 import java.util.Base64
+import kotlin.reflect.KClass
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -265,18 +266,25 @@ public class UploadPlugin<C : KlerkContext, V>(
      *
      * The blob is unclaimed until a command stores it, so it comes with a [lease] rather than the usual minute.
      *
+     * Waits for the steps [declaration] declares — a virus scan, a disarm pass, a check of the contents — since the
+     * command that attaches the blob follows immediately and would be rejected otherwise.
+     *
+     * @param declaration the property the file is being uploaded for. It decides what is acceptable and what must
+     * happen to the file first.
      * @throws IllegalStateException if the upload is not complete.
+     * @throws dev.klerkframework.klerk.BlobRejected if a step refused the file.
      */
     public suspend fun toAttachedData(
         context: C,
         id: ModelID<Upload>,
+        declaration: KClass<out BlobContainer>,
         lease: Duration = 1.minutes,
-        declaration: ((AttachedBlobID) -> BlobContainer)? = null,
     ): AttachedBlobID {
         val upload = get(context, id)
         requireComplete(upload, id)
         val blob = klerk.attachedData.prepareFromFile(
             file = staging.pathFor(id.value),
+            declaration = declaration,
             context = context,
             metadata = mapOf(
                 // The client's word, kept for the application to check or to serve back — never trusted as fact.
@@ -285,10 +293,9 @@ public class UploadPlugin<C : KlerkContext, V>(
             ),
             lease = lease,
         )
-        // The property's steps — a virus scan, a disarm pass, a check of the contents — before anything can attach
-        // the value. Running them here means the user waits for them; running them as the upload finishes instead is
-        // what the Inspecting state is for, and is not built yet.
-        declaration?.let { klerk.attachedData.process(it(blob), context) }
+        // Klerk is already running the property's steps in a job. Waiting for it here means the user waits for the
+        // scan; starting it as the upload finishes instead is what the Inspecting state is for, and is not built yet.
+        klerk.attachedData.awaitProcessing(blob)
 
         // Whether the file was moved or copied, nothing needs it any more.
         klerk.handle(

@@ -141,7 +141,7 @@ class UploadPluginTest {
         plugin.append(alice(), id, 0, "hello".byteInputStream())
 
         // the blob is unclaimed until a command stores it, which is what the lease is for
-        plugin.toAttachedData(alice(), id, lease = 15.minutes)
+        plugin.toAttachedData(alice(), id, DocumentContent::class, lease = 15.minutes)
 
         assertFalse(Files.exists(stagingDir.resolve(id.value.toString())), "the staged file is now the blob")
         assertFailsWith<NoSuchUploadException> { plugin.offsetOf(alice(), id) }
@@ -154,7 +154,7 @@ class UploadPluginTest {
         val id = plugin.create(alice(), "f.txt", "text/plain", 10)
         plugin.append(alice(), id, 0, "half".byteInputStream())
 
-        assertFailsWith<IllegalStateException> { plugin.toAttachedData(alice(), id) }
+        assertFailsWith<IllegalStateException> { plugin.toAttachedData(alice(), id, DocumentContent::class) }
         assertEquals(4, plugin.offsetOf(alice(), id), "the upload is untouched and can still be finished")
         klerk.meta.stop()
     }

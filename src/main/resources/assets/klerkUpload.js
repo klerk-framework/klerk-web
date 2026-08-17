@@ -172,6 +172,10 @@
                     if (progress) {
                         progress.textContent = "";
                     }
+                    // The validation script saw the field while it was still empty. Nothing else will change now
+                    // that the upload is done, so it is told here. The event does not bubble and is dispatched on
+                    // the form, so this handler does not see it again.
+                    form.dispatchEvent(new Event("change"));
                 }).catch(function (error) {
                     if (progress) {
                         progress.textContent = String(error.message || error);

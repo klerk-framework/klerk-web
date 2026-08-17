@@ -39,6 +39,7 @@ import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.models.cityStateMachine
 import dev.klerkframework.web.models.publisherStateMachine
 import dev.klerkframework.web.myScript
+import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -1200,7 +1201,7 @@ private fun newFlower(args: ArgForVoidEvent<Flower, CreateFlowerParams, Context,
 /** Anything at all, so that the form tests can post text files — but it does have a step, so that the pipeline is
  * exercised through the form. */
 class DocumentContent(id: AttachedBlobID) : BlobContainer(id) {
-    override val steps: List<BlobStep> = listOf(::refuseTheWordVirus)
+    override val preAttachSteps: List<BlobStep> = listOf(::refuseTheWordVirus)
 }
 
 /** Stands in for a virus scanner: cheap, deterministic, and it refuses rather than rewrites. */
@@ -1214,6 +1215,17 @@ class FlowerImage(id: AttachedBlobID) : BlobContainer(id) {
     override val accept: Set<String> = setOf("image/png", "image/jpeg", "image/gif", "image/webp")
     override val maxSize: Long = 10_000_000
     override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
+    override val preAttachSteps: List<BlobStep> = listOf(::removeEXIF, ::resizeImage)
+}
+
+suspend fun removeEXIF(args: BlobStepArgs): BlobStepResult {
+    delay(20.seconds)
+    return BlobStepResult.Pass
+}
+
+suspend fun resizeImage(args: BlobStepArgs): BlobStepResult {
+    delay(20.seconds)
+    return BlobStepResult.Pass
 }
 
 // A tiny limit, so that the streaming cap on the no-JavaScript path can be exercised without a large fixture.
@@ -1223,6 +1235,7 @@ enum class NoteStates { Written }
 
 class SmallNote(id: AttachedBlobID) : BlobContainer(id) {
     override val maxSize: Long = 10
+    override val preAttachSteps: List<BlobStep> = listOf(::noPreAttachProcessing)
 }
 
 data class CreateNoteParams(val title: DocumentTitle, val content: SmallNote)

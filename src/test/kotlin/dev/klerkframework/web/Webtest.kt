@@ -167,7 +167,7 @@ fun main() {
     runBlocking {
 
         klerk.meta.start()
-        klerk.jobs.schedule(PeriodicPingJob.schedule(""), Context.system())
+        //klerk.jobs.schedule(PeriodicPingJob.schedule(""), Context.system())
 
         if (klerk.meta.modelsCount < 10) {
             //   val rowling = createAuthorJKRowling(klerk)

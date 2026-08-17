@@ -87,7 +87,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
-                        _klerk.attachedData.prepare(brotli.inputStream(), context)
+                        _klerk.attachedData.prepare(brotli.inputStream(), CompressedAsset::class, context)
                     } else null
 
                     _klerk.handle(

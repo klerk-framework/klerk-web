@@ -166,18 +166,21 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     /**
-     * Builds the property's [BlobContainer] around a particular blob, so that its steps can be run against it.
+     * The [BlobContainer] class the property holds, which is what `prepare` needs in order to know what the file must
+     * be and what has to happen to it first.
      *
-     * [blobDeclarationFor] answers "what does this property declare"; this answers "declare that about *this* value".
+     * [blobDeclarationFor] answers "what does this property declare"; this answers "which declaration is it".
      */
-    internal fun blobFactoryFor(propertyName: String): ((AttachedBlobID) -> BlobContainer)? {
+    @Suppress("UNCHECKED_CAST")
+    internal fun blobClassFor(propertyName: String): KClass<out BlobContainer> {
         val kClass = parameters.raw.declaredMemberProperties
             .singleOrNull { it.name == propertyName }
-            ?.returnType?.jvmErasure ?: return null
-        if (!kClass.isSubclassOf(BlobContainer::class)) {
-            return null
+            ?.returnType?.jvmErasure
+        require(kClass != null && kClass.isSubclassOf(BlobContainer::class)) {
+            "file('$propertyName') needs a parameter of a BlobContainer type, but ${parameters.raw.simpleName}." +
+                    "$propertyName is ${kClass?.simpleName ?: "not a parameter at all"}"
         }
-        return { id -> kClass.constructors.single { c -> c.parameters.size == 1 }.call(id) as BlobContainer }
+        return kClass as KClass<out BlobContainer>
     }
 
     /**
@@ -400,6 +403,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         context: C,
         populatedAfterSubmit: Map<KProperty1<*, Any?>, DataContainer<*>> = emptyMap(),      // not only DataContainer, also references. Collections?
     ): ParseResult<T> {
+        // The form validation script submits the form on every change, so a dry run happens while the user is still
+        // filling the form in - and must leave the file alone. See [DRY_RUN_BLOB].
+        val isDryRun = call.request.queryParameters["dryRun"]?.equals("true") == true
+
         // A form with a file field posts as multipart when there is no JavaScript, and as an ordinary form when the
         // browser has already uploaded the bytes. Either way, what reaches the parameters below is a blob id.
         //
@@ -407,7 +414,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         // real actor, and a request that fails the check must not cause any of it.
         val callParams = if (call.request.contentType().match(ContentType.MultiPart.FormData)) {
             try {
-                receiveMultipartAsParameters(call, context)
+                receiveMultipartAsParameters(call, context, isDryRun)
             } catch (e: UploadRefused) {
                 // A file the property or the application's rules will not have. The user gets the reason, not a 500.
                 return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "The file was refused", KlerkErrorCode.NotFound)))
@@ -417,7 +424,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             if (!Csrf.isValid(call, submitted[CSRF_TOKEN])) {
                 return ParseResult.Forbidden()
             }
-            resolveUploads(submitted, context)
+            resolveUploads(submitted, context, isDryRun)
         }
         if (!Csrf.isValid(call, callParams[CSRF_TOKEN])) {
             return ParseResult.Forbidden()
@@ -477,7 +484,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             }
 
 
-            if (call.request.queryParameters["dryRun"]?.equals("true") == true) {
+            if (isDryRun) {
                 return ParseResult.DryRun(paramsClass, key)
             }
             return ParseResult.Parsed(paramsClass, key)
@@ -504,8 +511,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      *
      * The blob is leased for a few minutes rather than the usual one: a user may sit on a form with problems in it
      * for a while, and every attempt should not have to upload the file again.
+     *
+     * @param isDryRun a dry run stands the file in with [DRY_RUN_BLOB] instead, leaving the upload untouched.
      */
-    private suspend fun resolveUploads(submitted: Parameters, context: C): Parameters {
+    private suspend fun resolveUploads(submitted: Parameters, context: C, isDryRun: Boolean): Parameters {
         if (fileInputs.isEmpty()) {
             return submitted
         }
@@ -519,12 +528,16 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 continue
             }
             val uploadId = values.firstOrNull()?.takeIf { it.isNotBlank() }?.toIntOrNull() ?: continue
+            if (isDryRun) {
+                builder.appendBlob(name, DRY_RUN_BLOB)
+                continue
+            }
             val blob = withContext(Dispatchers.IO) {
                 plugin.toAttachedData(
                     context,
                     ModelID(uploadId),
+                    declaration = blobClassFor(name),
                     lease = UPLOAD_BLOB_LEASE,
-                    declaration = blobFactoryFor(name),
                 )
             }
             builder.appendBlob(name, blob)
@@ -542,8 +555,11 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      *   interrupted needs no [dev.klerkframework.web.upload.Upload] to track it.
      * * as a **form field holding an upload id**, when the script uploaded the bytes beforehand. The enctype is on the
      *   form either way, so this is the ordinary case, not the exception.
+     *
+     * @param isDryRun a dry run stands the file in with [DRY_RUN_BLOB] instead, so nothing is stored. The
+     * application's own upload rule is still consulted, since that is what the user is asking about.
      */
-    private suspend fun receiveMultipartAsParameters(call: ApplicationCall, context: C): Parameters {
+    private suspend fun receiveMultipartAsParameters(call: ApplicationCall, context: C, isDryRun: Boolean): Parameters {
         val builder = ParametersBuilder()
         // File fields submitted as an id rather than as bytes. Resolved after the parts, so that the CSRF token is
         // known to be valid first — it may be the very last field for all this code knows.
@@ -590,6 +606,11 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                         )
                         if (refusal != null) {
                             refused = refusal.endUserTranslatedMessage
+                        } else if (isDryRun) {
+                            // The bytes are read and dropped: what the user is being told is whether the rest of the
+                            // form is in order, and storing the file to answer that would store it twice.
+                            builder.appendBlob(name, DRY_RUN_BLOB)
+                            fromFileParts.add(name)
                         } else {
                             try {
                                 val blob = withContext(Dispatchers.IO) {
@@ -597,11 +618,15 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                                     // them at claim time. A partially written value is discarded by prepare itself.
                                     val bytes = part.provider().toInputStream()
                                     val limit = declaration?.maxSize ?: Long.MAX_VALUE
-                                    klerk.attachedData.prepare(LimitedInputStream(bytes, limit), context)
+                                    klerk.attachedData.prepare(
+                                        LimitedInputStream(bytes, limit),
+                                        blobClassFor(name),
+                                        context,
+                                    )
                                 }
-                                // The property's steps, inline: without JavaScript there is nothing to run them
-                                // asynchronously against, and nothing to poll for the result with either.
-                                blobFactoryFor(name)?.let { klerk.attachedData.process(it(blob), context) }
+                                // The property's steps run in a job, but this request waits for them: without
+                                // JavaScript there is nothing to poll for the result with.
+                                klerk.attachedData.awaitProcessing(blob)
                                 builder.appendBlob(name, blob)
                                 fromFileParts.add(name)
                             } catch (e: UploadRefused) {
@@ -627,12 +652,16 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             submittedUploads.forEach { (name, uploadId) ->
                 // A field that also arrived as bytes has already been dealt with; the bytes win.
                 val id = uploadId.toIntOrNull()?.takeIf { !fromFileParts.contains(name) } ?: return@forEach
+                if (isDryRun) {
+                    builder.appendBlob(name, DRY_RUN_BLOB)
+                    return@forEach
+                }
                 val blob = withContext(Dispatchers.IO) {
                     plugin.toAttachedData(
                         context,
                         ModelID<Upload>(id),
+                        declaration = blobClassFor(name),
                         lease = UPLOAD_BLOB_LEASE,
-                        declaration = blobFactoryFor(name),
                     )
                 }
                 builder.appendBlob(name, blob)
@@ -1505,6 +1534,19 @@ public data class EnumPropertyWithOptions(
     val propertyNullable: Boolean,
     val options: Set<Enum<*>>
 )
+
+/**
+ * The blob a file field stands in with while a form is being validated.
+ *
+ * The validation script submits the form on every change, as a dry run. Doing the real work then would upload the
+ * file a second time and consume the upload the form still points at, so a dry run leaves the file alone and the
+ * property gets an id that refers to nothing - enough to build the parameters and check every other field.
+ *
+ * A blob property validates to nothing on its own, so this is invisible - except to [respondDryRun], which issues the
+ * command: that reports the placeholder as attached data that does not exist. Respond to
+ * [ParseResult.DryRun] without issuing the command when the form has a file field.
+ */
+private val DRY_RUN_BLOB = AttachedBlobID(0)
 
 /**
  * Puts a resolved blob into the parameters a form submission produced.

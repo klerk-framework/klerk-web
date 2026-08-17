@@ -37,8 +37,15 @@ cleans it up when it is abandoned.
    before the model records it, so the recorded offset is never larger than what is actually there: an interrupted
    upload costs the client a re-sent chunk, never a lost one.
 3. When the last declared byte arrives, the upload becomes `Ready`.
-4. The form is submitted with the upload's id. `parse` hands the staged file to `prepare` and puts the resulting
-   `AttachedBlobID` in the parameters; your command stores it on a model and owns it from then on.
+4. The form is submitted with the upload's id. `parse` hands the staged file to `prepare`, naming the `BlobContainer`
+   the form field is for, and puts the resulting `AttachedBlobID` in the parameters; your command stores it on a model
+   and owns it from then on.
+
+If that property declares real [steps](../../klerk/docs/attached-data.md#steps-looking-at-the-bytes-and-rewriting-them)
+— a virus scan, a disarm pass — Klerk runs them in a job, and `parse` waits for it before the command. The user therefore
+waits for the scan inside the submit request, on both paths; running it as the upload finishes instead needs an
+`Inspecting` state on the upload, which is not built yet. A step that refuses the file fails the submit with the
+step's own reason, exactly like a size refusal, and the file is deleted.
 
 There is no state for "attached": once the bytes are a blob, the blob and its owning model are the record of it, and
 the upload is deleted.

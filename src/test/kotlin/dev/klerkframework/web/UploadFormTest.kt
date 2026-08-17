@@ -217,6 +217,91 @@ class UploadFormTest {
         klerk.meta.stop()
     }
 
+    /**
+     * The form validation script posts the whole form on every change, with `dryRun=true`. That must not turn the
+     * upload into attached data: the file would be prepared twice - once here and once at submit - and the upload the
+     * hidden field still points at would already be gone.
+     */
+    @Test
+    fun `the validation dry run neither prepares the file nor consumes the upload`() = testApplication {
+        val (klerk, plugin, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        val upload = plugin.create(context(), "notes.txt", "text/plain", 11)
+        plugin.append(context(), upload, 0, "hello world".byteInputStream())
+
+        val dry = client.submitFormWithBinaryData(
+            url = "/documents?dryRun=true&onlyErrors=true",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "My notes")
+                append("content", upload.value.toString())
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+        assertEquals(HttpStatusCode.OK, dry.status, dry.bodyAsText())
+        assertEquals(
+            0,
+            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            "a dry run should not prepare the file",
+        )
+
+        val response = client.submitFormWithBinaryData(
+            url = "/documents",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "My notes")
+                append("content", upload.value.toString())
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        assertEquals("hello world", response.bodyAsText())
+        assertEquals(
+            1,
+            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            "the file should be prepared exactly once",
+        )
+        klerk.meta.stop()
+    }
+
+    /**
+     * The validation script may catch the file input while the uploader script is still sending it, in which case the
+     * bytes travel with the dry run too. Storing them would be a second upload of the same file.
+     */
+    @Test
+    fun `a file posted with a dry run is not stored`() = testApplication {
+        val (klerk, _, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        val dry = client.submitFormWithBinaryData(
+            url = "/documents?dryRun=true&onlyErrors=true",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "Still uploading")
+                append("content", "posted directly".toByteArray(), Headers.build {
+                    append(HttpHeaders.ContentType, "text/plain")
+                    append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
+                })
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+
+        assertEquals(HttpStatusCode.OK, dry.status, dry.bodyAsText())
+        assertEquals(
+            0,
+            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            "a dry run should not store the file",
+        )
+        klerk.meta.stop()
+    }
+
     @Test
     fun `a submission without the csrf token is refused before the upload is touched`() = testApplication {
         val (klerk, plugin, _) = setup()
@@ -426,4 +511,5 @@ class UploadFormTest {
         assertContains(body, """data-klerk-max-size="10000000"""")
         klerk.meta.stop()
     }
+
 }
