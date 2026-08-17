@@ -1,5 +1,6 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.CommandResult
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
@@ -26,6 +27,7 @@ import io.ktor.http.*
 import io.ktor.server.response.*
 import java.nio.file.Path
 import io.ktor.server.application.*
+import io.ktor.server.config.configLoaders
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
@@ -348,12 +350,24 @@ private fun createFlower(
         is ParseResult.Invalid -> FormTemplate.respondInvalid(parsed, call)
         is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
         is ParseResult.Parsed -> {
-            klerk.handle(
+            val result = klerk.handle(
                 Command(event = CreateFlower, model = null, params = parsed.params),
                 context,
                 ProcessingOptions(parsed.key),
-            ).orThrow()
-            call.respondRedirect("${pathProvider.base}flowers")
+            )
+            when (result) {
+                is CommandResult.Success -> call.respondRedirect("${pathProvider.base}flowers")
+                // A rejected file lands here — FlowerImage refusing an HTML file that was named .png, say. The
+                // problem carries a message for the user and the status code to answer with.
+                is CommandResult.Failure -> {
+                    val problem = result.problems.first()
+                    call.respondHtml(HttpStatusCode.fromValue(problem.recommendedHttpCode), layout.page("Not planted") {
+                        h1 { +"That did not work" }
+                        p { +problem.endUserTranslatedMessage }
+                        p { a(href = "${pathProvider.base}flowers/new") { +"Try again" } }
+                    })
+                }
+            }
         }
     }
 }
@@ -392,23 +406,25 @@ private fun serveFlowerImage(klerk: Klerk<Context, MyCollections>): suspend Rout
         call.respond(HttpStatusCode.NotFound)
         return@rc
     }
-    val blob = klerk.read(context) { getOrNull(ModelID<Flower>(id))?.props?.image }
-    if (blob == null) {
+    val image = klerk.read(context) { getOrNull(ModelID<Flower>(id))?.props?.image }
+    if (image == null) {
         call.respond(HttpStatusCode.NotFound)
         return@rc
     }
 
-    val metadata = klerk.attachedData.getMetadata(blob, context)
-    val claimed = metadata.custom["declaredContentType"]
-    val inlineSafe = claimed in setOf("image/png", "image/jpeg", "image/gif", "image/webp")
+    // What Klerk recognised the bytes to be, not what the uploader called them. FlowerImage already refused
+    // anything that is not one of these, so this is belt and braces — but it is the belt that matters when serving.
+    val metadata = klerk.attachedData.getMetadata(image.id, context)
+    val detected = metadata.contentType
+    val inlineSafe = detected in setOf("image/png", "image/jpeg", "image/gif", "image/webp")
 
     call.response.header("X-Content-Type-Options", "nosniff")
     if (!inlineSafe) {
         call.response.header(HttpHeaders.ContentDisposition, "attachment")
     }
     call.respondBytes(
-        bytes = klerk.attachedData.get(blob, context).readAllBytes(),
-        contentType = if (inlineSafe) ContentType.parse(claimed!!) else ContentType.Application.OctetStream,
+        bytes = klerk.attachedData.get(image.id, context).readAllBytes(),
+        contentType = if (inlineSafe) ContentType.parse(detected!!) else ContentType.Application.OctetStream,
     )
 }
 

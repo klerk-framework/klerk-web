@@ -40,11 +40,13 @@ import mu.KotlinLogging
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.io.InputStream
 import kotlin.reflect.KClass
 import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KTypeProjection
 import kotlin.reflect.full.*
+import kotlin.reflect.jvm.jvmErasure
 import kotlin.time.Duration.Companion.minutes
 
 private val fileLog = KotlinLogging.logger {}
@@ -159,8 +161,40 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * Requires an `uploads` plugin on the template. Without JavaScript the field still works: the file is posted with
      * the form and uploaded in one request before the parameters are parsed.
      */
-    public fun file(property: KProperty1<*, AttachedBlobID?>): Unit {
+    public fun file(property: KProperty1<*, BlobContainer?>): Unit {
         fileInputs.add(property.name)
+    }
+
+    /**
+     * Builds the property's [BlobContainer] around a particular blob, so that its steps can be run against it.
+     *
+     * [blobDeclarationFor] answers "what does this property declare"; this answers "declare that about *this* value".
+     */
+    internal fun blobFactoryFor(propertyName: String): ((AttachedBlobID) -> BlobContainer)? {
+        val kClass = parameters.raw.declaredMemberProperties
+            .singleOrNull { it.name == propertyName }
+            ?.returnType?.jvmErasure ?: return null
+        if (!kClass.isSubclassOf(BlobContainer::class)) {
+            return null
+        }
+        return { id -> kClass.constructors.single { c -> c.parameters.size == 1 }.call(id) as BlobContainer }
+    }
+
+    /**
+     * The [BlobContainer] declared for [propertyName], so that the form can render what it says.
+     *
+     * The blob id it is given is a placeholder: what is wanted here is the declaration, not a particular value.
+     */
+    internal fun blobDeclarationFor(propertyName: String): BlobContainer? {
+        val kClass = parameters.raw.declaredMemberProperties
+            .singleOrNull { it.name == propertyName }
+            ?.returnType?.jvmErasure ?: return null
+        if (!kClass.isSubclassOf(BlobContainer::class)) {
+            return null
+        }
+        return runCatching {
+            kClass.constructors.single { c -> c.parameters.size == 1 }.call(AttachedBlobID(0)) as BlobContainer
+        }.onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
     }
 
     public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit {
@@ -372,7 +406,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         // Nothing is resolved before the CSRF check: turning an upload into attached data is real work on behalf of a
         // real actor, and a request that fails the check must not cause any of it.
         val callParams = if (call.request.contentType().match(ContentType.MultiPart.FormData)) {
-            receiveMultipartAsParameters(call, context)
+            try {
+                receiveMultipartAsParameters(call, context)
+            } catch (e: UploadRefused) {
+                // A file the property or the application's rules will not have. The user gets the reason, not a 500.
+                return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "The file was refused", KlerkErrorCode.NotFound)))
+            }
         } else {
             val submitted = call.receiveParameters()
             if (!Csrf.isValid(call, submitted[CSRF_TOKEN])) {
@@ -384,7 +423,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             return ParseResult.Forbidden()
         }
         val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) }
-            ?: throw java.lang.IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
+            ?: throw IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         callParams.forEach { name, _ ->
             if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && fileInputs.none { it == name } && !name.startsWith(
@@ -457,6 +496,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     /**
      * Replaces each file field's upload id with the id of the attached data it became.
      *
+     * This happens when JavaScript is used on the client.
+     *
      * The browser uploaded the bytes before submitting, so all that happens here is a lookup, a hand-over to attached
      * data and a substitution. With a file blob store on the staging filesystem the hand-over is a rename, so the
      * size of the file stops mattering here.
@@ -479,7 +520,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             }
             val uploadId = values.firstOrNull()?.takeIf { it.isNotBlank() }?.toIntOrNull() ?: continue
             val blob = withContext(Dispatchers.IO) {
-                plugin.toAttachedData(context, ModelID<Upload>(uploadId), lease = UPLOAD_BLOB_LEASE)
+                plugin.toAttachedData(
+                    context,
+                    ModelID(uploadId),
+                    lease = UPLOAD_BLOB_LEASE,
+                    declaration = blobFactoryFor(name),
+                )
             }
             builder.appendBlob(name, blob)
         }
@@ -504,6 +550,11 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val submittedUploads = mutableMapOf<String, String>()
         val fromFileParts = mutableSetOf<String>()
 
+        // Why the refusal is remembered rather than thrown: the rest of the request has to be read whatever we decide
+        // about the file. Abandoning the body mid-stream leaves the client writing to a socket nobody is draining,
+        // which for a large file is a hang rather than an error.
+        var refused: String? = null
+
         call.receiveMultipart().forEachPart { part ->
             when (part) {
                 is PartData.FormItem -> {
@@ -525,11 +576,42 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     if (authorized && name != null && fileInputs.contains(name) &&
                         part.originalFileName?.isNotBlank() == true
                     ) {
-                        val blob = withContext(Dispatchers.IO) {
-                            klerk.attachedData.prepare(part.provider().toInputStream(), context)
+                        val declaration = blobDeclarationFor(name)
+
+                        // Ask the application's own rules before a byte is stored. This path creates no Upload — a
+                        // single request has nothing to resume — so without this the rule on CreateUpload would apply
+                        // to one path and not the other. Content-Length covers the whole request, so it is an
+                        // over-estimate of the file, which is the safe direction for a limit.
+                        val refusal = uploads?.reasonUploadWouldBeRefused(
+                            context = context,
+                            filename = part.originalFileName ?: "upload",
+                            declaredContentType = part.contentType?.toString() ?: "application/octet-stream",
+                            declaredSize = call.request.contentLength() ?: 0,
+                        )
+                        if (refusal != null) {
+                            refused = refusal.endUserTranslatedMessage
+                        } else {
+                            try {
+                                val blob = withContext(Dispatchers.IO) {
+                                    // Cut off at what the property allows rather than storing gigabytes and refusing
+                                    // them at claim time. A partially written value is discarded by prepare itself.
+                                    val bytes = part.provider().toInputStream()
+                                    val limit = declaration?.maxSize ?: Long.MAX_VALUE
+                                    klerk.attachedData.prepare(LimitedInputStream(bytes, limit), context)
+                                }
+                                // The property's steps, inline: without JavaScript there is nothing to run them
+                                // asynchronously against, and nothing to poll for the result with either.
+                                blobFactoryFor(name)?.let { klerk.attachedData.process(it(blob), context) }
+                                builder.appendBlob(name, blob)
+                                fromFileParts.add(name)
+                            } catch (e: UploadRefused) {
+                                refused = e.message
+                            } catch (e: BlobRejected) {
+                                // A step said no. Same treatment as a size refusal: the body is still drained, and
+                                // the user is told why.
+                                refused = e.message
+                            }
                         }
-                        builder.appendBlob(name, blob)
-                        fromFileParts.add(name)
                     }
                 }
 
@@ -538,13 +620,20 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             part.dispose()
         }
 
+        refused?.let { throw UploadRefused(it) }
+
         if (submittedUploads.isNotEmpty() && Csrf.isValid(call, builder[CSRF_TOKEN])) {
             val plugin = requireNotNull(uploads) { "The form has a file field but no uploads plugin" }
             submittedUploads.forEach { (name, uploadId) ->
                 // A field that also arrived as bytes has already been dealt with; the bytes win.
                 val id = uploadId.toIntOrNull()?.takeIf { !fromFileParts.contains(name) } ?: return@forEach
                 val blob = withContext(Dispatchers.IO) {
-                    plugin.toAttachedData(context, ModelID<Upload>(id), lease = UPLOAD_BLOB_LEASE)
+                    plugin.toAttachedData(
+                        context,
+                        ModelID<Upload>(id),
+                        lease = UPLOAD_BLOB_LEASE,
+                        declaration = blobFactoryFor(name),
+                    )
                 }
                 builder.appendBlob(name, blob)
             }
@@ -853,6 +942,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 UIElementData(propertyName, dummyContainerFor(propertyName), true)
             ) ?: translator.klerk.property(property))
         }
+        val declaration = template.blobDeclarationFor(propertyName)
         input(InputType.file) {
             id = elementId(propertyName)
             // Named so that a submit without JavaScript still carries the file. The script removes the name when it
@@ -860,6 +950,12 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             name = propertyName
             attributes["data-klerk-file"] = propertyName
             required = !template.parameters.all.single { it.name == propertyName }.isNullable
+            // Derived from the property's BlobContainer, the same way maxlength is derived from a StringContainer.
+            // It only helps the user pick the right file; what actually keeps a wrong one out is the check the
+            // command makes against the bytes.
+            declaration?.accept?.takeIf { it.isNotEmpty() }?.let { accept = it.sorted().joinToString(",") }
+            declaration?.maxSize?.takeIf { it != Long.MAX_VALUE }
+                ?.let { attributes["data-klerk-max-size"] = it.toString() }
         }
         hiddenInput {
             id = "${elementId(propertyName)}-upload"
@@ -1301,6 +1397,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 if (fileInputs.isNotEmpty()) {
                     attributes["data-klerk-upload-path"] = template.uploads?.mountedAt
                         ?: error("The form has a file field but the uploads plugin has no routes registered")
+                    // Lets the upload endpoint apply the property's own limit before accepting any bytes.
+                    attributes["data-klerk-event"] = template.defaultValues.eventReference.id()
                 }
                 +System.lineSeparator()
 
@@ -1519,3 +1617,38 @@ public fun <T : Any, C : KlerkContext, V> FlowContent.eventForm(
     form: EventForm<T, C, V>,
     postPath: String? = null,
 ): Unit = form.renderInto(this, postPath)
+
+/** Thrown while reading a submission whose file the application's rules, or the property's limit, refuse. */
+internal class UploadRefused(message: String) : RuntimeException(message)
+
+/**
+ * Reads at most [limit] bytes and then refuses.
+ *
+ * A file arriving with the form has no declared length to check in advance, so the limit is enforced while copying:
+ * the alternative is storing whatever was sent and discovering at claim time that it was far too large.
+ */
+private class LimitedInputStream(private val source: InputStream, private val limit: Long) : InputStream() {
+
+    private var read = 0L
+
+    override fun read(): Int {
+        val b = source.read()
+        if (b != -1 && ++read > limit) {
+            throw UploadRefused("The file is larger than the $limit bytes this field allows")
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val count = source.read(b, off, len)
+        if (count > 0) {
+            read += count
+            if (read > limit) {
+                throw UploadRefused("The file is larger than the $limit bytes this field allows")
+            }
+        }
+        return count
+    }
+
+    override fun close(): Unit = source.close()
+}

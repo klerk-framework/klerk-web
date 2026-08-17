@@ -25,8 +25,17 @@
         return btoa(unescape(encodeURIComponent(value)));
     }
 
-    function metadataHeader(file) {
-        return "filename " + base64(file.name) + ",contentType " + base64(file.type || "application/octet-stream");
+    function metadataHeader(file, form, property) {
+        var parts = [
+            "filename " + base64(file.name),
+            "contentType " + base64(file.type || "application/octet-stream"),
+            "field " + base64(property)
+        ];
+        var event = form.getAttribute("data-klerk-event");
+        if (event) {
+            parts.push("event " + base64(event));
+        }
+        return parts.join(",");
     }
 
     function sleep(ms) {
@@ -34,8 +43,12 @@
     }
 
     // Creates the upload and returns its URL.
-    function create(form, basePath, file) {
-        var headers = {"Tus-Resumable": "1.0.0", "Upload-Length": String(file.size), "Upload-Metadata": metadataHeader(file)};
+    function create(form, basePath, file, property) {
+        var headers = {
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": String(file.size),
+            "Upload-Metadata": metadataHeader(file, form, property)
+        };
         headers[csrfHeaderName(form)] = csrfToken(form);
         return fetch(basePath, {method: "POST", headers: headers, credentials: "same-origin"}).then(function (response) {
             if (!response.ok) {
@@ -77,8 +90,8 @@
             });
     }
 
-    function upload(form, basePath, file, onProgress) {
-        return create(form, basePath, file).then(function (url) {
+    function upload(form, basePath, file, property, onProgress) {
+        return create(form, basePath, file, property).then(function (url) {
             var offset = 0;
             var attempts = 0;
 
@@ -133,10 +146,21 @@
                     hidden.value = "";
                     return;
                 }
+                // The property's declared maximum. Refusing here saves the user an upload that the server would
+                // reject anyway; the server does not rely on this having happened.
+                var maxSize = parseInt(input.getAttribute("data-klerk-max-size"), 10);
+                if (maxSize && file.size > maxSize) {
+                    if (progress) {
+                        progress.textContent = "The file is too large (at most " + maxSize + " bytes)";
+                    }
+                    input.value = "";
+                    hidden.value = "";
+                    return;
+                }
                 if (submit) {
                     submit.disabled = true;
                 }
-                upload(form, basePath, file, function (sent, total) {
+                upload(form, basePath, file, property, function (sent, total) {
                     if (progress) {
                         progress.textContent = Math.floor((sent / total) * 100) + "%";
                     }

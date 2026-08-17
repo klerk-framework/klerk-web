@@ -306,6 +306,12 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         return null
     }
 
+    if (type.isSubtypeOf(BlobContainer::class.starProjectedType.withNullability(true))) {
+        // The parameter is the application's own container class, so build one around the blob the form resolved.
+        return if (value.isEmpty()) null else type.jvmErasure.constructors
+            .single { it.parameters.size == 1 }
+            .call(AttachedBlobID(value.toInt()))
+    }
     if (type.isSubtypeOf(AttachedBlobID::class.starProjectedType.withNullability(true))) {
         return if (value.isEmpty()) null else AttachedBlobID(value.toInt())
     }

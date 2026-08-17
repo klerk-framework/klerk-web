@@ -98,7 +98,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
                                 AssetPath(asset.resourcePath),
                                 contentType,
                                 base64hash,
-                                brotliId,
+                                brotliId?.let { CompressedAsset(it) },
                             )
                         ),
                         context,
@@ -201,7 +201,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
             if (call.request.headers[HttpHeaders.AcceptEncoding]?.contains(contentEncodingBrotli) ?: false &&
                 textAsset.props.brotli != null
             ) {
-                serveBrotli(call, textAsset.props.brotli!!, contentType)
+                serveBrotli(call, textAsset.props.brotli!!.id, contentType)
                 return@get
             }
             serveUncompressed(asset, contentType)
@@ -261,7 +261,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
             AssetDetails(
                 asset.props.path.value,
                 ResourceReader.readResource(asset.props.path.value)?.length ?: 0,
-                asset.props.brotli?.let { blobId -> klerk.attachedData.get(blobId, context).readBytes().size })
+                asset.props.brotli?.let { blob -> klerk.attachedData.get(blob.id, context).readBytes().size })
         }
 
         support.respondPage(call, "Assets") {

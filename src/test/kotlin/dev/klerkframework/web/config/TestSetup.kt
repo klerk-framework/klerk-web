@@ -30,6 +30,7 @@ import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.AssetsPlugin
+import dev.klerkframework.web.upload.CreateUploadParams
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import dev.klerkframework.web.config.AuthorStates.*
 import dev.klerkframework.web.css
@@ -71,6 +72,7 @@ fun createConfig(
             model(City::class, cityStateMachine(collections), collections.cities)
             model(Document::class, documentStateMachine(), collections.documents)
             model(Flower::class, flowerStateMachine(), collections.flowers)
+            model(Note::class, noteStateMachine(), collections.notes)
             //model(Shop::class, cudStateMachine(Shop::class), views.shops)
         }
         jobs {
@@ -105,6 +107,7 @@ fun createConfig(
                     rule(::`Everybody can do everything`)
                 }
                 negative {
+                    rule(::noUploadLargerThanOneMegabyte)
                 }
             }
             eventLog {
@@ -552,6 +555,7 @@ data class MyCollections(
     val cities: ModelViews<City, Context> = ModelViews(),
     val documents: ModelViews<Document, Context> = ModelViews(),
     val flowers: ModelViews<Flower, Context> = ModelViews(),
+    val notes: ModelViews<Note, Context> = ModelViews(),
 ) //, val shops: ModelView<Shop, Context>)
 
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
@@ -1127,7 +1131,7 @@ class NumberOfOffices(value: Int) : IntContainer(value) {
 
 // A model with a blob, so that FormTemplate.file() has something to render and parse. Deliberately separate from the
 // other test models: adding a blob to those would change what remaining() renders for every existing form test.
-data class Document(val title: DocumentTitle, val content: AttachedBlobID?)
+data class Document(val title: DocumentTitle, val content: DocumentContent?)
 
 enum class DocumentStates { Created }
 
@@ -1137,7 +1141,7 @@ class DocumentTitle(value: String) : StringContainer(value) {
     override val maxLines: Int = 1
 }
 
-data class CreateDocumentParams(val title: DocumentTitle, val content: AttachedBlobID?)
+data class CreateDocumentParams(val title: DocumentTitle, val content: DocumentContent?)
 
 object CreateDocument : VoidEventWithParameters<Document, CreateDocumentParams>(
     Document::class, EventVisibility.EXTERNAL, CreateDocumentParams::class
@@ -1161,7 +1165,7 @@ private fun newDocument(args: ArgForVoidEvent<Document, CreateDocumentParams, Co
 
 // A flower has a name and a picture of it. The image is required: a flower without one is not much of an entry, and
 // it also exercises the non-nullable side of FormTemplate.file().
-data class Flower(val name: FlowerName, val image: AttachedBlobID)
+data class Flower(val name: FlowerName, val image: FlowerImage)
 
 enum class FlowerStates { Planted }
 
@@ -1171,7 +1175,7 @@ class FlowerName(value: String) : StringContainer(value) {
     override val maxLines: Int = 1
 }
 
-data class CreateFlowerParams(val name: FlowerName, val image: AttachedBlobID)
+data class CreateFlowerParams(val name: FlowerName, val image: FlowerImage)
 
 object CreateFlower : VoidEventWithParameters<Flower, CreateFlowerParams>(
     Flower::class, EventVisibility.EXTERNAL, CreateFlowerParams::class
@@ -1192,3 +1196,60 @@ fun flowerStateMachine(): StateMachine<Flower, FlowerStates, Context, MyCollecti
 
 private fun newFlower(args: ArgForVoidEvent<Flower, CreateFlowerParams, Context, MyCollections>): Flower =
     Flower(args.command.params.name, args.command.params.image)
+
+/** Anything at all, so that the form tests can post text files — but it does have a step, so that the pipeline is
+ * exercised through the form. */
+class DocumentContent(id: AttachedBlobID) : BlobContainer(id) {
+    override val steps: List<BlobStep> = listOf(::refuseTheWordVirus)
+}
+
+/** Stands in for a virus scanner: cheap, deterministic, and it refuses rather than rewrites. */
+suspend fun refuseTheWordVirus(args: BlobStepArgs): BlobStepResult {
+    val text = args.value.readBytes().decodeToString()
+    return if (text.contains("virus")) BlobStepResult.Reject("the file looks infected") else BlobStepResult.Pass
+}
+
+/** What a flower picture may be: an image, published to the world, and not enormous. */
+class FlowerImage(id: AttachedBlobID) : BlobContainer(id) {
+    override val accept: Set<String> = setOf("image/png", "image/jpeg", "image/gif", "image/webp")
+    override val maxSize: Long = 10_000_000
+    override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
+}
+
+// A tiny limit, so that the streaming cap on the no-JavaScript path can be exercised without a large fixture.
+data class Note(val title: DocumentTitle, val content: SmallNote)
+
+enum class NoteStates { Written }
+
+class SmallNote(id: AttachedBlobID) : BlobContainer(id) {
+    override val maxSize: Long = 10
+}
+
+data class CreateNoteParams(val title: DocumentTitle, val content: SmallNote)
+
+object CreateNote : VoidEventWithParameters<Note, CreateNoteParams>(Note::class, EventVisibility.EXTERNAL, CreateNoteParams::class)
+
+fun noteStateMachine(): StateMachine<Note, NoteStates, Context, MyCollections> = stateMachine {
+    event(CreateNote) {}
+    voidState {
+        onEvent(CreateNote) { createModel(NoteStates.Written, ::newNote) }
+    }
+    state(NoteStates.Written) {}
+}
+
+private fun newNote(args: ArgForVoidEvent<Note, CreateNoteParams, Context, MyCollections>): Note =
+    Note(args.command.params.title, args.command.params.content)
+
+/**
+ * The shape of rule the upload documentation recommends: the declared size is known before any byte is accepted, so a
+ * quota is an ordinary authorization rule rather than anything upload-specific.
+ */
+fun noUploadLargerThanOneMegabyte(
+    args: ArgCommandContextReader<*, Context, MyCollections>
+): NegativeAuthorization {
+    val params = args.command.params
+    if (params !is CreateUploadParams) {
+        return Pass
+    }
+    return if (params.declaredSize.valueWithoutAuthorization > 1_000_000) Deny else Pass
+}

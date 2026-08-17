@@ -84,7 +84,7 @@ Several forms may be rendered on the same page.
 
 ## Files
 
-A parameter of type `AttachedBlobID` is declared with `file()`, and needs the [Uploads](uploads.md) plugin:
+A parameter that is a `BlobContainer` is declared with `file()`, and needs the [Uploads](uploads.md) plugin:
 
 ```kotlin
 val template = FormTemplate(
@@ -106,6 +106,11 @@ other. Without JavaScript the file posts with the form and the server does the u
 The upload id is transport, like the CSRF token and the idempotence key — the parameter class is still the form's only
 source of truth. `remaining()` never renders a file field by itself: uploading needs the plugin, so it has to be
 declared.
+
+What the property's container declares is rendered the same way `maxLength` is rendered for a string: `accept` becomes
+the file input's `accept` attribute, and `maxSize` stops a too-large file before it is uploaded and is applied by the
+upload endpoint as well. As always the browser's version of a rule is a convenience — the one that decides is the
+check Klerk makes against the bytes when the command attaches them.
 
 ## Handle the submission
 

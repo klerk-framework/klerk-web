@@ -1,6 +1,10 @@
 package dev.klerkframework.web.upload
 
+import dev.klerkframework.klerk.AttachedBlobID
 import dev.klerkframework.klerk.AuthorizationException
+import dev.klerkframework.klerk.EventReference
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.datatypes.BlobContainer
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.web.Csrf
@@ -15,6 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import java.util.Base64
+import kotlin.reflect.full.declaredMemberProperties
+import kotlin.reflect.full.isSubclassOf
+import kotlin.reflect.jvm.jvmErasure
 
 private val log = KotlinLogging.logger {}
 
@@ -86,6 +93,16 @@ public fun <C : KlerkContext, V> Route.uploadRoutes(
             return@post
         }
         val metadata = parseUploadMetadata(call.request.header(UPLOAD_METADATA))
+
+        // The form says which property the file is destined for, so that the property's own limit applies before a
+        // byte is accepted rather than at submit. A client that says nothing, or lies, simply gets [maxSize] — the
+        // declaration is enforced again when the command attaches the value, which is the check that counts.
+        val declared = blobDeclarationFor(support.klerk, metadata["event"], metadata["field"])
+        if (declared != null && length > declared.maxSize) {
+            call.respond(HttpStatusCode.PayloadTooLarge, "At most ${declared.maxSize} bytes are allowed here")
+            return@post
+        }
+
         val id = try {
             plugin.create(
                 context = context,
@@ -93,7 +110,7 @@ public fun <C : KlerkContext, V> Route.uploadRoutes(
                 declaredContentType = metadata["contentType"]?.take(255) ?: ContentType.Application.OctetStream.toString(),
                 declaredSize = length,
             )
-        } catch (e: AuthorizationException) {
+        } catch (_: AuthorizationException) {
             call.respond(HttpStatusCode.Forbidden)
             return@post
         }
@@ -223,4 +240,30 @@ internal fun parseUploadMetadata(header: String?): Map<String, String> {
             null
         }
     }.toMap()
+}
+
+/**
+ * The [BlobContainer] declared for a property of an event's parameters, or null if there is no such declaration.
+ *
+ * Used to apply a property's own limit at the moment an upload starts. Everything it is given comes from the client,
+ * so nothing here may be trusted to *permit* anything — only to restrict further than the endpoint already does.
+ */
+internal fun <C : KlerkContext, V> blobDeclarationFor(
+    klerk: Klerk<C, V>,
+    event: String?,
+    property: String?,
+): BlobContainer? {
+    if (event == null || property == null) {
+        return null
+    }
+    return runCatching {
+        val parameters = klerk.config.getParameters(EventReference.from(event)) ?: return null
+        val kClass = parameters.raw.declaredMemberProperties
+            .singleOrNull { it.name == property }
+            ?.returnType?.jvmErasure ?: return null
+        if (!kClass.isSubclassOf(BlobContainer::class)) {
+            return null
+        }
+        kClass.constructors.single { it.parameters.size == 1 }.call(AttachedBlobID(0)) as BlobContainer
+    }.onFailure { log.debug(it) { "Could not read the declaration of $property on $event" } }.getOrNull()
 }

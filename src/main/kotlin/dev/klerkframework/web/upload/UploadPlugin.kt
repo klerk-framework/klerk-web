@@ -10,6 +10,11 @@ import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.SystemIdentity
 import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.datatypes.BlobContainer
+import dev.klerkframework.klerk.job.JobName
+import dev.klerkframework.klerk.job.JobResult
+import dev.klerkframework.klerk.job.JobStepArgs
+import dev.klerkframework.klerk.job.JobType
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -17,12 +22,12 @@ import mu.KotlinLogging
 import java.io.InputStream
 import java.nio.file.Path
 import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.CommandResult
+import dev.klerkframework.klerk.Problem
 import java.util.Base64
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
@@ -50,13 +55,13 @@ public class ChecksumMismatch(message: String) : RuntimeException(message)
  * application storing blobs in the database can still upload large files. Put it on the same filesystem as a
  * [dev.klerkframework.klerk.storage.FileBlobStore] to make the final step a rename rather than a copy.
  * @param lifetime how long an upload may sit unfinished, or finished but unused, before it is discarded.
- * @param sweepInterval how often the staging directory is reconciled against the models. The sweep runs when the
- * plugin is used, not on a timer, so an application with no upload traffic does no work.
+ * @param sweepExpression how often the staging directory is reconciled against the models, as a cron expression.
+ * Hourly by default.
  */
 public class UploadPlugin<C : KlerkContext, V>(
     stagingDirectory: Path,
     private val lifetime: Duration = 24.hours,
-    private val sweepInterval: Duration = 1.hours,
+    private val sweepExpression: String = "0 * * * *",
 ) : KlerkPlugin<C, V> {
 
     override val name: String = "Uploads"
@@ -72,12 +77,16 @@ public class UploadPlugin<C : KlerkContext, V>(
     internal var mountedAt: String? = null
 
     private lateinit var klerk: Klerk<C, V>
-    private val lastSweep = AtomicReference(Instant.DISTANT_PAST)
+
+    private val sweepJob = SweepStagingArea()
 
     override fun mergeConfig(previous: Config<C, V>): Config<C, V> {
         val managedModels = previous.managedModels.toMutableSet()
         managedModels.add(ManagedModel(Upload::class, uploadStateMachine(lifetime), views))
-        return previous.copy(managedModels = managedModels)
+        return previous.copy(managedModels = managedModels).withJobs {
+            register(sweepJob)
+            cron(sweepJob, sweepExpression) { cursor = "" }
+        }
     }
 
     override suspend fun start(klerk: Klerk<C, V>) {
@@ -97,7 +106,6 @@ public class UploadPlugin<C : KlerkContext, V>(
         declaredContentType: String,
         declaredSize: Long,
     ): ModelID<Upload> {
-        maybeSweep()
         val result = klerk.handle(
             Command(
                 event = CreateUpload,
@@ -112,6 +120,43 @@ public class UploadPlugin<C : KlerkContext, V>(
             ProcessingOptions(CommandToken.simple()),
         )
         return requireNotNull(result.orThrow().primaryModel)
+    }
+
+    /**
+     * Asks whether this actor would be allowed to start such an upload, without starting one.
+     *
+     * The path without JavaScript has no [Upload] to create — there is nothing to resume in a single request — but the
+     * application's authorization rules on [CreateUpload] should still decide, or a rule like "members may upload at
+     * most 10 MB" would silently apply to one path and not the other. Running the command as a dry run asks exactly
+     * that question and persists nothing.
+     *
+     * @param declaredSize the best estimate available before the bytes are read. For a form submission that is the
+     * request's `Content-Length`, which covers the whole request and so slightly over-estimates the file.
+     * @return null if the upload would be allowed, otherwise the problem to report.
+     */
+    public suspend fun reasonUploadWouldBeRefused(
+        context: C,
+        filename: String,
+        declaredContentType: String,
+        declaredSize: Long,
+    ): Problem? {
+        val result = klerk.handle(
+            Command(
+                event = CreateUpload,
+                model = null,
+                params = CreateUploadParams(
+                    filename = UploadFilename(filename),
+                    declaredContentType = UploadContentType(declaredContentType),
+                    declaredSize = ByteCount(declaredSize),
+                ),
+            ),
+            context,
+            ProcessingOptions(CommandToken.simple(), dryRun = true),
+        )
+        return when (result) {
+            is CommandResult.Success -> null
+            is CommandResult.Failure -> result.problems.firstOrNull()
+        }
     }
 
     /** How much of [id] has arrived, i.e. where the client should resume. */
@@ -226,6 +271,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         context: C,
         id: ModelID<Upload>,
         lease: Duration = 1.minutes,
+        declaration: ((AttachedBlobID) -> BlobContainer)? = null,
     ): AttachedBlobID {
         val upload = get(context, id)
         requireComplete(upload, id)
@@ -239,6 +285,11 @@ public class UploadPlugin<C : KlerkContext, V>(
             ),
             lease = lease,
         )
+        // The property's steps — a virus scan, a disarm pass, a check of the contents — before anything can attach
+        // the value. Running them here means the user waits for them; running them as the upload finishes instead is
+        // what the Inspecting state is for, and is not built yet.
+        declaration?.let { klerk.attachedData.process(it(blob), context) }
+
         // Whether the file was moved or copied, nothing needs it any more.
         klerk.handle(
             Command(event = DeleteUpload, model = id, params = null),
@@ -248,11 +299,6 @@ public class UploadPlugin<C : KlerkContext, V>(
         staging.delete(id.value)
         return blob
     }
-
-    hur anger jag att den ska vara public
-    hur anger jag att den ska vara serverbar
-    bör jag inte kolla magic bytes? Och vägra om den inte har rätt ändelse?
-    i många fall vill man väl att ett jobb ska triggas när den är uppladdad? Kanke det är jobbet som gör de sista grejerna?
 
     private fun requireComplete(upload: Model<Upload>, id: ModelID<Upload>) {
         check(upload.props.isComplete) {
@@ -302,27 +348,30 @@ public class UploadPlugin<C : KlerkContext, V>(
      * the file it leaves behind is removed here. Doing it by reconciliation rather than in a hook means a crash
      * midway through an upload is cleaned up too.
      */
-    internal suspend fun maybeSweep() {
-        val now = klerk.config.clock.now()
-        val previous = lastSweep.get()
-        if (now < previous.plus(sweepInterval)) {
-            return
-        }
-        if (!lastSweep.compareAndSet(previous, now)) {
-            return
-        }
-        sweep()
-    }
-
     internal suspend fun sweep() {
         // Qualified: inside a read block, `views` is the application's views, not the plugin's.
         val uploads = this@UploadPlugin.views.all
         val live = klerk.read(systemContext()) { list(uploads) }.map { it.id.value }.toSet()
-        lastSweep.set(klerk.config.clock.now())
         // Files younger than this may belong to an upload whose model is not visible to this read yet.
         val olderThan = klerk.config.clock.now().minus(10.minutes)
         runCatching { staging.sweep(live, olderThan) }
             .onFailure { logger.error(it) { "Could not sweep the upload staging directory" } }
+    }
+
+    /**
+     * Removes staging files that no upload refers to any more.
+     *
+     * An expired upload deletes its own model through a time trigger, and this removes the file it left behind. Doing
+     * it by reconciling the directory against the models, rather than in a hook, means bytes left by a crash are
+     * cleaned up too.
+     */
+    private inner class SweepStagingArea : JobType.Local<String, C, V>() {
+        override val name: JobName = JobName("klerk-web-upload-sweep")
+
+        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String> {
+            sweep()
+            return JobResult.Success(log = listOf(args.info("Swept the upload staging directory")))
+        }
     }
 }
 

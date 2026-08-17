@@ -58,9 +58,32 @@ class UploadFormTest {
             file(CreateDocumentParams::content)
         }
 
+        val noteTemplate = FormTemplate(
+            EventWithParameters(CreateNote.id, EventParameters(CreateNoteParams::class)),
+            klerk,
+            postPath = "/notes",
+            pathProvider = DefaultPathProvider(),
+            uploads = plugin,
+        ) {
+            text(CreateNoteParams::title)
+            file(CreateNoteParams::content)
+        }
+
         application {
             routing {
                 uploadRoutes(support, plugin)
+                post("/notes") {
+                    val ctx = context()
+                    when (val parsed = noteTemplate.parse(call, ctx)) {
+                        is ParseResult.Forbidden -> call.respond(HttpStatusCode.Forbidden)
+                        is ParseResult.Invalid -> call.respond(
+                            HttpStatusCode.BadRequest,
+                            parsed.problems.joinToString { it.endUserTranslatedMessage },
+                        )
+                        is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
+                        is ParseResult.Parsed -> call.respondText("stored")
+                    }
+                }
                 get("/new") {
                     val ctx = context()
                     val form = klerk.read(ctx) { template.build(call, null, this, translator = ctx.translation, context = ctx) }
@@ -70,7 +93,10 @@ class UploadFormTest {
                     val ctx = context()
                     when (val parsed = template.parse(call, ctx)) {
                         is ParseResult.Forbidden -> call.respond(HttpStatusCode.Forbidden)
-                        is ParseResult.Invalid -> call.respond(HttpStatusCode.BadRequest, parsed.problems.toString())
+                        is ParseResult.Invalid -> call.respond(
+                            HttpStatusCode.BadRequest,
+                            parsed.problems.joinToString { it.endUserTranslatedMessage },
+                        )
                         is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
                         is ParseResult.Parsed -> {
                             val result = klerk.handle(
@@ -80,7 +106,7 @@ class UploadFormTest {
                             )
                             val id = requireNotNull(result.orThrow().primaryModel)
                             val blob = requireNotNull(klerk.read(ctx) { get(id).props.content })
-                            call.respondText(String(klerk.attachedData.get(blob, ctx).readAllBytes()))
+                            call.respondText(String(klerk.attachedData.get(blob.id, ctx).readAllBytes()))
                         }
                     }
                 }
@@ -102,6 +128,8 @@ class UploadFormTest {
         assertContains(body, """data-klerk-file="content"""")
         assertContains(body, """data-klerk-upload-id="content"""")
         assertTrue(body.contains("klerkUpload.js"), "the uploader script should be included")
+        // DocumentContent accepts anything, so there is nothing to narrow the picker to
+        assertTrue(!body.contains("""accept="""), "an unconstrained property should not restrict the file picker")
         // The file input carries the name, so that a browser without JavaScript still sends the bytes.
         assertContains(body, """name="content"""")
         klerk.meta.stop()
@@ -214,6 +242,124 @@ class UploadFormTest {
         klerk.meta.stop()
     }
 
+    /**
+     * The path without JavaScript creates no Upload, so without this the property's limit would not be applied until
+     * the claim — by which point the bytes are already in the blob store.
+     */
+    @Test
+    fun `a file posted with the form is cut off at the size the property allows`() = testApplication {
+        val (klerk, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        // SmallNote allows 10 bytes
+        val response = client.submitFormWithBinaryData(
+            url = "/notes",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "Too much")
+                append("content", ByteArray(5000) { 'a'.code.toByte() }, Headers.build {
+                    append(HttpHeaders.ContentType, "text/plain")
+                    append(HttpHeaders.ContentDisposition, "filename=\"big.txt\"")
+                })
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertContains(response.bodyAsText(), "larger than")
+        klerk.meta.stop()
+    }
+
+    /**
+     * The rule the documentation tells applications to write lives on CreateUpload, and the path without JavaScript
+     * creates no upload. Dry-running the command is what keeps one definition of who may upload what.
+     */
+    @Test
+    fun `the application's own upload rule decides on the path without JavaScript too`() = testApplication {
+        val (klerk, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        // the rule in TestSetup refuses an upload declaring more than 1 MB for this actor
+        val response = client.submitFormWithBinaryData(
+            url = "/documents",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "Over the quota")
+                append("content", ByteArray(1_100_000), Headers.build {
+                    append(HttpHeaders.ContentType, "application/octet-stream")
+                    append(HttpHeaders.ContentDisposition, "filename=\"big.bin\"")
+                })
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        // Nothing was stored: the rule was consulted before the bytes were, so there is no blob to clean up either.
+        assertTrue(
+            klerk.read(context()) { list(views.documents.all) }.isEmpty(),
+            "the document should not have been created",
+        )
+        klerk.meta.stop()
+    }
+
+    /**
+     * The property's steps run before the command sees the file, whichever way it arrived. Here the script did the
+     * uploading, so the file is already on the server when the form is submitted.
+     */
+    @Test
+    fun `a file a step refuses cannot be submitted, the uploaded way`() = testApplication {
+        val (klerk, plugin, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        val upload = plugin.create(context(), "notes.txt", "text/plain", 12)
+        plugin.append(context(), upload, 0, "has a virus!".byteInputStream())
+
+        val response = client.post("/documents") {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody(
+                listOf(
+                    Csrf.TOKEN_NAME to csrfToken,
+                    IDEMPOTENCE_KEY to CommandToken.simple().toString(),
+                    "title" to "Infected",
+                    "content" to upload.value.toString(),
+                ).formUrlEncode()
+            )
+        }
+
+        assertTrue(response.status.value >= 400, "a refused file must not be stored: ${response.status}")
+        klerk.meta.stop()
+    }
+
+    @Test
+    fun `a file a step refuses cannot be submitted, the posted way`() = testApplication {
+        val (klerk, _, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        val response = client.submitFormWithBinaryData(
+            url = "/documents",
+            formData = formData {
+                append(Csrf.TOKEN_NAME, csrfToken)
+                append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
+                append("title", "Infected")
+                append("content", "has a virus!".toByteArray(), Headers.build {
+                    append(HttpHeaders.ContentType, "text/plain")
+                    append(HttpHeaders.ContentDisposition, "filename=\"notes.txt\"")
+                })
+            }
+        ) {
+            header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertContains(response.bodyAsText(), "infected")
+        klerk.meta.stop()
+    }
+
     @Test
     fun `an upload belonging to somebody else cannot be named in a form`() = testApplication {
         val (klerk, plugin, _) = setup()
@@ -238,6 +384,46 @@ class UploadFormTest {
 
         assertNotNull(response.status)
         assertTrue(response.status.value >= 400, "naming another actor's upload must not work")
+        klerk.meta.stop()
+    }
+
+    @Test
+    fun `a constrained property narrows the file picker`() = testApplication {
+        System.setProperty("DEVELOPMENT_MODE", "true")
+        val bc = BookCollections()
+        val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
+        val plugin = UploadPlugin<Context, MyCollections>(Files.createTempDirectory("klerk-upload-accept"))
+        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin))
+        klerk.meta.start(installShutdownHook = false)
+
+        // FlowerImage declares image types and a maximum size
+        val template = FormTemplate(
+            EventWithParameters(CreateFlower.id, EventParameters(CreateFlowerParams::class)),
+            klerk,
+            postPath = "/flowers",
+            pathProvider = DefaultPathProvider(),
+            uploads = plugin,
+        ) {
+            text(CreateFlowerParams::name)
+            file(CreateFlowerParams::image)
+        }
+        application {
+            routing {
+                uploadRoutes(support = WebSupport(klerk, { _, _ -> context() }), plugin = plugin)
+                get("/flowers/new") {
+                    val ctx = context()
+                    val form = klerk.read(ctx) {
+                        template.build(call, null, this, translator = ctx.translation, context = ctx)
+                    }
+                    call.respondHtml { body { eventForm(form) } }
+                }
+            }
+        }
+
+        val body = client.get("/flowers/new").bodyAsText()
+
+        assertContains(body, """accept="image/gif,image/jpeg,image/png,image/webp"""")
+        assertContains(body, """data-klerk-max-size="10000000"""")
         klerk.meta.stop()
     }
 }

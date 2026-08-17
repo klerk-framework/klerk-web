@@ -60,7 +60,13 @@ rejected with `460` and rolled back rather than stored.
 
 ## Limits and quotas
 
-The declared size is known before any byte is accepted, so limits are ordinary authorization rules:
+A limit that belongs to a *property* is declared on its `BlobContainer` and needs nothing here — the form tells the
+endpoint which property the file is for, so `maxSize` is applied before any byte is accepted as well as when the
+command attaches the value. On the path without JavaScript, where there is no upload to create, the limit is enforced
+while the file is being copied, so an over-long file is cut off rather than stored and rejected later.
+
+A limit that depends on *who is asking* is an ordinary authorization rule. The declared size is known before any byte
+is accepted, so the rule can see it:
 
 ```kotlin
 fun normalUsersCanUploadUpTo10MB(args: ArgCommandContextReader<*, Context, MyViews>): NegativeAuthorization {
@@ -74,24 +80,32 @@ The declared size is a claim, not a fact: the server stops at it while copying, 
 of its body is cut off rather than allowed to fill the disk. `uploadRoutes` also takes a `maxSize` that no upload may
 exceed, advertised to clients as `Tus-Max-Size`.
 
+The same rule decides on both paths. Without JavaScript no upload is created — a single request has nothing to resume
+— so klerk-web dry-runs `CreateUpload` before consuming the file part and reports the refusal as an ordinary form
+problem. Note what "before" means on each path: with JavaScript the client is told `403` and sends nothing, while a
+form submission has already begun transmitting by the time it can be authenticated, since the CSRF token is inside the
+body. What is prevented there is storing the bytes, not receiving them.
+
 ## Security
 
 - **An upload may only be continued by the actor that started it.** One that does not exist and one that belongs to
   somebody else give the same `404`, so the endpoints cannot be used to find out which uploads exist.
 - **Every mutating request carries a CSRF token**, as a header rather than a form field.
 - **The filename and content type are the client's claims**, kept as metadata and never used as fact. The filename is
-  never used as a path — staging files are named after the model id. Re-derive the content type from the bytes before
-  serving anything, and serve user-supplied files with `Content-Disposition: attachment` and
-  `X-Content-Type-Options: nosniff` unless you have a specific reason not to. Never serve user-supplied SVG or HTML
-  inline from the same origin as your application.
-- **Scanning** belongs between "the last byte arrived" and "the bytes are attached" — check the upload before your
-  command stores it.
+  never used as a path — staging files are named after the model id. When serving, use `metadata.contentType`, which
+  is what Klerk recognised the bytes to be, together with `X-Content-Type-Options: nosniff` and
+  `Content-Disposition: attachment` for anything you have not deliberately allowed inline. Never serve user-supplied
+  SVG or HTML inline from the same origin as your application.
+- **What the file may be is declared on the property**, not here. `accept`, `maxSize` and `inspect` on the
+  [`BlobContainer`](https://github.com/klerkframework/klerk/blob/main/docs/attached-data.md) are checked when the
+  command attaches the value, so they hold for uploads and for every other caller. This plugin only applies `maxSize`
+  early, as a courtesy, so that a file that cannot be used is not uploaded first.
 
 ## Cleaning up
 
 An upload that is never finished, or finished and never submitted, is deleted after `lifetime` (24 hours by default).
-The staging file it leaves behind is removed by a sweep that reconciles the directory against the models — by
-reconciliation rather than by a hook, so bytes left by a crash are cleaned up too. The sweep runs when the plugin is
-used rather than on a timer, so an idle application does no work.
+The staging file it leaves behind is removed by the plugin's own job, `klerk-web-upload-sweep`, which reconciles the
+directory against the models — by reconciliation rather than by a hook, so bytes left by a crash are cleaned up too.
+It runs hourly; pass `sweepExpression` to the plugin for a different cron expression.
 
 A submitted upload's bytes are handed to attached data straight away, and its model is deleted with them.

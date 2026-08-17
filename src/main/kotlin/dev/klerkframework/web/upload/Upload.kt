@@ -156,8 +156,8 @@ private fun <C : KlerkContext, V> withReceivedBytes(
  */
 private fun <C : KlerkContext, V> completesTheUpload(
     args: ArgForInstanceEvent<Upload, RecordUploadedBytesParams, C, V>
-): Boolean = args.command.params.receivedBytes.valueWithoutAuthorization >=
-        args.model.props.declaredSize.valueWithoutAuthorization
+): Boolean = args.command.params.receivedBytes.value >=
+        args.model.props.declaredSize.value
 
 /** The name the client gave the file. Only ever shown or offered as a download name — never used as a path. */
 public class UploadFilename(value: String) : StringContainer(value) {

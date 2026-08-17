@@ -170,6 +170,21 @@ class UploadPluginTest {
     }
 
     @Test
+    fun `The plugin registers its own sweep job`() = runBlocking {
+        val (klerk, _) = setup()
+        val types = klerk.config.jobs.types.keys.map { it.value }
+
+        assertTrue(types.contains("klerk-web-upload-sweep"), "expected the sweep job to be registered, got $types")
+        assertTrue(
+            klerk.config.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
+            "expected a cron for the sweep job",
+        )
+        // and the application's own job configuration is untouched
+        assertTrue(types.contains("my-job"), "the application's job types should still be registered, got $types")
+        klerk.meta.stop()
+    }
+
+    @Test
     fun `The sweep deletes staged bytes that no upload refers to`() = runBlocking {
         val (klerk, plugin) = setup()
         val id = plugin.create(alice(), "f.txt", "text/plain", 5)

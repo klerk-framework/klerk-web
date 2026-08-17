@@ -1,6 +1,7 @@
 package dev.klerkframework.web.assets
 
 import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.datatypes.BlobContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
@@ -13,7 +14,7 @@ public data class TextAsset(
     val path: AssetPath,
     val contentType: AssetContentType,
     val hash: Base64hash,
-    val brotli: AttachedBlobID?,
+    val brotli: CompressedAsset?,
 )
 
 /** The states of a [TextAsset]. */
@@ -57,7 +58,7 @@ public data class CreateTextAssetParams(
     val path: AssetPath,
     val contentType: AssetContentType,
     val hash: Base64hash,
-    val brotli: AttachedBlobID?
+    val brotli: CompressedAsset?
 )
 
 private fun <C : KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
@@ -96,3 +97,11 @@ public class Base64hash(value: String) : StringContainer(value) {
         }
     }
 }
+
+/**
+ * The Brotli-compressed bytes of an asset.
+ *
+ * Declares nothing beyond being a blob: what it holds is compressed output produced by this plugin, not something a
+ * user uploaded, so there is no type to insist on and nobody to keep out.
+ */
+public class CompressedAsset(id: AttachedBlobID) : BlobContainer(id)

@@ -51,6 +51,13 @@ class UploadRoutesTest {
         header(HttpHeaders.Cookie, "$csrfHeader=$token")
     }
 
+    /** What the form adds so that the endpoint can apply the target property's own declaration. */
+    private fun target(event: String, field: String): String {
+        val encoder = Base64.getEncoder()
+        return "event ${encoder.encodeToString(event.toByteArray())}," +
+                "field ${encoder.encodeToString(field.toByteArray())}"
+    }
+
     private fun metadata(filename: String, contentType: String): String {
         val encoder = Base64.getEncoder()
         return "filename ${encoder.encodeToString(filename.toByteArray())}," +
@@ -184,6 +191,28 @@ class UploadRoutesTest {
             setBody("hello".toByteArray())
         }
         assertEquals(HttpStatusCode.Forbidden, patchWithoutToken.status)
+        klerk.meta.stop()
+    }
+
+    @Test
+    fun `an upload larger than the property allows is refused before any bytes are sent`() = testApplication {
+        val (klerk, _) = setup()
+        klerk.meta.start(installShutdownHook = false)
+
+        // SmallNote declares a 10 byte maximum; the endpoint's own limit is far higher
+        val tooBig = client.post("/uploads") {
+            withCsrf()
+            header("Upload-Length", "500")
+            header("Upload-Metadata", metadata("big.txt", "text/plain") + ",${target("Note:CreateNote", "content")}")
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge, tooBig.status)
+
+        // and the same size is fine where no property says otherwise
+        val allowed = client.post("/uploads") {
+            withCsrf()
+            header("Upload-Length", "500")
+        }
+        assertEquals(HttpStatusCode.Created, allowed.status)
         klerk.meta.stop()
     }
 
