@@ -22,6 +22,7 @@ import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.misc.EventParameters
 import io.ktor.http.*
 import io.ktor.server.response.*
@@ -79,6 +80,7 @@ private data class YieldProgress(val total: Int, val completed: Int) {
  */
 object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
     override val name: JobName = JobName("periodic-ping")
+    override val agent: JobAgent = JobAgent.System
     override val maxDepth: Int = Int.MAX_VALUE
     override val maxDescendants: Int = Int.MAX_VALUE
 
@@ -87,7 +89,7 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
             val nextRun = args.context.time + 15.seconds
             return JobResult.Yield(
                 cursor = args.cursor,
-                spawn = listOf(PeriodicPingJob.schedule(args.cursor, scheduleAt = nextRun)),
+                spawn = listOf(PeriodicPingJob.declare(args.cursor, scheduleAt = nextRun)),
                 log = listOf(args.info("Scheduled the next run for $nextRun")),
             )
         }
@@ -162,7 +164,8 @@ fun main() {
     // A fixed directory rather than a temporary one, so that an upload interrupted by a restart can be resumed.
     val uploads = UploadPlugin<Context, MyCollections>(Path.of("/tmp/klerk-webtest-uploads"))
     val klerk = Klerk.create(
-        createConfig(collections, persistence, extraJobs = { register(PeriodicPingJob) }).withPlugin(uploads)
+        createConfig(collections, extraJobs = { register(PeriodicPingJob) }).withPlugin(uploads),
+        testSettings(persistence),
     )
     runBlocking {
 

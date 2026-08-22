@@ -6,7 +6,7 @@ import dev.klerkframework.klerk.job.JobId
 import dev.klerkframework.klerk.job.JobInfo
 import dev.klerkframework.klerk.job.JobLogEntry
 import dev.klerkframework.klerk.job.JobStatus
-import dev.klerkframework.klerk.job.JobsConfig
+import dev.klerkframework.klerk.job.JobsSpecification
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
@@ -97,7 +97,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                     }
                 }
 
-                apply(cronSchedulesTable(klerk.config.jobs))
+                apply(cronSchedulesTable(klerk.specification.jobs))
             }
     }
 }
@@ -216,7 +216,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
-    val jobsConfig = klerk.config.jobs
+    val jobsConfig = klerk.specification.jobs
 
     support.respondPage(call, "Job types") {
             nav {
@@ -286,7 +286,7 @@ internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall
     call.respondRedirect(jobsPath)
 }
 
-private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsConfig<C, V>): FlowContent.() -> Unit = {
+private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsSpecification<C, V>): FlowContent.() -> Unit = {
     h2 { +"Cron jobs" }
     if (jobsConfig.crons.isEmpty()) {
         p { +"No cron jobs configured" }

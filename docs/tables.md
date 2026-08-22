@@ -8,7 +8,7 @@ val template = TableTemplate(klerk, Author::class, support)
 get("/authors") {
     val context = call.ctx(klerk)
     val table = klerk.read(context) {
-        template.build(klerk.config.views.authors.all, this, call)
+        template.build(klerk.specification.views.authors.all, this, call)
     }
     call.respond(klerk.read(context) {
         html {

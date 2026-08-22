@@ -23,7 +23,7 @@ class LayoutTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
-        val klerk = Klerk.create(createConfig(collections))
+        val klerk = Klerk.create(createConfig(collections), testSettings())
         val layout = Layout(externalCssPath = "https://example.com/classless.css", lang = "sv")
         return Pair(klerk, KlerkWeb(klerk, ApplicationCall::layoutCtx, canSeeAdminUI = { true }, layout = layout))
     }

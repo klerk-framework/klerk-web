@@ -32,7 +32,7 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         val property = requestParams[DATA_CONTAINER_CLASS] ?: throw IllegalArgumentException("No class provided")
         val name = requestParams["name"] ?: throw IllegalArgumentException("No name provided")
         val value = requestParams["value"] ?: throw IllegalArgumentException("No value provided")
-        val prop = klerk.config.managedModels.flatMap { it.kClass.memberProperties }
+        val prop = klerk.specification.managedModels.flatMap { it.kClass.memberProperties }
             .firstOrNull { it.returnType.toString() == property }
         if (prop == null) {
             support.respondPage(call, "Function") { +"No property found with name $property" }

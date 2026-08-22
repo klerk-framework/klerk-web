@@ -44,7 +44,7 @@ class UploadFormTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val plugin = UploadPlugin<Context, MyCollections>(Files.createTempDirectory("klerk-upload-form"))
-        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin))
+        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin), testSettings())
         val support = WebSupport(klerk, { _, _ -> context() })
 
         val template = FormTemplate(
@@ -478,7 +478,7 @@ class UploadFormTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val plugin = UploadPlugin<Context, MyCollections>(Files.createTempDirectory("klerk-upload-accept"))
-        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin))
+        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin), testSettings())
         klerk.meta.start(installShutdownHook = false)
 
         // FlowerImage declares image types and a maximum size

@@ -35,7 +35,7 @@ class UploadRoutesTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val plugin = UploadPlugin<Context, MyCollections>(dir)
-        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin))
+        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin), testSettings())
         val support = WebSupport(klerk, { _, _ -> Context(CustomIdentity(id = null, externalId = 1)) })
         application {
             routing {

@@ -161,42 +161,42 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * Requires an `uploads` plugin on the template. Without JavaScript the field still works: the file is posted with
      * the form and uploaded in one request before the parameters are parsed.
      */
-    public fun file(property: KProperty1<*, BlobContainer?>): Unit {
+    public fun file(property: KProperty1<*, AttachedBlobContainer?>): Unit {
         fileInputs.add(property.name)
     }
 
     /**
-     * The [BlobContainer] class the property holds, which is what `prepare` needs in order to know what the file must
+     * The [AttachedBlobContainer] class the property holds, which is what `prepare` needs in order to know what the file must
      * be and what has to happen to it first.
      *
      * [blobDeclarationFor] answers "what does this property declare"; this answers "which declaration is it".
      */
     @Suppress("UNCHECKED_CAST")
-    internal fun blobClassFor(propertyName: String): KClass<out BlobContainer> {
+    internal fun blobClassFor(propertyName: String): KClass<out AttachedBlobContainer> {
         val kClass = parameters.raw.declaredMemberProperties
             .singleOrNull { it.name == propertyName }
             ?.returnType?.jvmErasure
-        require(kClass != null && kClass.isSubclassOf(BlobContainer::class)) {
-            "file('$propertyName') needs a parameter of a BlobContainer type, but ${parameters.raw.simpleName}." +
+        require(kClass != null && kClass.isSubclassOf(AttachedBlobContainer::class)) {
+            "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but ${parameters.raw.simpleName}." +
                     "$propertyName is ${kClass?.simpleName ?: "not a parameter at all"}"
         }
-        return kClass as KClass<out BlobContainer>
+        return kClass as KClass<out AttachedBlobContainer>
     }
 
     /**
-     * The [BlobContainer] declared for [propertyName], so that the form can render what it says.
+     * The [AttachedBlobContainer] declared for [propertyName], so that the form can render what it says.
      *
      * The blob id it is given is a placeholder: what is wanted here is the declaration, not a particular value.
      */
-    internal fun blobDeclarationFor(propertyName: String): BlobContainer? {
+    internal fun blobDeclarationFor(propertyName: String): AttachedBlobContainer? {
         val kClass = parameters.raw.declaredMemberProperties
             .singleOrNull { it.name == propertyName }
             ?.returnType?.jvmErasure ?: return null
-        if (!kClass.isSubclassOf(BlobContainer::class)) {
+        if (!kClass.isSubclassOf(AttachedBlobContainer::class)) {
             return null
         }
         return runCatching {
-            kClass.constructors.single { c -> c.parameters.size == 1 }.call(AttachedBlobID(0)) as BlobContainer
+            kClass.constructors.single { c -> c.parameters.size == 1 }.call(AttachedBlobID(0)) as AttachedBlobContainer
         }.onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
     }
 
@@ -295,7 +295,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .filter { selectEnums.contains(it.name) }
             .forEach { eventParameter ->
                 val validEnums =
-                    klerk.config.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
+                    klerk.specification.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
                         eventParameter.valueClass.supertypes.first { it.classifier == EnumContainer::class }.arguments.first()
                     )
                 result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
@@ -322,14 +322,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.all
             .filter { it.raw.type.withNullability(false).isSubtypeOf(ModelID::class.starProjectedType) }
             .map { eventParameter ->
-                val ls = klerk.config.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
+                val ls = klerk.specification.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 val options = reader.query(ls, QueryOptions(maxItems = 300)).items
                 if (options.size >= 300) {
                     TODO("Too many options")
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
-                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.config.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
+                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.specification.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -346,7 +346,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     internal fun validate() {
-        if (klerk.config.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
+        if (klerk.specification.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
         }
 
@@ -979,7 +979,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             name = propertyName
             attributes["data-klerk-file"] = propertyName
             required = !template.parameters.all.single { it.name == propertyName }.isNullable
-            // Derived from the property's BlobContainer, the same way maxlength is derived from a StringContainer.
+            // Derived from the property's AttachedBlobContainer, the same way maxlength is derived from a StringContainer.
             // It only helps the user pick the right file; what actually keeps a wrong one out is the check the
             // command makes against the bytes.
             declaration?.accept?.takeIf { it.isNotEmpty() }?.let { accept = it.sorted().joinToString(",") }
@@ -1567,9 +1567,15 @@ internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callP
 
     constructors.first().parameters
         .forEach {
+            // A nullable reference (renderReferenceSelect) or enum (renderEnumSelect) is a <select> with its own
+            // "(none)" option, not a renderInput() field -- so unlike those, it never gets a null-toggle checkbox.
+            // Without this check, every nullable reference/enum select was silently forced to null on submit,
+            // regardless of what the user picked, since callParams[nullToggleKey] is always absent for them.
+            val isReferenceOrEnumSelect = it.type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true)) ||
+                    it.type.withNullability(false).isSubtypeOf(Enum::class.starProjectedType)
             val nullToggleKey = "null-toggle-${it.name!!}"
             val isNullToggled = callParams[nullToggleKey] != "on"
-            if (isNullToggled && it.type.isMarkedNullable) {
+            if (!isReferenceOrEnumSelect && isNullToggled && it.type.isMarkedNullable) {
                 parameters[it] = null
             } else {
                 val value = valueWithCorrectType(callParams[it.name!!], it.type)

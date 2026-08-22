@@ -26,7 +26,7 @@ class UnrenderableEventTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
-        val klerk = Klerk.create(createConfig(collections))
+        val klerk = Klerk.create(createConfig(collections), testSettings())
         // CreateBook takes a Set<ModelID<Author>>, UpdateAuthor a nested Address, CreateTextAsset an AttachedDataRef.
         return Pair(klerk, KlerkWeb(klerk, ApplicationCall::sysCtx, canSeeAdminUI = { true }))
     }

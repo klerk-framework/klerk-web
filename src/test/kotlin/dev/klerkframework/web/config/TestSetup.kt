@@ -11,13 +11,15 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
+import dev.klerkframework.klerk.job.JobSettings
 import dev.klerkframework.klerk.job.JobExecution
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
 import dev.klerkframework.klerk.job.JobsBlock
-import dev.klerkframework.klerk.job.ScheduledJob
+import dev.klerkframework.klerk.job.DeclaredJob
+import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
@@ -58,14 +60,9 @@ var onEnterImprovingStateActionCallback: (() -> Unit)? = null
 
 fun createConfig(
     collections: MyCollections,
-    storage: Persistence = RamStorage(),
-    jobExecution: JobExecution = JobExecution.Automatic,
     extraJobs: JobsBlock<Context, MyCollections>.() -> Unit = {},
-): Config<Context, MyCollections> {
-    return ConfigBuilder<Context, MyCollections>(collections).build {
-        persistence(storage)
-        // AssetsPlugin's TextAsset holds the Brotli-compressed asset as a blob, so a store is required.
-        attachedBlobStore(AttachedBlobStore.Database)
+): Specification<Context, MyCollections> {
+    return SpecificationBuilder<Context, MyCollections>(collections).build {
         managedModels {
             model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
             model(Author::class, authorStateMachine(collections), collections.authors)
@@ -81,7 +78,6 @@ fun createConfig(
             cron(MyJob, "0 3 * * *") {
                 cursor = ""
             }
-            execution = jobExecution
             extraJobs()
         }
         authorization {
@@ -139,6 +135,20 @@ fun createConfig(
         systemContextProvider(::myContextProvider)
     }.withPlugin(AssetsPlugin(setOf(css, myScript)))
 }
+
+/**
+ * The settings the tests share.
+ *
+ * AssetsPlugin's TextAsset holds the Brotli-compressed asset as a blob, so a blob store is always required here.
+ */
+fun testSettings(
+    storage: Persistence = RamStorage(),
+    jobExecution: JobExecution = JobExecution.Automatic,
+): KlerkSettings = KlerkSettings(
+    persistence = storage,
+    attachedBlobStore = AttachedBlobStore.Database,
+    jobs = JobSettings(execution = jobExecution),
+)
 
 fun myContextProvider(systemIdentity: SystemIdentity): Context {
     return Context(systemIdentity)
@@ -425,8 +435,8 @@ fun later(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Instant
 fun hasTalent(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = true
 fun isAnImpostor(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = false
 
-fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<ScheduledJob<Context, MyCollections>> {
-    return listOf(MyJob.schedule(""))
+fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
+    return listOf(MyJob.declare(""))
 }
 
 
@@ -448,8 +458,8 @@ fun onEnterAmateurStateAction(args: ArgForInstanceNonEvent<Author, Context, MyCo
 }
 
 
-fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<ScheduledJob<Context, MyCollections>> {
-    return listOf(MyJob.schedule(""))
+fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
+    return listOf(MyJob.declare(""))
 }
 
 fun changeNameOfAuthor(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): Author {
@@ -755,7 +765,7 @@ class Street(value: String) : StringContainer(value) {
     override val maxLines: Int = 1
 }
 
-fun addStandardTestConfiguration(auth: Boolean = true): ConfigBuilder<Context, MyCollections>.() -> Unit = {
+fun addStandardTestConfiguration(auth: Boolean = true): SpecificationBuilder<Context, MyCollections>.() -> Unit = {
     if (auth) {
         authorization {
             readModels {
@@ -875,6 +885,7 @@ object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, E
 // compiler plugin applied, and String has a serializer built into kotlinx-serialization-core without it.
 object MyJob : JobType.Local<String, Context, MyCollections>() {
     override val name: JobName = JobName("my-job")
+    override val agent: JobAgent = JobAgent.System
 
     override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String> {
         println("Did MyJob")
@@ -1200,32 +1211,32 @@ private fun newFlower(args: ArgForVoidEvent<Flower, CreateFlowerParams, Context,
 
 /** Anything at all, so that the form tests can post text files — but it does have a step, so that the pipeline is
  * exercised through the form. */
-class DocumentContent(id: AttachedBlobID) : BlobContainer(id) {
-    override val preAttachSteps: List<BlobStep> = listOf(::refuseTheWordVirus)
+class DocumentContent(id: AttachedBlobID) : AttachedBlobContainer(id) {
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::refuseTheWordVirus)
 }
 
 /** Stands in for a virus scanner: cheap, deterministic, and it refuses rather than rewrites. */
-suspend fun refuseTheWordVirus(args: BlobStepArgs): BlobStepResult {
+suspend fun refuseTheWordVirus(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
     val text = args.value.readBytes().decodeToString()
-    return if (text.contains("virus")) BlobStepResult.Reject("the file looks infected") else BlobStepResult.Pass
+    return if (text.contains("virus")) BlobPreAttachStepResult.Reject("the file looks infected") else BlobPreAttachStepResult.Pass
 }
 
 /** What a flower picture may be: an image, published to the world, and not enormous. */
-class FlowerImage(id: AttachedBlobID) : BlobContainer(id) {
+class FlowerImage(id: AttachedBlobID) : AttachedBlobContainer(id) {
     override val accept: Set<String> = setOf("image/png", "image/jpeg", "image/gif", "image/webp")
     override val maxSize: Long = 10_000_000
     override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
-    override val preAttachSteps: List<BlobStep> = listOf(::removeEXIF, ::resizeImage)
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::removeEXIF, ::resizeImage)
 }
 
-suspend fun removeEXIF(args: BlobStepArgs): BlobStepResult {
+suspend fun removeEXIF(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
     delay(20.seconds)
-    return BlobStepResult.Pass
+    return BlobPreAttachStepResult.Pass
 }
 
-suspend fun resizeImage(args: BlobStepArgs): BlobStepResult {
+suspend fun resizeImage(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
     delay(20.seconds)
-    return BlobStepResult.Pass
+    return BlobPreAttachStepResult.Pass
 }
 
 // A tiny limit, so that the streaming cap on the no-JavaScript path can be exercised without a large fixture.
@@ -1233,9 +1244,9 @@ data class Note(val title: DocumentTitle, val content: SmallNote)
 
 enum class NoteStates { Written }
 
-class SmallNote(id: AttachedBlobID) : BlobContainer(id) {
+class SmallNote(id: AttachedBlobID) : AttachedBlobContainer(id) {
     override val maxSize: Long = 10
-    override val preAttachSteps: List<BlobStep> = listOf(::noPreAttachProcessing)
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::noPreAttachProcessing)
 }
 
 data class CreateNoteParams(val title: DocumentTitle, val content: SmallNote)

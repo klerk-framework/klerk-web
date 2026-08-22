@@ -120,7 +120,7 @@ routing {
 This registers a list and a detail route for each managed model, plus the AutoButtons and Admin UI routes.
 `modelsNav(klerkWeb)` renders a `<nav>` with a link to each model's list page.
 
-`canSeeAdminUI` has no default: the Admin UI exposes the log, the configuration and job control, so you must decide
+`canSeeAdminUI` has no default: the Admin UI exposes the log, the specification and job control, so you must decide
 who may see it.
 
 To build some pages yourself, exclude those models:
@@ -133,14 +133,14 @@ klerkWebRoutes(klerkWeb, filter = { it.kClass != Game::class })
 
 ## Ask Klerk
 
-One feature of Klerk is that it is easy to ask for the configuration of the application. This can be used to
-keep the UI in sync with the configuration. These methods are available when you read:
+One feature of Klerk is that it is easy to ask for the specification of the application. This can be used to
+keep the UI in sync with the specification. These methods are available when you read:
 * getPossibleVoidEvents: Given a model class, it will tell you which event(s) can be used to create a new instance.
 * getPossibleEvents: Give it a ModelID and Klerk will figure out all events that can be applied to it considering the current state.
   You can use these methods e.g. to figure out if a certain button should be visible or not.
 
 An even more powerful approach is to combine these methods with other building blocks to create a UI that automatically
-follows the configuration. So if the Klerk configuration changes, your UI will automatically update. Example:
+follows the specification. So if the specification changes, your UI will automatically update. Example:
 
 ```kotlin
 val context = call.ctx(klerk)

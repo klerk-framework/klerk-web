@@ -4,7 +4,7 @@ import dev.klerkframework.klerk.AttachedBlobID
 import dev.klerkframework.klerk.AuthorizationException
 import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.datatypes.BlobContainer
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.web.Csrf
@@ -243,7 +243,7 @@ internal fun parseUploadMetadata(header: String?): Map<String, String> {
 }
 
 /**
- * The [BlobContainer] declared for a property of an event's parameters, or null if there is no such declaration.
+ * The [AttachedBlobContainer] declared for a property of an event's parameters, or null if there is no such declaration.
  *
  * Used to apply a property's own limit at the moment an upload starts. Everything it is given comes from the client,
  * so nothing here may be trusted to *permit* anything — only to restrict further than the endpoint already does.
@@ -252,18 +252,18 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
     klerk: Klerk<C, V>,
     event: String?,
     property: String?,
-): BlobContainer? {
+): AttachedBlobContainer? {
     if (event == null || property == null) {
         return null
     }
     return runCatching {
-        val parameters = klerk.config.getParameters(EventReference.from(event)) ?: return null
+        val parameters = klerk.specification.getParameters(EventReference.from(event)) ?: return null
         val kClass = parameters.raw.declaredMemberProperties
             .singleOrNull { it.name == property }
             ?.returnType?.jvmErasure ?: return null
-        if (!kClass.isSubclassOf(BlobContainer::class)) {
+        if (!kClass.isSubclassOf(AttachedBlobContainer::class)) {
             return null
         }
-        kClass.constructors.single { it.parameters.size == 1 }.call(AttachedBlobID(0)) as BlobContainer
+        kClass.constructors.single { it.parameters.size == 1 }.call(AttachedBlobID(0)) as AttachedBlobContainer
     }.onFailure { log.debug(it) { "Could not read the declaration of $property on $event" } }.getOrNull()
 }

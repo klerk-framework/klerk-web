@@ -60,7 +60,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     /** Responds with the page. */
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
-        val modelView = klerk.config.getView<T>(kClass)
+        val modelView = klerk.specification.getView<T>(kClass)
         val collection = getCollection(call.request.queryParameters, modelView)
 
         val (table, voidEvents) = klerk.read(context) {
@@ -86,7 +86,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     ): ModelView<T, C> {
         val collectionId = queryParameters["collection"] ?: return ModelViews.all
         val decoded = CollectionId.from(URLDecoder.decode(collectionId, Charset.forName("utf-8")))
-        return klerk.config.getView<T>(kClass).getCollections().single { it.getFullId() == decoded }
+        return klerk.specification.getView<T>(kClass).getCollections().single { it.getFullId() == decoded }
     }
 
     /*
@@ -158,7 +158,7 @@ private fun <C : KlerkContext, V> renderFilter(
     kClass: KClass<out Any>
 ): FlowContent.() -> Unit =
     {
-        val stateNames = klerk.config.managedModels
+        val stateNames = klerk.specification.managedModels
             .single { it.kClass == kClass }
             .stateMachine.states.filter { it !is VoidState }
             .map { it.name }
@@ -178,7 +178,7 @@ private fun <C : KlerkContext, V> renderFilter(
                         select {
                             id = "collectionselect"
                             name = "collection"
-                            klerk.config.getCollections().filter { it.first == kClass }.map { it.second }.forEach {
+                            klerk.specification.getCollections().filter { it.first == kClass }.map { it.second }.forEach {
                                 option {
                                     value = it.getFullId().toString()
                                     if (call.request.queryParameters["collection"]?.equals(

@@ -45,7 +45,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
     private val textAssetCollections = ModelViews<TextAsset, C>()
 
-    override fun mergeConfig(previous: Config<C, V>): Config<C, V> {
+    override fun mergeSpecification(previous: Specification<C, V>): Specification<C, V> {
         val managedModels = previous.managedModels.toMutableSet()
         managedModels.add(
             ManagedModel(
@@ -59,7 +59,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
     override suspend fun start(klerk: Klerk<C, V>) {
         _klerk = klerk
-        var context = _klerk.config.systemContextProvider(SystemIdentity)
+        var context = _klerk.specification.systemContextProvider(SystemIdentity)
         textAssets = _klerk.read(context) {
             list(textAssetCollections.all)
         }
@@ -83,7 +83,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
                 // at startup: should delete any existing future job
 
                 if (textAssets.none { ta -> ta.props.hash == base64hash }) {
-                    context = _klerk.config.systemContextProvider(SystemIdentity)
+                    context = _klerk.specification.systemContextProvider(SystemIdentity)
 
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
@@ -124,7 +124,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
                         model = it.id,
                         params = null
                     ),
-                    context = _klerk.config.systemContextProvider(SystemIdentity),
+                    context = _klerk.specification.systemContextProvider(SystemIdentity),
                     ProcessingOptions(
                         CommandToken.simple()
                     )
@@ -228,7 +228,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
 
     private suspend fun serveBrotli(call: RoutingCall, id: AttachedBlobID, contentType: ContentType) {
         call.response.headers.append(ContentEncoding, contentEncodingBrotli)
-        val ctx = _klerk.config.systemContextProvider(SystemIdentity)
+        val ctx = _klerk.specification.systemContextProvider(SystemIdentity)
         val inputStream = _klerk.attachedData.get(id, ctx)
         setCacheControl(call)
         call.suppressCompression()

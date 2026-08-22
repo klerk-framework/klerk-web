@@ -40,7 +40,7 @@ class MultipleFormsTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
-        return Klerk.create(createConfig(collections))
+        return Klerk.create(createConfig(collections), testSettings())
     }
 
     @Test

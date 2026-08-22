@@ -1,9 +1,9 @@
 package dev.klerkframework.web.assets
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.datatypes.BlobContainer
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
-import dev.klerkframework.klerk.datatypes.BlobStep
+import dev.klerkframework.klerk.datatypes.BlobPreAttachStep
 import dev.klerkframework.klerk.datatypes.noPreAttachProcessing
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
@@ -106,6 +106,6 @@ public class Base64hash(value: String) : StringContainer(value) {
  * Declares nothing beyond being a blob: what it holds is compressed output produced by this plugin, not something a
  * user uploaded, so there is no type to insist on and nobody to keep out.
  */
-public class CompressedAsset(id: AttachedBlobID) : BlobContainer(id) {
-    override val preAttachSteps: List<BlobStep> = listOf(::noPreAttachProcessing)
+public class CompressedAsset(id: AttachedBlobID) : AttachedBlobContainer(id) {
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::noPreAttachProcessing)
 }

@@ -8,11 +8,14 @@ owned by one of your models.
 ```kotlin
 val uploads = UploadPlugin<Context, MyViews>(stagingDirectory = Path("/var/lib/myapp/uploads"))
 
-val config = ConfigBuilder<Context, MyViews>(views).build {
-    persistence(SqlPersistence(dataSource))
-    attachedBlobStore(FileBlobStore(Path("/var/lib/myapp/blobs")))
+val specification = SpecificationBuilder<Context, MyViews>(views).build {
     // ...
 }.withPlugin(uploads)
+
+val settings = KlerkSettings(
+    persistence = SqlPersistence(dataSource),
+    attachedBlobStore = FileBlobStore(Path("/var/lib/myapp/blobs")),
+)
 
 routing {
     uploadRoutes(support, uploads)
@@ -37,7 +40,7 @@ cleans it up when it is abandoned.
    before the model records it, so the recorded offset is never larger than what is actually there: an interrupted
    upload costs the client a re-sent chunk, never a lost one.
 3. When the last declared byte arrives, the upload becomes `Ready`.
-4. The form is submitted with the upload's id. `parse` hands the staged file to `prepare`, naming the `BlobContainer`
+4. The form is submitted with the upload's id. `parse` hands the staged file to `prepare`, naming the `AttachedBlobContainer`
    the form field is for, and puts the resulting `AttachedBlobID` in the parameters; your command stores it on a model
    and owns it from then on.
 
@@ -67,7 +70,7 @@ rejected with `460` and rolled back rather than stored.
 
 ## Limits and quotas
 
-A limit that belongs to a *property* is declared on its `BlobContainer` and needs nothing here — the form tells the
+A limit that belongs to a *property* is declared on its `AttachedBlobContainer` and needs nothing here — the form tells the
 endpoint which property the file is for, so `maxSize` is applied before any byte is accepted as well as when the
 command attaches the value. On the path without JavaScript, where there is no upload to create, the limit is enforced
 while the file is being copied, so an over-long file is cut off rather than stored and rejected later.
@@ -103,8 +106,8 @@ body. What is prevented there is storing the bytes, not receiving them.
   is what Klerk recognised the bytes to be, together with `X-Content-Type-Options: nosniff` and
   `Content-Disposition: attachment` for anything you have not deliberately allowed inline. Never serve user-supplied
   SVG or HTML inline from the same origin as your application.
-- **What the file may be is declared on the property**, not here. `accept`, `maxSize` and `inspect` on the
-  [`BlobContainer`](https://github.com/klerkframework/klerk/blob/main/docs/attached-data.md) are checked when the
+- **What the file may be is declared on the property**, not here. `accept`, `maxSize` and `preAttachSteps` on the
+  [`AttachedBlobContainer`](https://github.com/klerkframework/klerk/blob/main/docs/attached-data.md) are checked when the
   command attaches the value, so they hold for uploads and for every other caller. This plugin only applies `maxSize`
   early, as a courtesy, so that a file that cannot be used is not uploaded first.
 

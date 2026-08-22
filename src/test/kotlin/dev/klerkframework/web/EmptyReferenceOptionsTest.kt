@@ -22,7 +22,7 @@ class EmptyReferenceOptionsTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all))
-        val klerk = Klerk.create(createConfig(collections))
+        val klerk = Klerk.create(createConfig(collections), testSettings())
         klerk.meta.start()
 
         // No authors are created, so the non-nullable author field has no options
@@ -65,7 +65,7 @@ class EmptyReferenceOptionsTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all))
-        val klerk = Klerk.create(createConfig(collections))
+        val klerk = Klerk.create(createConfig(collections), testSettings())
         klerk.meta.start()
 
         // No authors are created, but favouriteColleague is nullable so it should still render

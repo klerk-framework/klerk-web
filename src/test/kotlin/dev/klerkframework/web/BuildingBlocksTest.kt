@@ -34,7 +34,7 @@ class BuildingBlocksTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
-        return Klerk.create(createConfig(collections))
+        return Klerk.create(createConfig(collections), testSettings())
     }
 
     @Test
@@ -87,7 +87,7 @@ class BuildingBlocksTest {
                     val context = Context.system()
                     val table = klerk.read(context) {
                         TableTemplate(klerk, Author::class, support, columns)
-                            .build(klerk.config.views.authors.all, this, call)
+                            .build(klerk.specification.views.authors.all, this, call)
                     }
                     support.respondPage(call, "Authors") { modelTable(table) }
                 }

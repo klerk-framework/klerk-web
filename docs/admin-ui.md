@@ -10,7 +10,7 @@ grown into your product. Build that from the [building blocks](introduction.md) 
 * A list and a detail page for every managed model, with a button for every possible event.
 * [Audit log](#audit-log) - every event that has been executed.
 * [Jobs](#jobs) - what is scheduled, running or dead-lettered, and cancel/resume/delete.
-* [Documentation](#documentation) - your configuration: models, state diagrams, authorization rules, plugins.
+* [Documentation](#documentation) - your specification: models, state diagrams, authorization rules, plugins.
 * [Log](#log) - Klerk's own log.
 * Metrics - JVM memory and processors.
 * [Plugins](plugins.md) - a page per plugin that provides one.
@@ -63,7 +63,7 @@ jobs rules.
 
 ## Documentation
 
-Renders your configuration: the properties and validation rules of every model, a state diagram per state machine,
+Renders your specification: the properties and validation rules of every model, a state diagram per state machine,
 the authorization rules, the registered algorithms as flow charts, and the plugins. For a `String` property you can
 try a value against its validators.
 

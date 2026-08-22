@@ -44,7 +44,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     private val template: FormTemplate<out Any, C, V>
 
     init {
-        val parameters = requireNotNull(klerk.config.getParameters(eventReference))
+        val parameters = requireNotNull(klerk.specification.getParameters(eventReference))
         try {
             template = FormTemplate(
                 EventWithParameters(eventReference, parameters),
@@ -85,7 +85,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val completionPaths = CompletionPaths.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
-            val parameters = klerk.config.getParameters(eventReference)
+            val parameters = klerk.specification.getParameters(eventReference)
 
             val eventHeading = headingFor(eventReference)
             if (parameters == null) {
@@ -109,7 +109,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
-                // TODO: this if statement should not check for "Update", that config should be injected into the template somehow. A function?
+                // TODO: this if statement should not check for "Update", that specification should be injected into the template somehow. A function?
                 val params = if (eventReference.eventName.contains("Update") && eventReference.modelName == eventWithParameters.parameters.raw.simpleName && id != null) get(id).props else null
                 template.build(
                     call,
@@ -185,9 +185,9 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
-            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.config.getParameters(eventReference)))
-            val parameters = klerk.config.getParameters(eventReference)
-            val event = klerk.config.getEvent(eventReference)
+            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.getParameters(eventReference)))
+            val parameters = klerk.specification.getParameters(eventReference)
+            val event = klerk.specification.getEvent(eventReference)
 
             val template = createCommandsWithParams.singleOrNull { it.eventReference == eventReference }?.template
 
@@ -306,7 +306,7 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         return null
     }
 
-    if (type.isSubtypeOf(BlobContainer::class.starProjectedType.withNullability(true))) {
+    if (type.isSubtypeOf(AttachedBlobContainer::class.starProjectedType.withNullability(true))) {
         // The parameter is the application's own container class, so build one around the blob the form resolved.
         return if (value.isEmpty()) null else type.jvmErasure.constructors
             .single { it.parameters.size == 1 }
@@ -425,7 +425,7 @@ private suspend fun getPossibleReferenceValues(
     eventInputs.all
         .filter { it.type == PropertyType.Ref }
         .forEach { p ->
-            val suitableModelsIds = data.config.getViewList(p.raw.type, "all")
+            val suitableModelsIds = data.specification.getViewList(p.raw.type, "all")
             val suitableModels = data.models.read(context) { list(suitableModelsIds) }
             map[p.name] = suitableModels
         }

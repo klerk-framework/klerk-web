@@ -15,9 +15,9 @@ Follow these steps:
    val css = CssAsset("matcha.css")
    val myScript = JsAsset("my-script.js")
    ```
-3. Add the AssetsPlugin when creating the Klerk configuration, e.g:
+3. Add the AssetsPlugin when creating the Klerk specification, e.g:
    ```kotlin
-   ConfigBuilder<Ctx, Views>(views).build {
+   SpecificationBuilder<Ctx, Views>(views).build {
    // lots of stuff here
    }.withPlugin(AssetsPlugin(setOf(css, myScript)))
    ```

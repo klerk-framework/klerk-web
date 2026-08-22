@@ -84,7 +84,7 @@ Several forms may be rendered on the same page.
 
 ## Files
 
-A parameter that is a `BlobContainer` is declared with `file()`, and needs the [Uploads](uploads.md) plugin:
+A parameter that is an `AttachedBlobContainer` is declared with `file()`, and needs the [Uploads](uploads.md) plugin:
 
 ```kotlin
 val template = FormTemplate(

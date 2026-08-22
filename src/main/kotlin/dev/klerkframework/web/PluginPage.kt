@@ -10,6 +10,6 @@ internal suspend fun <C : KlerkContext, V> renderPluginPage(
     klerk: Klerk<C, V>
 ) {
     val pluginName = requireNotNull(call.request.queryParameters["name"])
-    val plugin = klerk.config.plugins.single { it.name == pluginName } as AdminUIPluginIntegration<C, V>
+    val plugin = klerk.specification.plugins.single { it.name == pluginName } as AdminUIPluginIntegration<C, V>
     plugin.page.respond(call, support, klerk)
 }

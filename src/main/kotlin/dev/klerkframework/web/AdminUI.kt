@@ -53,7 +53,7 @@ public class AdminUI<C : KlerkContext, V>(
                 LowCodeCreateEvent(support, createCommandPath, event, kClass, autoButtons)
             }
 
-        val pairs = klerk.config.getManagedClasses().map { managedClass ->
+        val pairs = klerk.specification.getManagedClasses().map { managedClass ->
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             val modelPathPart = managedClass.simpleName!!.lowercase()
@@ -165,7 +165,7 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
             plugin.registerExtraRoutes(this, pathProvider)
         }
 
@@ -214,7 +214,7 @@ public class AdminUI<C : KlerkContext, V>(
                             a(href = pluginsPath) { button { +"Plugins" } }
                         }
 
-                        klerk.config.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+                        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
                             span {
                                 style = "margin: 10px;"
                                 a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }

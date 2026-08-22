@@ -64,17 +64,19 @@ public enum class UiPart {
 }
 
 /**
- * Returns the CSS classes to put on an element that klerk-web renders. Return an empty set to leave it unstyled,
- * which is what a classless CSS expects.
- *
- * The same provider is used by every building block; [part] says which one is asking.
- *
- * @param part where the element sits.
- * @param element the HTML element name, e.g. "table", "td" or "input".
- * @param property the name of the model or parameter property the element belongs to, if any.
- * @param model the model being rendered, if any.
+ * Provides the CSS classes to put on elements that klerk-web renders. The same provider is used by every
+ * building block, so the [UiPart] argument says which one is asking.
  */
 public fun interface CssClassProvider {
+    /**
+     * Returns the CSS classes to put on an element that klerk-web renders. Return an empty set to leave it
+     * unstyled, which is what a classless CSS expects.
+     *
+     * @param part where the element sits.
+     * @param element the HTML element name, e.g. "table", "td" or "input".
+     * @param property the name of the model or parameter property the element belongs to, if any.
+     * @param model the model being rendered, if any.
+     */
     public fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String>
 }
 

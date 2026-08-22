@@ -35,7 +35,7 @@ fun main() {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all))
-        val klerk = Klerk.create(createConfig(collections))
+        val klerk = Klerk.create(createConfig(collections), testSettings())
         klerk.meta.start()
         if (klerk.meta.modelsCount == 0) {
             val rowling = createAuthorJKRowling(klerk)

@@ -32,7 +32,7 @@ class JobsAdminTest {
     private fun setup(): Pair<Klerk<Context, MyCollections>, KlerkWeb<Context, MyCollections>> {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
-        val klerk = Klerk.create(createConfig(collections, jobExecution = JobExecution.Manual))
+        val klerk = Klerk.create(createConfig(collections), testSettings(jobExecution = JobExecution.Manual))
         // Note that CreateBook, UpdateAuthor and CreateTextAsset have parameter shapes klerk-web cannot render.
         // They are reported at startup and skipped, so no exclusion is needed here.
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::systemCtx, canSeeAdminUI = { true })
@@ -44,7 +44,7 @@ class JobsAdminTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
-        val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
+        val jobId = klerk.jobs.schedule(MyJob.declare(""), Context.system())
 
         application { routing { klerkWebRoutes(klerkWeb) } }
 
@@ -64,7 +64,7 @@ class JobsAdminTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
-        val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
+        val jobId = klerk.jobs.schedule(MyJob.declare(""), Context.system())
 
         application { routing { klerkWebRoutes(klerkWeb) } }
         val client = createClient { install(HttpCookies) }
@@ -95,7 +95,7 @@ class JobsAdminTest {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val (klerk, klerkWeb) = setup()
         klerk.meta.start()
-        val jobId = klerk.jobs.schedule(MyJob.schedule(""), Context.system())
+        val jobId = klerk.jobs.schedule(MyJob.declare(""), Context.system())
         klerk.jobs.runUntilIdle()
         assertTrue(klerk.jobs.getJob(jobId, Context.system()).status == JobStatus.Succeeded)
 

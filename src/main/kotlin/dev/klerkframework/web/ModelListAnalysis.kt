@@ -14,7 +14,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     kClass: KClass<out Any>
 ) {
     val context = support.contextProvider(call, klerk)
-    val modelView = klerk.config.getView<T>(kClass)
+    val modelView = klerk.specification.getView<T>(kClass)
 
     call.respond(klerk.read(context) {
         html {

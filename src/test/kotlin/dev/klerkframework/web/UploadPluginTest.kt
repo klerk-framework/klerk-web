@@ -33,7 +33,7 @@ class UploadPluginTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val plugin = UploadPlugin<Context, MyCollections>(stagingDir)
-        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin))
+        val klerk = Klerk.create(createConfig(collections).withPlugin(plugin), testSettings())
         klerk.meta.start(installShutdownHook = false)
         return klerk to plugin
     }
@@ -172,11 +172,11 @@ class UploadPluginTest {
     @Test
     fun `The plugin registers its own sweep job`() = runBlocking {
         val (klerk, _) = setup()
-        val types = klerk.config.jobs.types.keys.map { it.value }
+        val types = klerk.specification.jobs.types.keys.map { it.value }
 
         assertTrue(types.contains("klerk-web-upload-sweep"), "expected the sweep job to be registered, got $types")
         assertTrue(
-            klerk.config.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
+            klerk.specification.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
             "expected a cron for the sweep job",
         )
         // and the application's own job configuration is untouched

@@ -26,7 +26,7 @@ class DocExamplesTest {
     private fun klerk(): Klerk<Context, MyCollections> {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
-        return Klerk.create(createConfig(MyCollections(bc, AuthorCollections(bc.all), ModelViews())))
+        return Klerk.create(createConfig(MyCollections(bc, AuthorCollections(bc.all), ModelViews())), testSettings())
     }
 
     // docs/model-pages.md
@@ -91,7 +91,7 @@ class DocExamplesTest {
                 get("/authors") {
                     val context = call.docCtx(klerk)
                     val built = klerk.read(context) {
-                        table.build(klerk.config.views.authors.all, this, call)
+                        table.build(klerk.specification.views.authors.all, this, call)
                     }
                     call.respond(klerk.read(context) {
                         html {

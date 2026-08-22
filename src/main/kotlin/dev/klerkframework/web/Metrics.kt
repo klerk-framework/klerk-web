@@ -52,7 +52,7 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                                         }
                                     }
                                     tbody {
-                                        data.config.meterRegistry.meters.sortedBy { it.id.name }.forEach {
+                                        data.specification.meterRegistry.meters.sortedBy { it.id.name }.forEach {
                                             tr {
                                                 td { +it.id.name }
                                                 td {

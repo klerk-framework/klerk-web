@@ -34,13 +34,13 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
                 h1 { +"Documentation" }
-                apply(renderModels(klerk.config.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
-                apply(renderAuthorizationRules(klerk.config.authorization))
-                apply(renderCollections(klerk.config.views))
-                apply(renderPluginsDocumentation(klerk.config.plugins))
+                apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
+                apply(renderAuthorizationRules(klerk.specification.authorization))
+                apply(renderCollections(klerk.specification.views))
+                apply(renderPluginsDocumentation(klerk.specification.plugins))
                 hr()
                 ul {
-                    klerk.config.managedModels.forEach { managedModel ->
+                    klerk.specification.managedModels.forEach { managedModel ->
                         li {
                             a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") { +managedModel.kClass.simpleName.toString() }
                         }
@@ -48,7 +48,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 }
 
             } else {
-                val model = klerk.config.managedModels.single { it.kClass.qualifiedName == forModel }
+                val model = klerk.specification.managedModels.single { it.kClass.qualifiedName == forModel }
                 h1 { +"Documentation for ${model.kClass.simpleName}" }
                 pre(classes = "mermaid") {
                     unsafe {
@@ -178,7 +178,7 @@ private fun <C : KlerkContext, V> renderEvents(
     {
         h5 { +"Events" }
         stateMachine.getAllEvents().forEach { externalEvent ->
-            val parameters = klerk.config.getParameters(externalEvent)
+            val parameters = klerk.specification.getParameters(externalEvent)
             h6 { +externalEvent.id() }
             ul {
                 style = noBullets
@@ -239,7 +239,7 @@ private fun <C : KlerkContext, V> renderEvents(
                     details {
                         summary { +"Validation rules" }
                         ul {
-                            klerk.config.getEvent(externalEvent).getContextRules<C>().forEach {
+                            klerk.specification.getEvent(externalEvent).getContextRules<C>().forEach {
                                 li {
                                     +"Context: ${extractNameFromFunction(it)}"
                                 }
@@ -252,18 +252,18 @@ private fun <C : KlerkContext, V> renderEvents(
     }
 
 
-internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): FlowContent.() -> Unit = {
+internal fun <V> renderAuthorizationRules(specification: AuthorizationConfig<*, V>): FlowContent.() -> Unit = {
     h2 { +"Authorization rules" }
     h3 { +"Events" }
     h4 { +"Positive" }
     ul {
-        config.eventPositiveRules.forEach {
+        specification.eventPositiveRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
     h4 { +"Negative" }
     ul {
-        config.eventNegativeRules.forEach {
+        specification.eventNegativeRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
@@ -271,13 +271,13 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): Fl
     h3 { +"Read models" }
     h4 { +"Positive" }
     ul {
-        config.readModelPositiveRules.forEach {
+        specification.readModelPositiveRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
     h4 { +"Negative" }
     ul {
-        config.readModelNegativeRules.forEach {
+        specification.readModelNegativeRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
@@ -285,13 +285,13 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): Fl
     h3 { +"Read model properties" }
     h4 { +"Positive" }
     ul {
-        config.readPropertyPositiveRules.forEach {
+        specification.readPropertyPositiveRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
     h4 { +"Negative" }
     ul {
-        config.readPropertyNegativeRules.forEach {
+        specification.readPropertyNegativeRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
@@ -299,13 +299,13 @@ internal fun <V> renderAuthorizationRules(config: AuthorizationConfig<*, V>): Fl
     h3 { +"Event log" }
     h4 { +"Positive" }
     ul {
-        config.eventLogPositiveRules.forEach {
+        specification.eventLogPositiveRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }
     h4 { +"Negative" }
     ul {
-        config.eventLogNegativeRules.forEach {
+        specification.eventLogNegativeRules.forEach {
             li { +extractNameFromFunction(it) }
         }
     }

@@ -1,7 +1,7 @@
 package dev.klerkframework.web.upload
 
 import dev.klerkframework.klerk.ActorIdentity
-import dev.klerkframework.klerk.Config
+import dev.klerkframework.klerk.Specification
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.KlerkPlugin
@@ -10,7 +10,8 @@ import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.SystemIdentity
 import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.datatypes.BlobContainer
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
+import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
@@ -81,7 +82,7 @@ public class UploadPlugin<C : KlerkContext, V>(
 
     private val sweepJob = SweepStagingArea()
 
-    override fun mergeConfig(previous: Config<C, V>): Config<C, V> {
+    override fun mergeSpecification(previous: Specification<C, V>): Specification<C, V> {
         val managedModels = previous.managedModels.toMutableSet()
         managedModels.add(ManagedModel(Upload::class, uploadStateMachine(lifetime), views))
         return previous.copy(managedModels = managedModels).withJobs {
@@ -277,7 +278,7 @@ public class UploadPlugin<C : KlerkContext, V>(
     public suspend fun toAttachedData(
         context: C,
         id: ModelID<Upload>,
-        declaration: KClass<out BlobContainer>,
+        declaration: KClass<out AttachedBlobContainer>,
         lease: Duration = 1.minutes,
     ): AttachedBlobID {
         val upload = get(context, id)
@@ -346,10 +347,10 @@ public class UploadPlugin<C : KlerkContext, V>(
         return upload
     }
 
-    private fun systemContext(): C = klerk.config.systemContextProvider(SystemIdentity)
+    private fun systemContext(): C = klerk.specification.systemContextProvider(SystemIdentity)
 
     /**
-     * Reconciles the staging directory against the models, at most once per [sweepInterval].
+     * Reconciles the staging directory against the models, on the schedule given by [sweepExpression].
      *
      * This is how abandoned bytes are cleaned up: an expired upload deletes its own model through a time trigger, and
      * the file it leaves behind is removed here. Doing it by reconciliation rather than in a hook means a crash
@@ -360,7 +361,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         val uploads = this@UploadPlugin.views.all
         val live = klerk.read(systemContext()) { list(uploads) }.map { it.id.value }.toSet()
         // Files younger than this may belong to an upload whose model is not visible to this read yet.
-        val olderThan = klerk.config.clock.now().minus(10.minutes)
+        val olderThan = klerk.settings.clock.now().minus(10.minutes)
         runCatching { staging.sweep(live, olderThan) }
             .onFailure { logger.error(it) { "Could not sweep the upload staging directory" } }
     }
@@ -374,6 +375,7 @@ public class UploadPlugin<C : KlerkContext, V>(
      */
     private inner class SweepStagingArea : JobType.Local<String, C, V>() {
         override val name: JobName = JobName("klerk-web-upload-sweep")
+        override val agent: JobAgent = JobAgent.System
 
         override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String> {
             sweep()
