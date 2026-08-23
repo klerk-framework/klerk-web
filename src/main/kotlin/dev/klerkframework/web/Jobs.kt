@@ -97,7 +97,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                     }
                 }
 
-                apply(cronSchedulesTable(klerk.specification.jobs))
+                apply(cronSchedulesTable(klerk.spec.jobs))
             }
     }
 }
@@ -216,7 +216,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     jobsPath: String,
     klerk: Klerk<C, V>
 ) {
-    val jobsConfig = klerk.specification.jobs
+    val jobsConfig = klerk.spec.jobs
 
     support.respondPage(call, "Job types") {
             nav {

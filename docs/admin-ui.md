@@ -13,6 +13,7 @@ grown into your product. Build that from the [building blocks](introduction.md) 
 * [Documentation](#documentation) - your specification: models, state diagrams, authorization rules, plugins.
 * [Log](#log) - Klerk's own log.
 * Metrics - JVM memory and processors.
+* [Settings](#settings) - the running instance's `KlerkSettings`, and which env var each was resolved from.
 * [Plugins](plugins.md) - a page per plugin that provides one.
 
 ## Initializing
@@ -70,3 +71,9 @@ try a value against its validators.
 ## Log
 
 Klerk's own log: what was read and written, by whom, with the facts behind each entry.
+
+## Settings
+
+Lists the running instance's `KlerkSettings`. For a setting built with `KlerkSettingsBuilder` from an `EnvVar`, the
+"Env var" column names the variable that controls it, so an operator knows what to change (and restart) rather than
+having to read the code.

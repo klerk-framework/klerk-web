@@ -180,7 +180,7 @@ fun main() {
             //data.makeSnapshot()
         }
 
-        val embeddedServer = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+        val embeddedServer = embeddedServer(Netty, port = 8081, host = "0.0.0.0") {
             configureRouting(klerk, uploads)
             //        configureSecurity()
             //      configureHTTP()

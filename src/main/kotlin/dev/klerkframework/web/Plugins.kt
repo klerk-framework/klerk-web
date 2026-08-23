@@ -17,7 +17,7 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
             }
             h1 { +"Plugins" }
             main {
-                val plugins = klerk.specification.plugins
+                val plugins = klerk.spec.plugins
                 if (plugins.isEmpty()) {
                     p { +"No plugins" }
                 } else {

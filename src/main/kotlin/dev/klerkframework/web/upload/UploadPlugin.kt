@@ -347,7 +347,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         return upload
     }
 
-    private fun systemContext(): C = klerk.specification.systemContextProvider(SystemIdentity)
+    private fun systemContext(): C = klerk.spec.systemContextProvider(SystemIdentity)
 
     /**
      * Reconciles the staging directory against the models, on the schedule given by [sweepExpression].

@@ -33,7 +33,7 @@ fun main() {
                             Author::class,
                             WebSupport(klerk, { _, _ -> Context.system() }),
                         ).build(
-                            klerk.specification.views.authors.all,
+                            klerk.spec.views.authors.all,
                             this,
                             call
                         )

@@ -295,7 +295,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .filter { selectEnums.contains(it.name) }
             .forEach { eventParameter ->
                 val validEnums =
-                    klerk.specification.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
+                    klerk.spec.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
                         eventParameter.valueClass.supertypes.first { it.classifier == EnumContainer::class }.arguments.first()
                     )
                 result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
@@ -322,14 +322,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.all
             .filter { it.raw.type.withNullability(false).isSubtypeOf(ModelID::class.starProjectedType) }
             .map { eventParameter ->
-                val ls = klerk.specification.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
+                val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 val options = reader.query(ls, QueryOptions(maxItems = 300)).items
                 if (options.size >= 300) {
                     TODO("Too many options")
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
-                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.specification.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
+                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.spec.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -346,7 +346,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     internal fun validate() {
-        if (klerk.specification.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
+        if (klerk.spec.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
         }
 

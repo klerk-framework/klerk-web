@@ -978,19 +978,17 @@ class AuthorsWithAtLeastTwoBooks<V>(
     private val books: AllModelView<Book, Context>,
 ) : ModelView<Author, Context>(authors) {
 
-    override fun filter(filter: ((Model<Author>) -> Boolean)?): ModelView<Author, Context> {
-        return if (filter == null) this else FilteredModelView(this, filter)
+    override fun <V> memberIds(reader: Reader<Context, V>, cursor: QueryListCursor?): Sequence<ModelID<Author>> {
+        val authorsWithTwoBooks = books.withReader(reader, null)
+            .groupingBy { it.props.author }
+            .eachCount()
+            .filterValues { it >= 2 }
+            .keys
+        return authors.memberIds(reader, cursor).filter { authorsWithTwoBooks.contains(it) }
     }
 
-    override fun <V> withReader(reader: Reader<Context, V>, cursor: QueryListCursor?): Sequence<Model<Author>> {
-        return authors.withReader(reader, cursor).filter { author ->
-            books.withReader(reader, null).filter { it.props.author == author.id }.take(2).count() == 2
-        }
-    }
-
-    override fun <V> contains(value: ModelID<*>, reader: Reader<Context, V>): Boolean {
-        return withReader(reader, null).any { it.id == value }
-    }
+    override fun <V> contains(value: ModelID<*>, reader: Reader<Context, V>): Boolean =
+        memberIds(reader, null).any { it.value == value.value }
 
 }
 

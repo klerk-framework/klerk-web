@@ -45,6 +45,7 @@ public class AdminUI<C : KlerkContext, V>(
     private val pluginsPath = "${pathProvider.withPrefix()}_plugins"
     private val logPath = "${pathProvider.withPrefix()}_log"
     private val documentationPath = "${pathProvider.withPrefix()}_documentation"
+    private val settingsPath = "${pathProvider.withPrefix()}_settings"
 
     init {
         // TODO: remove and use autobuttons instead
@@ -53,7 +54,7 @@ public class AdminUI<C : KlerkContext, V>(
                 LowCodeCreateEvent(support, createCommandPath, event, kClass, autoButtons)
             }
 
-        val pairs = klerk.specification.getManagedClasses().map { managedClass ->
+        val pairs = klerk.spec.getManagedClasses().map { managedClass ->
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             val modelPathPart = managedClass.simpleName!!.lowercase()
@@ -135,6 +136,12 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
+        get(settingsPath) {
+            requireAdmin(call) {
+                renderSettings(call, support, klerk)
+            }
+        }
+
         get(documentationPath) {
             requireAdmin(call) {
                 renderDocumentation(call, support, klerk, documentationPath)
@@ -165,7 +172,7 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+        klerk.spec.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
             plugin.registerExtraRoutes(this, pathProvider)
         }
 
@@ -214,7 +221,12 @@ public class AdminUI<C : KlerkContext, V>(
                             a(href = pluginsPath) { button { +"Plugins" } }
                         }
 
-                        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+                        span {
+                            style = "margin: 10px;"
+                            a(href = settingsPath) { button { +"Settings" } }
+                        }
+
+                        klerk.spec.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
                             span {
                                 style = "margin: 10px;"
                                 a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }

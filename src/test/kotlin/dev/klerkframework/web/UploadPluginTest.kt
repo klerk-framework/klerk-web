@@ -172,11 +172,11 @@ class UploadPluginTest {
     @Test
     fun `The plugin registers its own sweep job`() = runBlocking {
         val (klerk, _) = setup()
-        val types = klerk.specification.jobs.types.keys.map { it.value }
+        val types = klerk.spec.jobs.types.keys.map { it.value }
 
         assertTrue(types.contains("klerk-web-upload-sweep"), "expected the sweep job to be registered, got $types")
         assertTrue(
-            klerk.specification.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
+            klerk.spec.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
             "expected a cron for the sweep job",
         )
         // and the application's own job configuration is untouched

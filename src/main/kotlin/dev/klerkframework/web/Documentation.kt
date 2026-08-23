@@ -34,13 +34,13 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
                 h1 { +"Documentation" }
-                apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
-                apply(renderAuthorizationRules(klerk.specification.authorization))
-                apply(renderCollections(klerk.specification.views))
-                apply(renderPluginsDocumentation(klerk.specification.plugins))
+                apply(renderModels(klerk.spec.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
+                apply(renderAuthorizationRules(klerk.spec.authorization))
+                apply(renderCollections(klerk.spec.views))
+                apply(renderPluginsDocumentation(klerk.spec.plugins))
                 hr()
                 ul {
-                    klerk.specification.managedModels.forEach { managedModel ->
+                    klerk.spec.managedModels.forEach { managedModel ->
                         li {
                             a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") { +managedModel.kClass.simpleName.toString() }
                         }
@@ -48,7 +48,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 }
 
             } else {
-                val model = klerk.specification.managedModels.single { it.kClass.qualifiedName == forModel }
+                val model = klerk.spec.managedModels.single { it.kClass.qualifiedName == forModel }
                 h1 { +"Documentation for ${model.kClass.simpleName}" }
                 pre(classes = "mermaid") {
                     unsafe {
@@ -178,7 +178,7 @@ private fun <C : KlerkContext, V> renderEvents(
     {
         h5 { +"Events" }
         stateMachine.getAllEvents().forEach { externalEvent ->
-            val parameters = klerk.specification.getParameters(externalEvent)
+            val parameters = klerk.spec.getParameters(externalEvent)
             h6 { +externalEvent.id() }
             ul {
                 style = noBullets
@@ -239,7 +239,7 @@ private fun <C : KlerkContext, V> renderEvents(
                     details {
                         summary { +"Validation rules" }
                         ul {
-                            klerk.specification.getEvent(externalEvent).getContextRules<C>().forEach {
+                            klerk.spec.getEvent(externalEvent).getContextRules<C>().forEach {
                                 li {
                                     +"Context: ${extractNameFromFunction(it)}"
                                 }

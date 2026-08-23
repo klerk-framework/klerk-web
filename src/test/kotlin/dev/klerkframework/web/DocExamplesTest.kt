@@ -91,7 +91,7 @@ class DocExamplesTest {
                 get("/authors") {
                     val context = call.docCtx(klerk)
                     val built = klerk.read(context) {
-                        table.build(klerk.specification.views.authors.all, this, call)
+                        table.build(klerk.spec.views.authors.all, this, call)
                     }
                     call.respond(klerk.read(context) {
                         html {

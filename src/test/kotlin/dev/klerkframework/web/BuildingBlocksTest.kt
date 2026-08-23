@@ -87,7 +87,7 @@ class BuildingBlocksTest {
                     val context = Context.system()
                     val table = klerk.read(context) {
                         TableTemplate(klerk, Author::class, support, columns)
-                            .build(klerk.specification.views.authors.all, this, call)
+                            .build(klerk.spec.views.authors.all, this, call)
                     }
                     support.respondPage(call, "Authors") { modelTable(table) }
                 }

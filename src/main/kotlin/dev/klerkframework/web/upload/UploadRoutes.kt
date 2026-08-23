@@ -257,7 +257,7 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
         return null
     }
     return runCatching {
-        val parameters = klerk.specification.getParameters(EventReference.from(event)) ?: return null
+        val parameters = klerk.spec.getParameters(EventReference.from(event)) ?: return null
         val kClass = parameters.raw.declaredMemberProperties
             .singleOrNull { it.name == property }
             ?.returnType?.jvmErasure ?: return null
