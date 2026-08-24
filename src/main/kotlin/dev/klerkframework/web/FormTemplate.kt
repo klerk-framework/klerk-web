@@ -139,6 +139,13 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     private fun dateTime(parameter: EventParameter) = inputs.add(Pair(parameter.name, dateTimeLocal))
 
+    /** A `date` input — a calendar date with no time of day or time zone. */
+    public fun date(property: KProperty1<*, DateContainer?>): Unit {
+        inputs.add(Pair(property.name, InputType.date))
+    }
+
+    private fun date(parameter: EventParameter) = inputs.add(Pair(parameter.name, InputType.date))
+
     /** A number of seconds. */
     public fun duration(property: KProperty1<*, DurationContainer?>): Unit {
         inputs.add(Pair(property.name, number))
@@ -240,6 +247,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Ref -> selectReference(p)
                     PropertyType.Enum -> selectEnum(p)
                     PropertyType.Instant -> dateTime(p)
+                    PropertyType.Date -> date(p)
                     PropertyType.Duration -> duration(p)
                     PropertyType.AttachedDataRef -> throw IllegalStateException(
                         "The property '${p.name}' refers to attached data. Declare it with file() if it is an " +
@@ -1077,7 +1085,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             val isNullable = parameters.all.single { it.name == propertyName }.isNullable
             val value: DataContainer<*> = if (params == null) {
                 val prop = parameters.all.single { it.name == propertyName }
-                prop.recommendedDefaultValue?.let { prop.getInstance(it) } ?: prop.getDummyInstance()
+                prop.kotlinDefaultInstance
+                    ?: prop.recommendedDefaultValue?.let { prop.getInstance(it) }
+                    ?: prop.getDummyInstance()
             } else {
                 getParamDatatype(propertyName, params)
             }
@@ -1126,6 +1136,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 }
 
                 dateTimeLocal -> this.apply(renderInstantInput(propertyName, value as InstantContainer))
+
+                InputType.date -> this.apply(renderDateInput(propertyName, value as DateContainer))
 
                 checkBox -> this.apply(
                     renderCheckboxInput(
@@ -1314,6 +1326,22 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             id = elementId(propertyName)
             name = propertyName
             value = theValue.instant.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat)
+            attributes["aria-invalid"] = "false"
+            attributes["aria-errormessage"] = errorId(propertyName)
+        }
+        apply(createErrorPlaceholder(propertyName))
+    }
+
+    /** A `date` input — a calendar date with no time of day or time zone. */
+    private fun renderDateInput(
+        propertyName: String,
+        theValue: DateContainer,
+    ): FlowContent.() -> Unit = {
+        apply(createLabel(propertyName))
+        input(InputType.date) {
+            id = elementId(propertyName)
+            name = propertyName
+            value = theValue.date.toString()
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
         }

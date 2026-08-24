@@ -12,6 +12,7 @@ import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.html.*
+import java.time.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -360,6 +361,12 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
         val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
         return type.jvmErasure.constructors.single { it.parameters.size == 1 }
             .call(local.toInstant(TimeZone.currentSystemDefault()))
+    }
+
+    if (type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(false)) ||
+        type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(true))
+    ) {
+        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(LocalDate.parse(value))
     }
 
     if (type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(false)) ||
