@@ -36,7 +36,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
                 thead {
                     tr {
                         th { +"Time" }
-                        //  th { +"actor" }
+                        th { +"Actor" }
                         th { +"Event" }
                         if (forModel == null) th { +"Model" }
                     }
@@ -45,7 +45,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
                     events.forEach { event ->
                         tr {
                             td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
-                            // td { +(event.actor?.toAuditLog() ?: "[unauthenticated]") }
+                            td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
                             td { a(href = "_audit/${event.time.to64bitMicroseconds()}") { +event.eventReference.eventName } }
                             if (forModel == null) td { +(ModelID<Any>(event.reference).toString()) }
                         }
