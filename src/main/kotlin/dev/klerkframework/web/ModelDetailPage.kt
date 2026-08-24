@@ -40,15 +40,20 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    /** Responds with the page. */
+    /** Responds with the page, or a 404 if [id] no longer exists (e.g. the model was deleted). */
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val id = ModelID<Any>(call.parameters["id"]!!.toInt())
-        val (reflected, model) = klerk.read(context) {
-            val model = get(id)
-            val reflectedModel = ReflectedModel(model)
-            apply(reflectedModel.populateRelations())
-            Pair(reflectedModel, model)
+        val (reflected, model) = try {
+            klerk.read(context) {
+                val model = get(id)
+                val reflectedModel = ReflectedModel(model)
+                apply(reflectedModel.populateRelations())
+                Pair(reflectedModel, model)
+            }
+        } catch (e: NoSuchElementException) {
+            support.respondPage(call, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+            return
         }
         val events = klerk.read(context) { getPossibleEvents(id) }
 
