@@ -40,7 +40,10 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    /** Responds with the page, or a 404 if [id] no longer exists (e.g. the model was deleted). */
+    /**
+     * Responds with the page, or a 404 if [id] no longer exists (e.g. the model was deleted), or a 403 if the actor
+     * isn't authorized to read it.
+     */
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val id = ModelID<Any>(call.parameters["id"]!!.toInt())
@@ -53,6 +56,9 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             }
         } catch (e: NoSuchElementException) {
             support.respondPage(call, "Not found", HttpStatusCode.NotFound) { +"Not found" }
+            return
+        } catch (e: AuthorizationException) {
+            support.respondPage(call, "Forbidden", HttpStatusCode.Forbidden) { +"Forbidden" }
             return
         }
         val events = klerk.read(context) { getPossibleEvents(id) }
