@@ -11,7 +11,7 @@ import java.util.*
 import kotlin.reflect.KClass
 
 /**
- * An operations console: audit log, jobs, metrics, the application log, the configuration and plugin pages, plus a
+ * An operations console: event log, jobs, metrics, the application log, the configuration and plugin pages, plus a
  * generated list and detail page for every managed model.
  *
  * The Admin UI is an **internal tool**. It is not a foundation for the UI your users see - build that from the
@@ -39,7 +39,7 @@ public class AdminUI<C : KlerkContext, V>(
     private val detailViews: List<ModelDetailPage<out Any, C, V>>
     private val createCommandsWithParams: List<LowCodeCreateEvent<C, V>>
 
-    private val auditPath = "${pathProvider.withPrefix()}_audit"
+    private val eventLogPath = "${pathProvider.withPrefix()}_eventlog"
     private val jobsPath = "${pathProvider.withPrefix()}_jobs"
     private val metricsPath = "${pathProvider.withPrefix()}_metrics"
     private val pluginsPath = "${pathProvider.withPrefix()}_plugins"
@@ -62,7 +62,7 @@ public class AdminUI<C : KlerkContext, V>(
 
             val listView = ModelListPage<Any, C, V>(managedClass, support, pathToList, humanName)
             val detailView = ModelDetailPage<Any, C, V>(
-                managedClass, support, humanName, auditPath, customAfterEventButtonsOnDetailView
+                managedClass, support, humanName, eventLogPath, customAfterEventButtonsOnDetailView
             )
             Pair(listView, detailView)
         }
@@ -82,15 +82,15 @@ public class AdminUI<C : KlerkContext, V>(
             }
         }
 
-        get(auditPath) {
+        get(eventLogPath) {
             requireAdmin(call) {
-                renderAudit(call, support, klerk)
+                renderEventLog(call, support, klerk)
             }
         }
 
-        get("$auditPath/{id}") {
+        get("$eventLogPath/{id}") {
             requireAdmin(call) {
-                renderAuditDetails(call, support, klerk)
+                renderEventLogDetails(call, support, klerk)
             }
         }
 
@@ -208,7 +208,7 @@ public class AdminUI<C : KlerkContext, V>(
 
                         span {
                             style = "margin: 10px;"
-                            a(href = auditPath) { button { +"Audit Log" } }
+                            a(href = eventLogPath) { button { +"Event log" } }
                         }
 
                         span {

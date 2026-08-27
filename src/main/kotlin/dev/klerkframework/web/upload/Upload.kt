@@ -22,7 +22,7 @@ import kotlin.time.Duration
  * this model holds is everything needed to decide whether the next chunk may be written: who started the upload, how
  * large it claims to be, and how much of it has arrived.
  *
- * Being a model is what makes an upload safe to name in a form: it has an owner, an authorization rule, an audit
+ * Being a model is what makes an upload safe to name in a form: it has an owner, an authorization rule, an event log
  * trail, and a time trigger that cleans it up if it is abandoned.
  */
 public data class Upload(

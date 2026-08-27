@@ -67,7 +67,7 @@ class DocExamplesTest {
             Author::class,
             support,
             humanName = "Author",
-            auditPath = "/admin/_audit",
+            eventLogPath = "/admin/_eventlog",
             useTable = true,
             extraContent = { _, _ -> { p { +"Anything you like" } } },
         )

@@ -8,7 +8,7 @@ grown into your product. Build that from the [building blocks](introduction.md) 
 ## What it gives you
 
 * A list and a detail page for every managed model, with a button for every possible event.
-* [Audit log](#audit-log) - every event that has been executed.
+* [Event log](#event-log) - every event that has been executed.
 * [Jobs](#jobs) - what is scheduled, running or dead-lettered, and cancel/resume/delete.
 * [Documentation](#documentation) - your specification: models, state diagrams, authorization rules, plugins.
 * [Log](#log) - Klerk's own log.
@@ -43,7 +43,7 @@ It is not a second permission system. Klerk's own rules still apply to everythin
 
 * which events a user may execute (`getPossibleEvents`),
 * which models a user may read,
-* the audit log (`eventLogPositiveRules`),
+* the event log (`eventLogPositiveRules`),
 * which jobs a user may see or control.
 
 So `canSeeAdminUI` decides whether the console is shown at all - not what may be done in it.
@@ -51,10 +51,10 @@ So `canSeeAdminUI` decides whether the console is shown at all - not what may be
 > Note: the documentation page has no Klerk rules, so if you want to prevent someone from reading it, you must not allow
 > `canSeeAdminUI` for them.
 
-## Audit log
+## Event log
 
 Every executed event, with its parameters and actor. Reached from a model's detail page with the "History" button,
-or in full at `_audit`.
+or in full at `_eventlog`.
 
 ## Jobs
 

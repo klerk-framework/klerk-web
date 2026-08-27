@@ -35,7 +35,7 @@ ModelDetailPage(
     Author::class,
     support,
     humanName = "Author",
-    auditPath = "/admin/_audit",   // adds a "History" button
+    eventLogPath = "/admin/_eventlog",   // adds a "History" button
     useTable = true,               // <table> instead of <dl>
     extraContent = { kClass, model -> { p { +"Anything you like" } } },
 )

@@ -9,7 +9,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 
-internal suspend fun <C : KlerkContext, V> renderAudit(
+internal suspend fun <C : KlerkContext, V> renderEventLog(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     klerk: Klerk<C, V>
@@ -19,13 +19,13 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
     val forModel = call.request.queryParameters["model"]
     val id = forModel?.let { ModelID<Any>(it.toInt()) }
     // One block, so the summary and the log describe the same moment. The entries themselves are read afterwards,
-    // since the audit log must not be queried while the read lock is held.
+    // since the event log must not be queried while the read lock is held.
     val (modelSummary, query) = klerk.read(context) {
-        (if (id == null) "" else get(id).toString()) to auditLog(id)
+        (if (id == null) "" else get(id).toString()) to eventLog(id)
     }
     val events = query.get()
 
-    support.respondPage(call, "Audit log") {
+    support.respondPage(call, "Event log") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
@@ -49,7 +49,7 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
                         tr {
                             td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
                             td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
-                            td { a(href = "_audit/${event.sequenceNumber}") { +event.eventReference.eventName } }
+                            td { a(href = "_eventlog/${event.sequenceNumber}") { +event.eventReference.eventName } }
                             if (forModel == null) td { +(ModelID<Any>(event.reference).toString()) }
                         }
                     }
@@ -58,22 +58,22 @@ internal suspend fun <C : KlerkContext, V> renderAudit(
     }
 }
 
-internal suspend fun <C : KlerkContext, V> renderAuditDetails(
+internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     klerk: Klerk<C, V>
 ) {
     val context = support.contextProvider(call, klerk)
     val sequenceNumber = requireNotNull(call.parameters["id"]).toLong()
-    val event = klerk.read(context) { auditLog(sequenceNumber = sequenceNumber) }.get().single()
+    val event = klerk.read(context) { eventLog(sequenceNumber = sequenceNumber) }.get().single()
 
-    support.respondPage(call, "Audit entry") {
+    support.respondPage(call, "Event log entry") {
             header {
                 nav {
                     div {
                         a(href = support.pathProvider.withPrefix()) { +"Home" }
                         +" / "
-                        a(href = "${support.pathProvider.withPrefix()}_audit") { +"Audit log" }
+                        a(href = "${support.pathProvider.withPrefix()}_eventlog") { +"Event log" }
                     }
                 }
             }

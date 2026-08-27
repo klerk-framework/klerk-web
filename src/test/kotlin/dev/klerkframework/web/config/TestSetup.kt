@@ -853,7 +853,7 @@ object AlwaysFalseAlgorithm :
 
 data class Context(
     override val actor: dev.klerkframework.klerk.ActorIdentity,
-    override val auditExtra: String? = null,
+    override val eventLogExtra: String? = null,
     override val time: Instant = Clock.System.now(),
     override val translation: Translation = SwedishTranslation,
     val user: Model<User>? = null,

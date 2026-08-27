@@ -31,7 +31,7 @@ is what happens underneath and what you can change.
 
 ## How an upload works
 
-An upload is a model. That is what gives it an owner, an authorization rule, an audit trail and a time trigger that
+An upload is a model. That is what gives it an owner, an authorization rule, an event log trail and a time trigger that
 cleans it up when it is abandoned.
 
 1. The browser starts an upload. `CreateUpload` runs **as the user**, carrying the filename, the content type and the

@@ -16,7 +16,7 @@ import kotlin.reflect.KClass
  *
  * Register its route, or call [respond] from a route of your own.
  *
- * @param auditPath where the history of a model can be seen, if anywhere.
+ * @param eventLogPath where the history of a model can be seen, if anywhere.
  * @param useTable renders the properties in a `<table>` instead of a `<dl>`.
  * @param extraContent rendered after the event buttons.
  */
@@ -24,7 +24,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
     private val support: WebSupport<C, V>,
     private val humanName: String,
-    private val auditPath: String? = null,
+    private val eventLogPath: String? = null,
     private val extraContent: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
     private val useTable: Boolean = false,
 ) {
@@ -86,7 +86,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
 
             extraContent?.let { div { apply(it.invoke(kClass, reflected.original)) } }
 
-            auditPath?.let { p { a(href = "$it?model=${reflected.id}") { button { +"History" } } } }
+            eventLogPath?.let { p { a(href = "$it?model=${reflected.id}") { button { +"History" } } } }
 
             apply(renderRelations(reflected))
         }
