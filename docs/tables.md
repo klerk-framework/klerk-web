@@ -28,11 +28,17 @@ of the properties - and you map over that list to change them:
 
 ```kotlin
 val columns = listOf(
-    Column<Author>("Name") { model -> +model.props.name.value },
+    Column<Author>("Name") { model -> +model.props.name.toString() },
 ) + Column.defaults<Author>().filter { it.header == "State" }
 
 TableTemplate(klerk, Author::class, support, columns)
 ```
+
+Render property values with `toString()`, not `.value`: `toString()` formats temporal
+types and shows the masked placeholder for unauthorized reads, whereas `.value` returns
+the raw stored form and throws `AuthorizationException` if the actor may not read it.
+Use `.value` only when you need the unwrapped value programmatically (arithmetic,
+comparisons, a `ModelID`'s `Int` for a URL).
 
 A `Column` is a header and a function that renders one `<td>`:
 
@@ -42,6 +48,9 @@ Column<Game>("Opponent") { model -> a(href = "/player/${model.props.opponent.val
 
 Rows link to the model's detail page. If `PathProvider.pathForItem` returns null for that model, the cells are
 rendered as plain text instead, so no table ever contains a dead link.
+
+Rows the current actor is not authorized to read are omitted from the page rather than raising an error. Because the
+filtering happens after paging, a page can hold fewer than the page size even when later pages have more.
 
 ## Filtering
 

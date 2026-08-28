@@ -3,7 +3,6 @@ package dev.klerkframework.web
 import com.google.gson.Gson
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelView
-import dev.klerkframework.klerk.collection.QueryOptions
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -332,7 +331,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .map { eventParameter ->
                 val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
-                val options = reader.query(ls, QueryOptions(maxItems = 300)).items
+                // Only offer references the actor may read; an unreadable row must not turn the form into a 500.
+                val options = reader.listIfAuthorized(ls).take(300)
                 if (options.size >= 300) {
                     TODO("Too many options")
                 } else {
@@ -345,7 +345,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         result.addAll(developerProvidedModelIDSelects.map { entry ->
             ReferencePropertyWithOptions(
                 entry.key.name, entry.key.returnType.isMarkedNullable,
-                reader.query(entry.value).items,
+                reader.listIfAuthorized(entry.value),
                 emptyList(),
             )
         }
@@ -1082,18 +1082,19 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         classProvider: CssClassProvider?,
     ): FlowContent.() -> Unit =
         {
-            val isNullable = parameters.all.single { it.name == propertyName }.isNullable
-            val value: DataContainer<*> = if (params == null) {
-                val prop = parameters.all.single { it.name == propertyName }
-                prop.kotlinDefaultInstance
-                    ?: prop.recommendedDefaultValue?.let { prop.getInstance(it) }
-                    ?: prop.getDummyInstance()
-            } else {
-                getParamDatatype(propertyName, params)
-            }
+            val prop = parameters.all.single { it.name == propertyName }
+            val isNullable = prop.isNullable
+            // A prefilled value can legitimately be null (a nullable param that isn't set); fall back to a default so
+            // there is still a container to derive the input type and constraints from.
+            val prefilled: DataContainer<*>? = if (params == null) null else getParamDatatype(propertyName, params)
+            val hasValue = params == null || prefilled != null
+            val value: DataContainer<*> = prefilled
+                ?: prop.kotlinDefaultInstance
+                ?: prop.recommendedDefaultValue?.let { prop.getInstance(it) }
+                ?: prop.getDummyInstance()
 
             if (isNullable && type != InputType.hidden) {
-                apply(renderNullableToggle(propertyName, (params == null || value != null)))
+                apply(renderNullableToggle(propertyName, hasValue))
             }
             when (type) {
                 text -> this.apply(
@@ -1394,9 +1395,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         apply(createErrorPlaceholder(propertyName))
     }
 
-    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*> {
+    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? {
         val prop = params::class.memberProperties.single { it.name == propertyName }
-        return prop.getter.call(params) as DataContainer<*>
+        return prop.getter.call(params) as DataContainer<*>?
     }
 
     private fun getModelIdValue(propertyName: String, params: T): Int? {

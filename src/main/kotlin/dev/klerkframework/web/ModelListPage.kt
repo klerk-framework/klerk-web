@@ -481,7 +481,8 @@ public class Column<T : Any>(
 }
 
 /**
- * A paginated, filterable table of the models in a collection.
+ * A paginated, filterable table of the models in a collection. Rows the current actor is not authorized to read are
+ * left out of the page rather than raising an error.
  *
  * @param columns what to show. Start from [Column.defaults] and map over it to change, add or drop a column.
  */
@@ -499,7 +500,8 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
     ): Table<T, C, V> {
         val queryOptions = createQueryOptions(call.request.queryParameters)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
-        val queryResponse = reader.query(source.filter(filter = metaFilter), queryOptions)
+        // queryIfAuthorized so a row the actor may not read shrinks the page instead of turning it into a 500.
+        val queryResponse = reader.queryIfAuthorized(source.filter(filter = metaFilter), queryOptions)
         return Table(queryResponse, support, call, klerk, kClass, columns)
     }
 
