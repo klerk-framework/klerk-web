@@ -30,6 +30,9 @@ A [table](tables.md) of every model in the collection, plus a button for each ev
 The model's properties (a reference is a link to that model's own page), its metadata, a button for every event
 that is possible in the model's current state, and the models that refer to it.
 
+A `DateContainer` renders as `2026-08-22`, an `InstantContainer` as `2026-08-22 14:30:00` and a
+`DurationContainer` as `1h 30m`. Instants are shown in the server's time zone.
+
 ```kotlin
 ModelDetailPage(
     Author::class,

@@ -3,6 +3,10 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.datatypes.DataContainer
+import dev.klerkframework.klerk.datatypes.DateContainer
+import dev.klerkframework.klerk.datatypes.DurationContainer
+import dev.klerkframework.klerk.datatypes.InstantContainer
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.Reader
 import io.ktor.http.ContentType
@@ -13,7 +17,11 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.utils.io.charsets.Charsets
 import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
 import kotlinx.datetime.format.char
+import kotlinx.datetime.toKotlinLocalDate
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 import kotlinx.html.stream.appendHTML
 import java.security.SecureRandom
@@ -100,6 +108,26 @@ internal val dateTimeFormatter = LocalDateTime.Format {
     char(':')
     second()
 }
+
+/**
+ * Human-readable rendering of the temporal containers, whose stored value is a number (epoch day or
+ * microseconds). Returns null for anything else, so the caller can fall back to its usual rendering.
+ */
+internal fun renderTemporalContainer(value: Any?): String? = when (value) {
+    is DateContainer -> value.ifAuthorized { dateFormatter.format(date.toKotlinLocalDate().atTime(0, 0)) }
+    is InstantContainer -> value.ifAuthorized {
+        dateTimeFormatter.format(instant.toLocalDateTime(TimeZone.currentSystemDefault()))
+    }
+    is DurationContainer -> value.ifAuthorized { duration.toString() }
+    else -> null
+}
+
+/**
+ * The container's `date`/`instant`/`duration` fields are readable even when the property is masked, so the
+ * authorization of this particular container decides whether [render] may be used at all.
+ */
+private fun <T : DataContainer<*>> T.ifAuthorized(render: T.() -> String): String =
+    if (valueOrNullIfNotAuthorized == null) toString() else render()
 
 
 /** Produces a complete HTML document inside a read. Use [Layout.page] to get the same head as the generated pages. */

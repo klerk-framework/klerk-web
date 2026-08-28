@@ -117,7 +117,8 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         val href = if (modelId is ModelID<*> && propsClass != null) {
             pathProvider.pathForItem(propsClass, modelId.value.toString())
         } else null
-        if (href != null) a(href = href) { +property.toString() } else +property.toString()
+        val text = renderTemporalContainer(property.value) ?: property.toString()
+        if (href != null) a(href = href) { +text } else +text
     }
 
     private fun renderProperties(reflected: ReflectedModel<Any>, context: C): FlowContent.() -> Unit = {

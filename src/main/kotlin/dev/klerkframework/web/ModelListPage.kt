@@ -295,7 +295,10 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
 
 
 internal fun ReflectedProperty.renderValueNonBreakingHtml(): HTMLTag.() -> Unit = {
-    if (value is Instant) {
+    val temporal = renderTemporalContainer(value)
+    if (temporal != null) {
+        unsafe { +temporal.replace("-", NON_BREAKING_HYPHEN) }
+    } else if (value is Instant) {
         unsafe {
             +(dateFormatter.format((value as Instant).toLocalDateTime(TimeZone.currentSystemDefault()))
                 .replace("-", NON_BREAKING_HYPHEN))
