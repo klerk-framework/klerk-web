@@ -5,6 +5,7 @@ import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.collection.asList
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobProgress
 import dev.klerkframework.klerk.job.JobResult
@@ -377,7 +378,7 @@ private fun createFlower(
 
 private fun renderFlowers(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     val context = call.ctx(klerk)
-    val flowers = klerk.read(context) { list(views.flowers.all) }
+    val flowers = klerk.read(context) { views.flowers.all.asList() }
     call.respondHtml(block = layout.page("Flowers") {
         h1 { +"Flowers" }
         p { a(href = "${pathProvider.base}flowers/new") { +"Plant another one" } }

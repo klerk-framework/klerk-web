@@ -3,6 +3,7 @@ package dev.klerkframework.web
 import com.google.gson.Gson
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelView
+import dev.klerkframework.klerk.collection.asListIfAuthorized
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -332,7 +333,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 // Only offer references the actor may read; an unreadable row must not turn the form into a 500.
-                val options = reader.listIfAuthorized(ls).take(300)
+                val options = with(reader) { ls.asListIfAuthorized() }.take(300)
                 if (options.size >= 300) {
                     TODO("Too many options")
                 } else {
@@ -345,7 +346,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         result.addAll(developerProvidedModelIDSelects.map { entry ->
             ReferencePropertyWithOptions(
                 entry.key.name, entry.key.returnType.isMarkedNullable,
-                reader.listIfAuthorized(entry.value),
+                with(reader) { entry.value.asListIfAuthorized() },
                 emptyList(),
             )
         }

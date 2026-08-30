@@ -10,6 +10,7 @@ import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.SystemIdentity
 import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.collection.asList
 import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobName
@@ -359,7 +360,7 @@ public class UploadPlugin<C : KlerkContext, V>(
     internal suspend fun sweep() {
         // Qualified: inside a read block, `views` is the application's views, not the plugin's.
         val uploads = this@UploadPlugin.views.all
-        val live = klerk.read(systemContext()) { list(uploads) }.map { it.id.value }.toSet()
+        val live = klerk.read(systemContext()) { uploads.asList() }.map { it.id.value }.toSet()
         // Files younger than this may belong to an upload whose model is not visible to this read yet.
         val olderThan = klerk.settings.clock.now().minus(10.minutes)
         runCatching { staging.sweep(live, olderThan) }

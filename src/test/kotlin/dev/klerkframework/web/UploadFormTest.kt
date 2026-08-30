@@ -4,6 +4,7 @@ import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.collection.asList
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -385,7 +386,7 @@ class UploadFormTest {
         assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
         // Nothing was stored: the rule was consulted before the bytes were, so there is no blob to clean up either.
         assertTrue(
-            klerk.read(context()) { list(views.documents.all) }.isEmpty(),
+            klerk.read(context()) { views.documents.all.asList() }.isEmpty(),
             "the document should not have been created",
         )
         klerk.meta.stop()

@@ -18,6 +18,8 @@ import kotlin.test.assertTrue
 
 private suspend fun ApplicationCall.blockCtx(klerk: Klerk<Context, MyCollections>): Context = Context.system()
 
+private const val AUTHOR_COUNT = 70
+
 class PaginationTest {
 
     private fun klerk(): Klerk<Context, MyCollections> {
@@ -42,25 +44,30 @@ class PaginationTest {
     fun `First Previous Next Last walk the whole list without skipping or repeating a row`() = testApplication {
         val klerk = klerk()
         klerk.meta.start()
-        generateSampleData(numberOfAuthors = 38, booksPerAuthor = 0, klerk = klerk)
+        generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
         application { routing { klerkWebRoutes(klerkWeb) } }
 
-        // Walk forward with Next.
+        // Walk forward with Next. The page size is TableTemplate's default, so read it off the first page rather
+        // than hard-coding it here.
         val seen = mutableListOf<String>()
+        val pageSizes = mutableListOf<Int>()
         var url = "/author"
-        var pages = 0
         while (true) {
             val html = client.get(url).bodyAsText()
-            seen.addAll(rowIds(html))
-            pages++
-            assertTrue(pages < 20, "the traversal does not terminate")
+            val rows = rowIds(html)
+            seen.addAll(rows)
+            pageSizes.add(rows.size)
+            assertTrue(pageSizes.size < 20, "the traversal does not terminate")
             val next = cursorOf(html, "Next") ?: break
             url = "/author?cursor=$next"
         }
-        assertEquals(3, pages, "38 authors at 15 per page")
-        assertEquals(38, seen.size)
-        assertEquals(38, seen.toSet().size, "no row may appear twice")
+        val pageSize = pageSizes.first()
+        assertTrue(pageSize < AUTHOR_COUNT, "the fixture must span more than one page")
+        assertEquals((AUTHOR_COUNT + pageSize - 1) / pageSize, pageSizes.size, "page count for $AUTHOR_COUNT rows")
+        pageSizes.dropLast(1).forEach { assertEquals(pageSize, it, "every page but the last must be full") }
+        assertEquals(AUTHOR_COUNT, seen.size)
+        assertEquals(AUTHOR_COUNT, seen.toSet().size, "no row may appear twice")
 
         // The last page offers First and Previous, but no Next or Last.
         val lastHtml = client.get(url).bodyAsText()
@@ -84,7 +91,7 @@ class PaginationTest {
     fun `the first page offers no First or Previous, and Last jumps to the end`() = testApplication {
         val klerk = klerk()
         klerk.meta.start()
-        generateSampleData(numberOfAuthors = 38, booksPerAuthor = 0, klerk = klerk)
+        generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
         application { routing { klerkWebRoutes(klerkWeb) } }
 
@@ -94,8 +101,10 @@ class PaginationTest {
         assertNotNull(cursorOf(firstHtml, "Next"))
         val last = assertNotNull(cursorOf(firstHtml, "Last"))
 
+        val pageSize = rowIds(firstHtml).size
         val lastHtml = client.get("/author?cursor=$last").bodyAsText()
-        assertEquals(8, rowIds(lastHtml).size, "38 authors, 15 per page, so the last page holds 8")
+        val remainder = AUTHOR_COUNT % pageSize
+        assertEquals(if (remainder == 0) pageSize else remainder, rowIds(lastHtml).size, "size of the last page")
         assertNull(cursorOf(lastHtml, "Next"))
     }
 
@@ -118,7 +127,7 @@ class PaginationTest {
     fun `paging keeps the other query parameters`() = testApplication {
         val klerk = klerk()
         klerk.meta.start()
-        generateSampleData(numberOfAuthors = 38, booksPerAuthor = 0, klerk = klerk)
+        generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
         application { routing { klerkWebRoutes(klerkWeb) } }
 

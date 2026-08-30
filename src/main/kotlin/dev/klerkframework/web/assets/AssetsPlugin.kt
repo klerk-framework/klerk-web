@@ -2,6 +2,7 @@ package dev.klerkframework.web.assets
 
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.collection.asList
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -61,7 +62,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         _klerk = klerk
         var context = _klerk.spec.systemContextProvider(SystemIdentity)
         textAssets = _klerk.read(context) {
-            list(textAssetCollections.all)
+            textAssetCollections.all.asList()
         }
 
         val brotliAvailable = isBrotliAvailable()
@@ -110,7 +111,7 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         deleteObsoleteTextAssets(assets, textAssets)
 
         textAssets = _klerk.read(context) {
-            list(textAssetCollections.all)
+            textAssetCollections.all.asList()
         }
     }
 
@@ -254,7 +255,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
     ) {
         val context = support.contextProvider(call, klerk)
         val textAssets = klerk.read(context) {
-            list(textAssetCollections.all)
+            textAssetCollections.all.asList()
         }
 
         val sizes = textAssets.map { asset ->
