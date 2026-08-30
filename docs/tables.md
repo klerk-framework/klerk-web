@@ -49,8 +49,10 @@ Column<Game>("Opponent") { model -> a(href = "/player/${model.props.opponent.val
 Rows link to the model's detail page. If `PathProvider.pathForItem` returns null for that model, the cells are
 rendered as plain text instead, so no table ever contains a dead link.
 
-Rows the current actor is not authorized to read are omitted from the page rather than raising an error. Because the
-filtering happens after paging, a page can hold fewer than the page size even when later pages have more.
+Rows the current actor is not authorized to read are omitted from the page rather than raising an error. The check
+happens before the page is cut, so a page is still full whenever there are enough rows the actor may read.
+
+Pass `pageSize` to change how many rows a page holds.
 
 ## Filtering
 
@@ -59,7 +61,7 @@ The rendered filter controls set query parameters, which `build` picks up:
 * `collection` - which of the model's collections to show.
 * `filterState` - only models in one state.
 * `filterString` - a small filter language, e.g. `created>2023-03-10T20:23:13Z`.
-* `cursor` - the page to show.
+* `cursor` - the page to show. A value that isn't a cursor falls back to the first page.
 
 Anything beyond that is a good reason to build the page yourself: read the collection with your own query and render
 it however you like.

@@ -321,10 +321,16 @@ internal fun addMermaidScript(): FlowContent.() -> Unit = {
     }
 }
 
-private fun createQueryOptions(queryParameters: Parameters): QueryOptions {
-    val cursorInRequest = queryParameters["cursor"]
-    val cursor = if (cursorInRequest == null) null else QueryListCursor.fromString(cursorInRequest)
-    return QueryOptions(maxItems = 15, cursor = cursor)
+/** A `?cursor=` that isn't one (hand-edited, or kept from an older version of Klerk) starts from the beginning. */
+private fun createQueryOptions(queryParameters: Parameters, pageSize: Int): QueryOptions {
+    val cursor = queryParameters["cursor"]?.let {
+        try {
+            QueryListCursor.fromString(it)
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+    }
+    return QueryOptions(maxItems = pageSize, cursor = cursor, countTotal = true)
 }
 
 private fun <T : Any> createMetaFilter(queryParameters: Parameters): ((Model<T>) -> Boolean)? {
@@ -392,57 +398,33 @@ private fun <T : Any> renderPagination(
 ): FlowContent.() -> Unit = {
     div {
 
-        queryResponse.cursorFirst?.let {
-            a(withQueryParam(call.request.uri, "cursor", it.toString())) {
-                button {
-                    style = BUTTON_STYLE
-                    +"First"
-                }
-            }
-        }
-
-        queryResponse.cursorPrevious?.let {
-            a(withQueryParam(call.request.uri, "cursor", it.toString())) {
-                button {
-                    style = BUTTON_STYLE
-                    +"Previous"
-                }
-            }
-        }
-
-        queryResponse.cursorNext?.let {
-            a(withQueryParam(call.request.uri, "cursor", it.toString())) {
-                button {
-                    style = BUTTON_STYLE
-                    +"Next"
-                }
-            }
-        }
-
-        queryResponse.cursorLast?.let {
-            a(withQueryParam(call.request.uri, "cursor", it.toString())) {
-                button {
-                    style = BUTTON_STYLE
-                    +"Last"
+        // Each cursor is null when there is no such page, so no button here is ever a dead link.
+        listOf(
+            "First" to queryResponse.cursorFirstPage,
+            "Previous" to queryResponse.cursorPreviousPage,
+            "Next" to queryResponse.cursorNextPage,
+            "Last" to queryResponse.cursorLastPage,
+        ).forEach { (label, cursor) ->
+            cursor?.let {
+                a(withQueryParam(call.request.uri, "cursor", it.toString())) {
+                    button {
+                        style = BUTTON_STYLE
+                        +label
+                    }
                 }
             }
         }
     }
 }
 
+/** [url] with [paramName] set to [paramValue], replacing it if it is already there and keeping every other parameter. */
 internal fun withQueryParam(url: String, paramName: String, paramValue: String): String {
-    // FIXME: sloppy implementation
-    if (!url.contains("?")) {
-        return "$url?$paramName=$paramValue"
-    }
-    if (!url.contains(paramName)) {
-        return "$url&$paramName=$paramValue"
-    }
-    val valueStartIndex = url.indexOf(paramName) + paramName.length + 1
-    val valueEndIndex = url.indexOf("&", valueStartIndex)
-    val oldValue =
-        if (valueEndIndex == -1) url.substring(valueStartIndex) else url.substring(valueStartIndex, valueEndIndex)
-    return url.replace(oldValue, paramValue)
+    val path = url.substringBefore('?')
+    val parameters = ParametersBuilder().apply {
+        appendAll(parseQueryString(url.substringAfter('?', "")))
+        set(paramName, paramValue)
+    }.build()
+    return "$path?${parameters.formUrlEncode()}"
 }
 
 /**
@@ -491,6 +473,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
     private val support: WebSupport<C, V>,
     private val columns: List<Column<T>> = Column.defaults(),
+    private val pageSize: Int = 30,
 ) {
 
     public fun build(
@@ -498,7 +481,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
         reader: Reader<C, V>,
         call: ApplicationCall,
     ): Table<T, C, V> {
-        val queryOptions = createQueryOptions(call.request.queryParameters)
+        val queryOptions = createQueryOptions(call.request.queryParameters, pageSize)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
         // queryIfAuthorized so a row the actor may not read shrinks the page instead of turning it into a 500.
         val queryResponse = reader.queryIfAuthorized(source.filter(filter = metaFilter), queryOptions)
@@ -522,6 +505,10 @@ public class Table<T : Any, C : KlerkContext, V>(
             p { +"The list is empty" }
         } else {
             apply(renderTable(queryResponse.items, support, kClass, columns))
+        }
+        // Outside the branch: a page can be empty and still have pages around it, and dropping the links there would
+        // leave the reader stuck.
+        if (queryResponse.hasPreviousPage || queryResponse.hasNextPage) {
             apply(renderPagination(queryResponse, call))
         }
     }
