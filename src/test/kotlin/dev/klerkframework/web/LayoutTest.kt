@@ -34,7 +34,7 @@ class LayoutTest {
         klerk.meta.start()
         createAuthorJKRowling(klerk)
 
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         listOf("/author", "/admin/", "/admin/_jobs").forEach { path ->
             val body = client.get(path).bodyAsText()

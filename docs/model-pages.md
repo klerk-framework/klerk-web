@@ -1,7 +1,7 @@
 # Model pages
 
-A generated list page and detail page for one model. These are the pages `klerkWebRoutes(klerkWeb)` produces; you
-can also use them one at a time.
+A generated list page and detail page for one model. These are the pages `klerkWebRoutes(klerkWeb, setOf(Author::class))`
+produces; you can also use them one at a time.
 
 ```kotlin
 val authors = ModelListPage<Author, Ctx, Views>(
@@ -56,4 +56,5 @@ class MyPaths : PathProvider by DefaultPathProvider() {
 }
 ```
 
-Use this together with `klerkWebRoutes(klerkWeb, filter = ...)` when you build some pages yourself.
+This applies to a model in `klerkWebRoutes`'s set too: keep it in the set for its list page, and return null from
+`pathForItem` to drop just its detail page.

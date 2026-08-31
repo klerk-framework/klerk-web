@@ -46,7 +46,7 @@ class PaginationTest {
         klerk.meta.start()
         generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         // Walk forward with Next. The page size is TableTemplate's default, so read it off the first page rather
         // than hard-coding it here.
@@ -93,7 +93,7 @@ class PaginationTest {
         klerk.meta.start()
         generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         val firstHtml = client.get("/author").bodyAsText()
         assertNull(cursorOf(firstHtml, "First"))
@@ -114,7 +114,7 @@ class PaginationTest {
         klerk.meta.start()
         generateSampleData(numberOfAuthors = 3, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         val html = client.get("/author").bodyAsText()
         assertEquals(3, rowIds(html).size)
@@ -129,7 +129,7 @@ class PaginationTest {
         klerk.meta.start()
         generateSampleData(numberOfAuthors = AUTHOR_COUNT, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         val html = client.get("/author?filterState=All").bodyAsText()
         val next = Regex("""<a href="([^"]*)"><button[^>]*>Next</button></a>""").find(html)?.groupValues?.get(1)
@@ -144,7 +144,7 @@ class PaginationTest {
         klerk.meta.start()
         generateSampleData(numberOfAuthors = 20, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
         listOf("", "hello", "!!!", "YToxLGY6Q1JFQVRFRF9BVA").forEach { cursor ->
             val response = client.get("/author?cursor=$cursor")

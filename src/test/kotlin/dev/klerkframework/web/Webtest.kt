@@ -17,6 +17,8 @@ import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.config.*
+import dev.klerkframework.web.models.City
+import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
 import dev.klerkframework.klerk.EventWithParameters
@@ -221,6 +223,9 @@ val css = CssAsset("water.css")
 val pathProvider = DefaultPathProvider()
 val layout = Layout(css = css, assetsBase = pathProvider.assetsBase)
 
+/** Models that get generated list/detail pages here. Flower is left out - it keeps its custom `/flowers` routes. */
+val webModels = setOf(Book::class, Author::class, Publisher::class, City::class, Document::class, Note::class)
+
 //val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("other/my-script.js")
@@ -239,7 +244,7 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>, uploads: 
     val flowerForm = flowerFormTemplate(klerk, uploads)
 
     routing {
-        klerkWebRoutes(klerkWeb)
+        klerkWebRoutes(klerkWeb, webModels)
         uploadRoutes(support, uploads)
 
         route(pathProvider.base) {
@@ -302,7 +307,7 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
                 +" for your application."
             }
             h2 { +"Item lists" }
-            modelsNav(klerkWeb)
+            modelsNav(klerkWeb, models = webModels)
         }
     }
 }

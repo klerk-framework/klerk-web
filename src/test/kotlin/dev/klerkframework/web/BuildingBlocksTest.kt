@@ -38,13 +38,13 @@ class BuildingBlocksTest {
     }
 
     @Test
-    fun `generateRoutes can be limited to some models`() = testApplication {
+    fun `klerkWebRoutes only generates pages for the models it is given`() = testApplication {
         val klerk = klerk()
         klerk.meta.start()
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
 
         application {
-            routing { klerkWebRoutes(klerkWeb, filter = { it.kClass == Author::class }) }
+            routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) }
         }
 
         assertEquals(HttpStatusCode.OK, client.get("/author").status)
@@ -59,7 +59,7 @@ class BuildingBlocksTest {
         val book = createBookHarryPotter1(klerk, author)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true }, pathProvider = NoBookDetails())
 
-        application { routing { klerkWebRoutes(klerkWeb) } }
+        application { routing { klerkWebRoutes(klerkWeb, setOf(Book::class)) } }
 
         // No route was registered for the detail page...
         assertEquals(HttpStatusCode.NotFound, client.get("/book/${book.value}").status)

@@ -107,27 +107,23 @@ call.respond(klerk.read(context) {
 
 ## Quick start
 
-If you want routes for every managed model without assembling the blocks yourself, use `KlerkWeb`:
+If you want generated pages without assembling the blocks yourself, use `KlerkWeb`:
 
 ```kotlin
 val klerkWeb = KlerkWeb(klerk, ApplicationCall::ctx, canSeeAdminUI = ::canSeeAdminUI)
 
 routing {
-    klerkWebRoutes(klerkWeb)
+    klerkWebRoutes(klerkWeb, setOf(Game::class, Player::class))
 }
 ```
 
-This registers a list and a detail route for each managed model, plus the AutoButtons and Admin UI routes.
-`modelsNav(klerkWeb)` renders a `<nav>` with a link to each model's list page.
+This registers the AutoButtons and Admin UI routes, plus a list route and a detail route for each model you name.
+The set is empty by default, so you opt each model in explicitly and build the pages for the rest yourself.
+`modelsNav(klerkWeb, models = setOf(Game::class, Player::class))` renders a `<nav>` linking to those list pages;
+pass it the same set.
 
 `canSeeAdminUI` has no default: the Admin UI exposes the log, the specification and job control, so you must decide
 who may see it.
-
-To build some pages yourself, exclude those models:
-
-```kotlin
-klerkWebRoutes(klerkWeb, filter = { it.kClass != Game::class })
-```
 
 `klerkWeb.support` is the `WebSupport` the generated pages use. Pass it to your own blocks so they match.
 
@@ -154,7 +150,8 @@ support.respondPage(call, "Actions") {
 ## How to build a basic web UI
 
 * Start with a classless CSS. Use the [assets](assets.md) tools to serve it, and give it to the `Layout`.
-* Create a `KlerkWeb(klerk, ::ctx, canSeeAdminUI)`, call `klerkWebRoutes(klerkWeb)` and `modelsNav(klerkWeb)` to get a list page and a detail page for every
-  managed model, with buttons for every possible event already wired up.
-* When you need something else for a specific model, exclude it from `klerkWebRoutes` and build that page with
-  `TableTemplate`/`FormTemplate`/`AutoButtons` - or from scratch. The other models keep their generated pages.
+* Create a `KlerkWeb(klerk, ::ctx, canSeeAdminUI)`, then call `klerkWebRoutes(klerkWeb, setOf(...))` and
+  `modelsNav(klerkWeb, models = setOf(...))` with the models you want generated - a list page and a detail page each,
+  with buttons for every possible event already wired up.
+* When you need something else for a specific model, leave it out of the set and build that page with
+  `TableTemplate`/`FormTemplate`/`AutoButtons` - or from scratch. The models in the set keep their generated pages.

@@ -14,7 +14,7 @@ import kotlin.reflect.KClass
 private val log = KotlinLogging.logger {}
 
 /**
- * Wires the building blocks together: a list page and a detail page for every managed model, plus AutoButtons and the
+ * Wires the building blocks together: a list page and a detail page for each model you name, plus AutoButtons and the
  * Admin UI. The fastest way to get a working UI - see
  * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/introduction.md).
  *
@@ -49,11 +49,11 @@ public class KlerkWeb<C : KlerkContext, V>(
 
     internal fun nav(
         translator: (ManagedModel<*, *, C, V>) -> String,
-        filter: (ManagedModel<*, *, C, V>) -> Boolean,
+        models: Set<KClass<*>>,
     ): FlowContent.() -> Unit = {
         nav {
             ul {
-                klerk.spec.managedModels.filter(filter).sortedBy { it.kClass.simpleName }.forEach { model ->
+                klerk.spec.managedModels.filter { it.kClass in models }.sortedBy { it.kClass.simpleName }.forEach { model ->
                     li {
                         a(href = pathProvider.pathForCollection(model.kClass)) { +translator(model) }
                     }
@@ -62,10 +62,10 @@ public class KlerkWeb<C : KlerkContext, V>(
         }
     }
 
-    internal fun registerInto(route: Route, filter: (ManagedModel<*, *, C, V>) -> Boolean) {
+    internal fun registerInto(route: Route, models: Set<KClass<*>>) {
         route.autoButtonsRoutes(support.autoButtons)
         route.adminUiRoutes(adminUI)
-        klerk.spec.managedModels.filter(filter).forEach { model ->
+        klerk.spec.managedModels.filter { it.kClass in models }.forEach { model ->
             val humanName = camelCaseToPretty(model.kClass.simpleName ?: "")
             log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
             route.modelListRoutes(
@@ -84,26 +84,27 @@ public class KlerkWeb<C : KlerkContext, V>(
 }
 
 /**
- * A list route and a detail route for every managed model that [filter] admits, plus the AutoButtons and Admin UI
- * routes. Exclude a model to build its pages yourself; make [PathProvider.pathForItem] return null for it as well,
- * so that nothing links to a page that no longer exists.
+ * The AutoButtons and Admin UI routes, plus a list route and a detail route for each model in [models]. [models] is
+ * empty by default, so nothing model-specific is generated until you name a model; build the pages for the rest
+ * yourself. When [PathProvider.pathForItem] returns null for a model in [models], its detail route is skipped and the
+ * list page renders plain text instead of dead links.
  *
  * ```kotlin
  * routing {
- *     klerkWebRoutes(klerkWeb)
+ *     klerkWebRoutes(klerkWeb, setOf(Author::class, Book::class))
  * }
  * ```
  */
 public fun <C : KlerkContext, V> Route.klerkWebRoutes(
     klerkWeb: KlerkWeb<C, V>,
-    filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
-): Unit = klerkWeb.registerInto(this, filter)
+    models: Set<KClass<*>> = emptySet(),
+): Unit = klerkWeb.registerInto(this, models)
 
-/** A `<nav>` with a link to each managed model's list page. */
+/** A `<nav>` with a link to the list page of each model in [models]. Pass the same set as [klerkWebRoutes]. */
 public fun <C : KlerkContext, V> FlowContent.modelsNav(
     klerkWeb: KlerkWeb<C, V>,
     translator: (ManagedModel<*, *, C, V>) -> String = { it.kClass.simpleName ?: "?" },
-    filter: (ManagedModel<*, *, C, V>) -> Boolean = { true },
+    models: Set<KClass<*>> = emptySet(),
 ) {
-    apply(klerkWeb.nav(translator, filter))
+    apply(klerkWeb.nav(translator, models))
 }
