@@ -483,8 +483,8 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
     ): Table<T, C, V> {
         val queryOptions = createQueryOptions(call.request.queryParameters, pageSize)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
-        // queryIfAuthorized so a row the actor may not read shrinks the page instead of turning it into a 500.
-        val queryResponse = with(reader) { source.filter(filter = metaFilter).queryIfAuthorized(queryOptions) }
+        // query() skips a row the actor may not read instead of turning the page into a 500.
+        val queryResponse = with(reader) { source.filter(filter = metaFilter).query(queryOptions) }
         return Table(queryResponse, support, call, klerk, kClass, columns)
     }
 

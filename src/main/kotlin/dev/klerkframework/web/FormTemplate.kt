@@ -3,7 +3,7 @@ package dev.klerkframework.web
 import com.google.gson.Gson
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelView
-import dev.klerkframework.klerk.collection.asListIfAuthorized
+import dev.klerkframework.klerk.collection.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -54,6 +54,9 @@ private val fileLog = KotlinLogging.logger {}
 private val CSRF_TOKEN = Csrf.TOKEN_NAME
 /** How long a blob prepared from an upload waits for its command. Long enough to fix a form and submit again. */
 private val UPLOAD_BLOB_LEASE = 15.minutes
+
+/** Above this, a reference select would be unusable anyway; see the TODO where it is enforced. */
+private const val MAX_REFERENCE_OPTIONS = 300
 
 internal val IDEMPOTENCE_KEY: String = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
 
@@ -333,8 +336,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 // Only offer references the actor may read; an unreadable row must not turn the form into a 500.
-                val options = with(reader) { ls.asListIfAuthorized() }.take(300)
-                if (options.size >= 300) {
+                // One past the limit, so "too many" can be told from "exactly the limit" -- and lazily, so a large
+                // collection is not read in full just to be cut down here.
+                val options = with(reader) { ls.asSequence().take(MAX_REFERENCE_OPTIONS + 1).toList() }
+                if (options.size > MAX_REFERENCE_OPTIONS) {
                     TODO("Too many options")
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
@@ -346,7 +351,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         result.addAll(developerProvidedModelIDSelects.map { entry ->
             ReferencePropertyWithOptions(
                 entry.key.name, entry.key.returnType.isMarkedNullable,
-                with(reader) { entry.value.asListIfAuthorized() },
+                with(reader) { entry.value.asSequence().toList() },
                 emptyList(),
             )
         }
