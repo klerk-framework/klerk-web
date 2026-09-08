@@ -25,6 +25,8 @@ Start with the [introduction](docs/introduction.md).
 * [Forms](docs/forms.md) - generate a form for an event and parse what is submitted
 * [Auto buttons](docs/auto-buttons.md) - a button that renders the form and issues the command
 * [Uploads](docs/uploads.md) - resumable file upload, ending in attached data
+* [Serving attached data](docs/serving-attached-data.md) - the route that serves blobs and strings back out
+* [Images](docs/images.md) - serving an image in the size the page needs
 * [Admin UI](docs/admin-ui.md) - an operations console; an internal tool
 * [Appearance](docs/appearance.md) - layout, semantic HTML and CSS classes
 * [Assets](docs/assets.md) - serving CSS and JavaScript

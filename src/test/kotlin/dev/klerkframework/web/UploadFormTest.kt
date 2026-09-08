@@ -367,14 +367,14 @@ class UploadFormTest {
         val (klerk, _) = setup()
         klerk.meta.start(installShutdownHook = false)
 
-        // the rule in TestSetup refuses an upload declaring more than 1 MB for this actor
+        // the rule in TestSetup refuses an upload declaring more than 10 MB for this actor
         val response = client.submitFormWithBinaryData(
             url = "/documents",
             formData = formData {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "Over the quota")
-                append("content", ByteArray(1_100_000), Headers.build {
+                append("content", ByteArray(10_100_000), Headers.build {
                     append(HttpHeaders.ContentType, "application/octet-stream")
                     append(HttpHeaders.ContentDisposition, "filename=\"big.bin\"")
                 })

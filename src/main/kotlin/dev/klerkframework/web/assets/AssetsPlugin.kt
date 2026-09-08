@@ -12,6 +12,8 @@ import dev.klerkframework.web.WebSupport
 import dev.klerkframework.web.AdminUI
 import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.PluginPage
+import dev.klerkframework.web.image.ASSET
+import dev.klerkframework.web.image.ImagePlugin
 import io.ktor.http.*
 import io.ktor.http.HttpHeaders.ContentEncoding
 import io.ktor.server.application.*
@@ -24,6 +26,7 @@ import kotlinx.io.asSource
 import mu.KotlinLogging
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.file.Files
 
 private const val contentEncodingBrotli = "br"
 private val log = KotlinLogging.logger {}
@@ -32,7 +35,10 @@ private val log = KotlinLogging.logger {}
  * Serves static assets with cache-busting URLs, long cache headers and Brotli compression when available. See
  * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/assets.md).
  */
-public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: Set<KlerkAsset>) : AdminUIPluginIntegration<C, V> {
+public class AssetsPlugin<C : KlerkContext, V>(
+    private val userAssetResources: Set<KlerkAsset>,
+    private val images: ImagePlugin<C, V>? = null,
+) : AdminUIPluginIntegration<C, V> {
 
     private lateinit var assets: Set<KlerkAsset>
     private lateinit var textAssets: List<Model<TextAsset>>
@@ -68,7 +74,8 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         val brotliAvailable = isBrotliAvailable()
 
         assets = userAssetResources.plus(formJs).plus(uploadJs)
-        assets.forEach { asset ->
+        assets.filterIsInstance<ImageAsset>().forEach { prepareImageAsset(it) }
+        assets.filter { it !is ImageAsset }.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)
                 ?: throw IllegalStateException("Resource not found: ${asset.resourcePath}")
 
@@ -113,6 +120,25 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
         textAssets = _klerk.read(context) {
             textAssetCollections.all.asSequence().toList()
         }
+    }
+
+    /**
+     * Hashes an image asset over its real bytes, extracts it where the processor can read it, and has the image
+     * plugin measure it.
+     *
+     * Nothing is compressed: JPEG, PNG, WebP and AVIF already are, and Brotli on top of them is work for nothing.
+     */
+    private suspend fun prepareImageAsset(asset: ImageAsset) {
+        val bytes = ResourceReader.readBytes(asset.resourcePath)
+            ?: throw IllegalStateException("Resource not found: ${asset.resourcePath}")
+        asset.setHash(Base64hash.from(bytes))
+        val plugin = checkNotNull(images) {
+            "The image asset '${asset.resourcePath}' needs an ImagePlugin: AssetsPlugin(assets, images = images)"
+        }
+        val file = Files.createTempFile("klerk-asset-", "-${asset.hash()}")
+        file.toFile().deleteOnExit()
+        Files.write(file, bytes)
+        plugin.registerAsset(asset.hash(), file, asset.resourcePath)
     }
 
     private suspend fun deleteObsoleteTextAssets(assets: Set<KlerkAsset>, textAssets: List<Model<TextAsset>>) {
@@ -185,7 +211,13 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
             }
             val asset = assets.firstOrNull { a -> a.getPathAndHash() == path }
             if (asset == null) {
-                call.respond(HttpStatusCode.NotFound)
+                serveImageVariant(path)
+                return@get
+            }
+            if (asset is ImageAsset) {
+                // No variant was asked for, so this is the asset itself. It is public and unchanging, and the hash
+                // in the URL is what makes caching it forever safe.
+                serveUncompressed(asset, ContentType.parse(asset.contentType))
                 return@get
             }
             val contentType = when (asset) {
@@ -207,6 +239,52 @@ public class AssetsPlugin<C : KlerkContext, V>(private val userAssetResources: S
             }
             serveUncompressed(asset, contentType)
         }
+    }
+
+    /**
+     * Serves one variant of an image asset: `<path>_<hash>/<template>-<width>.<format>`.
+     *
+     * The same machinery as an uploaded image — the same allow-list, the same store, the same job, the same wait —
+     * with no authorization, because an asset ships with the application.
+     */
+    private suspend fun RoutingContext.serveImageVariant(path: String) {
+        val plugin = images
+        val slash = path.lastIndexOf('/')
+        val asset = if (slash <= 0 || plugin == null) null else {
+            val head = path.substring(0, slash)
+            assets.filterIsInstance<ImageAsset>().firstOrNull { it.getPathAndHash() == head }
+        }
+        if (asset == null || plugin == null) {
+            call.respond(HttpStatusCode.NotFound)
+            return
+        }
+        val variant = plugin.parseVariant(path.substring(slash + 1))
+        if (variant == null) {
+            call.respond(HttpStatusCode.NotFound)
+            return
+        }
+        val hash = asset.hash()
+        if (plugin.refused(ASSET, hash, variant)) {
+            call.respond(HttpStatusCode.NotFound)
+            return
+        }
+        val generated = plugin.existing(ASSET, hash, variant) ?: run {
+            plugin.requestVariant(ASSET, hash, variant)
+            plugin.awaitVariant(ASSET, hash, variant)
+        }
+        if (generated == null) {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+            if (plugin.refused(ASSET, hash, variant)) {
+                call.respond(HttpStatusCode.NotFound)
+            } else {
+                plugin.recordUnavailable()
+                call.response.headers.append(HttpHeaders.RetryAfter, "1")
+                call.respond(HttpStatusCode.ServiceUnavailable)
+            }
+            return
+        }
+        setCacheControl(call)
+        call.respondFile(generated.toFile())
     }
 
     /**
@@ -296,12 +374,20 @@ public abstract class KlerkAsset(public val resourcePath: String) {
         _hash = hash
     }
 
-    internal fun getPathAndHash(): String {
+    /**
+     * The URL path of this asset, content hash included, for [dev.klerkframework.web.PathProvider.assetPath].
+     *
+     * @throws IllegalStateException if the asset was not given to an [AssetsPlugin].
+     */
+    public fun getPathAndHash(): String {
         if (_hash == null) {
             throw IllegalStateException("Asset '$resourcePath' has not been registered")
         }
         return "${resourcePath}_${_hash!!.value}"
     }
+
+    /** The content hash on its own, which is what identifies an image asset's variants. */
+    internal fun hash(): String = checkNotNull(_hash) { "Asset '$resourcePath' has not been registered" }.value
 }
 
 /** A stylesheet. Give it to [dev.klerkframework.web.Layout] to have the `<link>` rendered for you. */
@@ -310,6 +396,38 @@ public class CssAsset(resourcePath: String) : KlerkAsset(resourcePath)
 /** A script. Build its URL with [dev.klerkframework.web.PathProvider.assetPath]. */
 public class JsAsset(resourcePath: String) : KlerkAsset(resourcePath) // TODO: Subresource Integrity? nonce?
 
+/**
+ * A picture that ships with the application: a logo, an illustration, a splash image.
+ *
+ * Give the [AssetsPlugin] an [dev.klerkframework.web.image.ImagePlugin] and it is rendered through the same
+ * [dev.klerkframework.web.image.ImageTemplate] as an uploaded image, in the sizes that template declares — so a
+ * 4000 px photograph in the jar is not what a phone downloads. Without one, it is served as it is, with the content
+ * hash in the URL and cached forever.
+ *
+ * ```kotlin
+ * val splash = ImageAsset("splash.jpg")
+ * AssetsPlugin(setOf(css, splash), images = images)
+ *
+ * image(hero, splash, alt = "")
+ * ```
+ *
+ * Unlike attached data an asset is public: no authorization is evaluated for it, because it is part of the
+ * application rather than something one of its users owns. It is measured when the application starts, so a page
+ * can reserve space for it from the very first render.
+ */
+public class ImageAsset(resourcePath: String) : KlerkAsset(resourcePath) {
+
+    /** What this is, from the file's extension. */
+    internal val contentType: String = when (resourcePath.substringAfterLast('.', "").lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "avif" -> "image/avif"
+        else -> throw IllegalArgumentException("'$resourcePath' is not an image klerk-web recognises")
+    }
+}
+
 
 private object ResourceReader {
     fun readResource(path: String): String? {
@@ -317,6 +435,11 @@ private object ResourceReader {
         return this::class.java.getResourceAsStream("/assets$resourcePath")?.bufferedReader()?.use { it.readText() }
     }
 
+    /** As [readResource], without decoding it as text — an image is not text and must not be read as any. */
+    fun readBytes(path: String): ByteArray? {
+        val resourcePath = if (path.startsWith("/")) path else "/$path"
+        return this::class.java.getResourceAsStream("/assets$resourcePath")?.use { it.readBytes() }
+    }
 }
 
 

@@ -1,6 +1,10 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
+import dev.klerkframework.klerk.datatypes.AttachedDataContainer
+import dev.klerkframework.klerk.datatypes.AttachedStringContainer
+import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.misc.ReflectedModel
 import dev.klerkframework.klerk.misc.ReflectedProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
@@ -47,12 +51,12 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val id = ModelID<Any>(call.parameters["id"]!!.toInt())
-        val (reflected, model) = try {
+        val (reflected, model, attachedHashes) = try {
             klerk.read(context) {
                 val model = get(id)
                 val reflectedModel = ReflectedModel(model)
                 apply(reflectedModel.populateRelations())
-                Pair(reflectedModel, model)
+                Triple(reflectedModel, model, attachedDataHashes(reflectedModel))
             }
         } catch (e: NoSuchElementException) {
             support.respondPage(call, "Not found", HttpStatusCode.NotFound) { +"Not found" }
@@ -67,7 +71,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             breadcrumbs(model.props::class, pathProvider, true)
             h1 { +camelCaseToPretty(requireNotNull(model.props::class.simpleName)) }
 
-            apply(renderProperties(reflected, context))
+            apply(renderProperties(reflected, context, attachedHashes))
             apply(renderMeta(reflected))
 
             h3 { +"Commands" }
@@ -108,27 +112,64 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    /** The value, linked to its own detail page when it is a reference. */
-    private fun propertyValue(property: ReflectedProperty): FlowOrPhrasingContent.() -> Unit = {
+    /**
+     * The hash of every attached value on the model, keyed by its id, so that each can be linked to. A value the
+     * actor may not read is absent, and is then rendered as plain text.
+     *
+     * Read inside the read block, so that the hashes come from the same snapshot as the model itself.
+     */
+    private fun Reader<C, V>.attachedDataHashes(reflected: ReflectedModel<Any>): Map<Any, String> {
+        val result = mutableMapOf<Any, String>()
+        reflected.getProperties().forEach { property ->
+            val value = property.value
+            if (value !is AttachedDataContainer<*>) {
+                return@forEach
+            }
+            val entry: Pair<Any, String>? = when (value) {
+                is AttachedBlobContainer -> attachedData.metadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                is AttachedStringContainer -> attachedData.metadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                else -> null
+            }
+            entry?.let { result[it.first] = it.second }
+        }
+        return result
+    }
+
+    /** The value, linked to its own detail page when it is a reference, or to its bytes when it is attached data. */
+    private fun propertyValue(
+        property: ReflectedProperty,
+        attachedHashes: Map<Any, String>,
+    ): FlowOrPhrasingContent.() -> Unit = {
         val modelId = property.value
 
         @Suppress("UNCHECKED_CAST")
         val propsClass = property.getRelatedModelPropsClass() as? KClass<out Any>
-        val href = if (modelId is ModelID<*> && propsClass != null) {
-            pathProvider.pathForItem(propsClass, modelId.value.toString())
-        } else null
+        val href = when {
+            modelId is ModelID<*> && propsClass != null -> pathProvider.pathForItem(propsClass, modelId.value.toString())
+            modelId is AttachedBlobContainer -> attachedHashes[modelId.id]?.let {
+                pathProvider.attachedDataPath(modelId.id, it)
+            }
+            modelId is AttachedStringContainer -> attachedHashes[modelId.id]?.let {
+                pathProvider.attachedDataPath(modelId.id, it)
+            }
+            else -> null
+        }
         val text = renderTemporalContainer(property.value) ?: property.toString()
         if (href != null) a(href = href) { +text } else +text
     }
 
-    private fun renderProperties(reflected: ReflectedModel<Any>, context: C): FlowContent.() -> Unit = {
+    private fun renderProperties(
+        reflected: ReflectedModel<Any>,
+        context: C,
+        attachedHashes: Map<Any, String>,
+    ): FlowContent.() -> Unit = {
         if (useTable) {
             table(classesFor("table")) {
                 tbody {
                     reflected.getProperties().forEach { property ->
                         tr(classesFor("tr", property.name())) {
                             td(classesFor("td", property.name())) { apply(propertyName(property, context)) }
-                            td(classesFor("td", property.name())) { apply(propertyValue(property)) }
+                            td(classesFor("td", property.name())) { apply(propertyValue(property, attachedHashes)) }
                         }
                     }
                 }
@@ -137,7 +178,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             dl(classesFor("dl")) {
                 reflected.getProperties().forEach { property ->
                     dt(classesFor("dt", property.name())) { apply(propertyName(property, context)) }
-                    dd(classesFor("dd", property.name())) { apply(propertyValue(property)) }
+                    dd(classesFor("dd", property.name())) { apply(propertyValue(property, attachedHashes)) }
                 }
             }
         }

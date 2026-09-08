@@ -1,6 +1,11 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.AttachedDataID
+import dev.klerkframework.klerk.AttachedDataMetadata
+import dev.klerkframework.klerk.AttachedStringID
 import dev.klerkframework.klerk.ModelID
+import io.ktor.http.*
 import kotlin.reflect.KClass
 
 /**
@@ -15,6 +20,9 @@ public interface PathProvider {
     public val prefix: String
     public val assetsBase: String
     public val autoButtons: String
+
+    /** Where [dev.klerkframework.web.attached.attachedDataRoutes] is mounted. */
+    public val attachedDataBase: String get() = "${base}_attached"
     public fun pathForCollection(kClass: KClass<out Any>): String {
         return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
     }
@@ -30,6 +38,34 @@ public interface PathProvider {
      */
     public fun pathForItem(kClass: KClass<out Any>, id: String): String?
     public fun assetPath(resource: String): String = "$assetsBase/$resource"
+
+    /**
+     * The URL of a piece of attached data, as served by [dev.klerkframework.web.attached.attachedDataRoutes].
+     *
+     * The hash is part of the URL and not decoration: attached-data ids are recycled once the data they referred to
+     * has been deleted, so an id alone is not a safe cache key. Get it from
+     * `klerk.attachedData.getMetadata(id, context).hash`.
+     *
+     * @param filename an optional last segment, ignored when serving. Use it to give a download a human name.
+     */
+    public fun attachedDataPath(id: AttachedBlobID, hash: String, filename: String? = null): String =
+        attachedDataPath("$id", hash, filename)
+
+    /** As [attachedDataPath], for an attached string. Blobs and strings are served by the same route. */
+    public fun attachedDataPath(id: AttachedStringID, hash: String, filename: String? = null): String =
+        attachedDataPath("$id", hash, filename)
+
+    /** As [attachedDataPath], for a value whose kind is not known. */
+    public fun attachedDataPath(id: AttachedDataID, hash: String, filename: String? = null): String =
+        attachedDataPath("$id", hash, filename)
+
+    /** As [attachedDataPath], taking the id and the hash from the metadata that carries both. */
+    public fun attachedDataPath(metadata: AttachedDataMetadata, filename: String? = null): String =
+        attachedDataPath("${metadata.id}", metadata.hash, filename)
+
+    private fun attachedDataPath(id: String, hash: String, filename: String?): String =
+        "$attachedDataBase/$id/$hash" + (filename?.let { "/${it.encodeURLPathPart()}" } ?: "")
+
     public fun withPrefix(): String = "$base$prefix"
 }
 

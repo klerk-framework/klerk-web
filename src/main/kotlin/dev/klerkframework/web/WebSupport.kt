@@ -1,8 +1,11 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.AttachedDataMetadata
 import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.web.attached.attachedDataRoutes
+import dev.klerkframework.web.attached.defaultAttachedDataCacheControl
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
@@ -19,6 +22,8 @@ import kotlinx.html.HEAD
  * @param contextProvider see [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/introduction.md).
  * @param classProvider optional; leave it out when using a classless CSS.
  * @param eventFilter which events to generate forms for, see [AutoButtons].
+ * @param attachedDataCacheControl the `Cache-Control` [attachedDataRoutes] sends for a value, decided from its
+ * metadata — its visibility, its size, its `custom` entries. See [defaultAttachedDataCacheControl].
  */
 public class WebSupport<C : KlerkContext, V>(
     public val klerk: Klerk<C, V>,
@@ -27,13 +32,14 @@ public class WebSupport<C : KlerkContext, V>(
     public val layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
     public val classProvider: CssClassProvider? = null,
     public val eventFilter: (EventReference) -> Boolean = { true },
+    public val attachedDataCacheControl: (AttachedDataMetadata) -> String = defaultAttachedDataCacheControl,
 ) {
     /** Renders a button for an event, and the form behind it. */
     public val autoButtons: AutoButtons<C, V> by lazy { AutoButtons(this, eventFilter) }
 
     /** The same, but for pages mounted somewhere else. */
     public fun withPathProvider(other: PathProvider): WebSupport<C, V> =
-        WebSupport(klerk, contextProvider, other, layout, classProvider, eventFilter)
+        WebSupport(klerk, contextProvider, other, layout, classProvider, eventFilter, attachedDataCacheControl)
 
     /**
      * Responds with a complete page produced by [layout].

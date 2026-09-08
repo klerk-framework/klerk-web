@@ -36,6 +36,7 @@ import dev.klerkframework.web.upload.CreateUploadParams
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
 import dev.klerkframework.web.config.AuthorStates.*
 import dev.klerkframework.web.css
+import dev.klerkframework.web.image.ImagePlugin
 import dev.klerkframework.web.models.City
 import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.models.cityStateMachine
@@ -61,6 +62,7 @@ var onEnterImprovingStateActionCallback: (() -> Unit)? = null
 fun createConfig(
     collections: MyCollections,
     extraJobs: JobsBlock<Context, MyCollections>.() -> Unit = {},
+    assets: AssetsPlugin<Context, MyCollections> = AssetsPlugin(setOf(css, myScript)),
 ): Specification<Context, MyCollections> {
     return SpecificationBuilder<Context, MyCollections>(collections).build {
         managedModels {
@@ -71,6 +73,8 @@ fun createConfig(
             model(Document::class, documentStateMachine(), collections.documents)
             model(Flower::class, flowerStateMachine(), collections.flowers)
             model(Note::class, noteStateMachine(), collections.notes)
+            model(Publication::class, publicationStateMachine(), collections.publications)
+            model(Photo::class, photoStateMachine(), collections.photos)
             //model(Shop::class, cudStateMachine(Shop::class), views.shops)
         }
         jobs {
@@ -104,7 +108,7 @@ fun createConfig(
                     rule(::`Everybody can do everything`)
                 }
                 negative {
-                    rule(::noUploadLargerThanOneMegabyte)
+                    rule(::noUploadLargerThanTenMegabytes)
                 }
             }
             eventLog {
@@ -123,7 +127,9 @@ fun createConfig(
                 positive {
                     rule(::`Everybody can read attached data`)
                 }
-                negative {}
+                negative {
+                    rule(::`Only the author can read a publication`)
+                }
             }
             writeAttachedData {
                 positive {
@@ -133,7 +139,7 @@ fun createConfig(
             }
         }
         systemContextProvider(::myContextProvider)
-    }.withPlugin(AssetsPlugin(setOf(css, myScript)))
+    }.withPlugin(assets)
 }
 
 /**
@@ -567,6 +573,8 @@ data class MyCollections(
     val documents: ModelViews<Document, Context> = ModelViews(),
     val flowers: ModelViews<Flower, Context> = ModelViews(),
     val notes: ModelViews<Note, Context> = ModelViews(),
+    val publications: ModelViews<Publication, Context> = ModelViews(),
+    val photos: ModelViews<Photo, Context> = ModelViews(),
 ) //, val shops: ModelView<Shop, Context>)
 
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
@@ -1219,21 +1227,33 @@ suspend fun refuseTheWordVirus(args: BlobPreAttachStepArgs): BlobPreAttachStepRe
     return if (text.contains("virus")) BlobPreAttachStepResult.Reject("the file looks infected") else BlobPreAttachStepResult.Pass
 }
 
-/** What a flower picture may be: an image, published to the world, and not enormous. */
+/**
+ * What a flower picture may be: an image, published to the world, not enormous, and served in three sizes.
+ *
+ * `describeTestImage` is last, so that it measures the bytes that will actually be stored.
+ */
+/**
+ * The sizes a flower is served in.
+ *
+ * Declared here rather than inline because the [ImagePlugin]'s allow-list has to contain every one of them — a width
+ * the property declares but the plugin does not allow simply disappears from the page.
+ */
+val flowerImageWidths: Set<Int> = setOf(500, 640, 800)
+
 class FlowerImage(id: AttachedBlobID) : AttachedBlobContainer(id) {
     override val accept: Set<String> = setOf("image/png", "image/jpeg", "image/gif", "image/webp")
     override val maxSize: Long = 10_000_000
     override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
-    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::removeEXIF, ::resizeImage)
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::removeEXIF, ::resizeImage, ::describeTestImage)
 }
 
+// The delay stands in for a scan that takes a moment, so that the demo shows the user waiting for it. Long enough to
+// be visible, short enough that uploading a flower is not a chore.
 suspend fun removeEXIF(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
-    delay(20.seconds)
     return BlobPreAttachStepResult.Pass
 }
 
 suspend fun resizeImage(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
-    delay(20.seconds)
     return BlobPreAttachStepResult.Pass
 }
 
@@ -1265,13 +1285,103 @@ private fun newNote(args: ArgForVoidEvent<Note, CreateNoteParams, Context, MyCol
 /**
  * The shape of rule the upload documentation recommends: the declared size is known before any byte is accepted, so a
  * quota is an ordinary authorization rule rather than anything upload-specific.
+ *
+ * The limit matches [FlowerImage]'s `maxSize`. A quota below what the property declares is a trap: the form tells the
+ * browser it may pick a 10 MB file, and the rule then refuses it with a bare `403` that says nothing about why.
  */
-fun noUploadLargerThanOneMegabyte(
+fun noUploadLargerThanTenMegabytes(
     args: ArgCommandContextReader<*, Context, MyCollections>
 ): NegativeAuthorization {
     val params = args.command.params
     if (params !is CreateUploadParams) {
         return Pass
     }
-    return if (params.declaredSize.valueWithoutAuthorization > 1_000_000) Deny else Pass
+    return if (params.declaredSize.valueWithoutAuthorization > 10_000_000) Deny else Pass
+}
+
+// Attached data of both kinds and both visibilities, with no slow steps, so that the serving route can be exercised
+// over HTTP.
+data class Publication(val cover: PublicCover, val body: PublicBody, val draft: SecretDraft?)
+
+enum class PublicationStates { Published }
+
+class PublicCover(id: AttachedBlobID) : AttachedBlobContainer(id) {
+    override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::noPreAttachProcessing)
+}
+
+class PublicBody(id: AttachedStringID) : AttachedStringContainer(id) {
+    override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
+}
+
+class SecretDraft(id: AttachedStringID) : AttachedStringContainer(id)
+
+data class CreatePublicationParams(val cover: PublicCover, val body: PublicBody, val draft: SecretDraft?)
+
+object CreatePublication : VoidEventWithParameters<Publication, CreatePublicationParams>(
+    Publication::class, EventVisibility.EXTERNAL, CreatePublicationParams::class
+)
+
+object DeletePublication : InstanceEventNoParameters<Publication>(Publication::class, EventVisibility.EXTERNAL)
+
+fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Context, MyCollections> = stateMachine {
+    event(CreatePublication) {}
+    event(DeletePublication) {}
+    voidState {
+        onEvent(CreatePublication) { createModel(PublicationStates.Published, ::newPublication) }
+    }
+    state(PublicationStates.Published) {
+        onEvent(DeletePublication) { delete() }
+    }
+}
+
+private fun newPublication(args: ArgForVoidEvent<Publication, CreatePublicationParams, Context, MyCollections>): Publication =
+    Publication(args.command.params.cover, args.command.params.body, args.command.params.draft)
+
+// An image that klerk-web has measured while it was being attached, so that a page can be laid out before any
+// variant exists.
+data class Photo(val image: DescribedImage)
+
+enum class PhotoStates { Taken }
+
+class DescribedImage(id: AttachedBlobID) : AttachedBlobContainer(id) {
+    override val visibility: AttachedDataVisibility = AttachedDataVisibility.Public
+    override val preAttachSteps: List<BlobPreAttachStep> = listOf(::describeTestImage)
+}
+
+/**
+ * The shape an application uses: a named top-level function delegating to the plugin, so that the container can be
+ * declared without the plugin instance being in scope.
+ */
+var testImagePlugin: ImagePlugin<Context, MyCollections>? = null
+
+suspend fun describeTestImage(args: BlobPreAttachStepArgs): BlobPreAttachStepResult =
+    testImagePlugin?.prepareImageKeepExif(args) ?: BlobPreAttachStepResult.Pass
+
+data class CreatePhotoParams(val image: DescribedImage)
+
+object CreatePhoto : VoidEventWithParameters<Photo, CreatePhotoParams>(
+    Photo::class, EventVisibility.EXTERNAL, CreatePhotoParams::class
+)
+
+fun photoStateMachine(): StateMachine<Photo, PhotoStates, Context, MyCollections> = stateMachine {
+    event(CreatePhoto) {}
+    voidState {
+        onEvent(CreatePhoto) { createModel(PhotoStates.Taken, ::newPhoto) }
+    }
+    state(PhotoStates.Taken) {}
+}
+
+private fun newPhoto(args: ArgForVoidEvent<Photo, CreatePhotoParams, Context, MyCollections>): Photo =
+    Photo(args.command.params.image)
+
+/**
+ * Only actor 1 may read a publication's private data, so that a denial can be told from a hit. The public properties
+ * of the same model are unaffected: no read rule is evaluated for public data, not even a negative one.
+ */
+fun `Only the author can read a publication`(args: ArgsForAttachedDataRead<Context, MyCollections>): NegativeAuthorization {
+    if (args.owner.props !is Publication) {
+        return Pass
+    }
+    return if (args.context.actor.externalId == 1L) Pass else Deny
 }

@@ -33,6 +33,10 @@ that is possible in the model's current state, and the models that refer to it.
 A `DateContainer` renders as `2026-08-22`, an `InstantContainer` as `2026-08-22 14:30:00` and a
 `DurationContainer` as `1h 30m`. Instants are shown in the server's time zone.
 
+An attached blob or string is a link to its bytes, provided
+[`attachedDataRoutes`](serving-attached-data.md) is registered. A value the actor may not read is rendered as plain
+text instead.
+
 ```kotlin
 ModelDetailPage(
     Author::class,

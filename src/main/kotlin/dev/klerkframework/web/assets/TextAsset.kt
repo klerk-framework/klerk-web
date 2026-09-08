@@ -93,8 +93,11 @@ public class Base64hash(value: String) : StringContainer(value) {
 
     public companion object {
         private val md = MessageDigest.getInstance("SHA-256")
-        public fun from(string: String): Base64hash {
-            val digest = md.digest(string.toByteArray())
+        public fun from(string: String): Base64hash = from(string.toByteArray())
+
+        /** Both callers run while the application is starting, which is the only reason sharing [md] is safe. */
+        public fun from(bytes: ByteArray): Base64hash {
+            val digest = md.digest(bytes)
             return Base64hash(Base64.getUrlEncoder().withoutPadding().encodeToString(digest).take(11))
         }
     }

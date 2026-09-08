@@ -16,7 +16,17 @@ import dev.klerkframework.klerk.read.ModelModification.*
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
+import dev.klerkframework.web.attached.attachedDataRoutes
 import dev.klerkframework.web.config.*
+import dev.klerkframework.web.image.ImageIoProcessor
+import dev.klerkframework.web.image.ImagePlugin
+import dev.klerkframework.web.image.ImageProcessor
+import dev.klerkframework.web.image.Crop
+import dev.klerkframework.web.image.FetchPriority
+import dev.klerkframework.web.image.Gravity
+import dev.klerkframework.web.image.ImageLoading
+import dev.klerkframework.web.image.ImageTemplate
+import dev.klerkframework.web.image.image
 import dev.klerkframework.web.models.City
 import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.upload.UploadPlugin
@@ -166,8 +176,17 @@ fun main() {
     val persistence = RamStorage()
     // A fixed directory rather than a temporary one, so that an upload interrupted by a restart can be resumed.
     val uploads = UploadPlugin<Context, MyCollections>(Path.of("/tmp/klerk-webtest-uploads"))
+    val images = ImagePlugin<Context, MyCollections>(
+        variantDirectory = Path.of("/tmp/klerk-webtest-variants"),
+        formats = demoFormats(),
+        processor = demoProcessor,
+    )
+    // FlowerImage's last pre-attach step goes through this, so that a flower is measured as it is uploaded.
+    testImagePlugin = images
     val klerk = Klerk.create(
-        createConfig(collections, extraJobs = { register(PeriodicPingJob) }).withPlugin(uploads),
+        createConfig(collections, extraJobs = { register(PeriodicPingJob) })
+            .withPlugin(uploads)
+            .withPlugin(images),
         testSettings(persistence),
     )
     runBlocking {
@@ -184,7 +203,7 @@ fun main() {
         }
 
         val embeddedServer = embeddedServer(Netty, port = 8081, host = "0.0.0.0") {
-            configureRouting(klerk, uploads)
+            configureRouting(klerk, uploads, images)
             //        configureSecurity()
             //      configureHTTP()
             install(Compression)
@@ -212,6 +231,11 @@ fun main() {
 
 }
 
+/** The demo has to start on any machine, so it uses the processor that needs nothing installed. */
+private val demoProcessor: ImageProcessor by lazy { ImageIoProcessor() }
+
+private fun demoFormats(): Set<String> = setOf("jpeg")
+
 suspend fun ApplicationCall.ctx(klerk: Klerk<Context, MyCollections>): Context = Context.swedishUnauthenticated()
 
 suspend fun canSeeAdminUI(context: Context): Boolean {
@@ -230,7 +254,11 @@ val webModels = setOf(Book::class, Author::class, Publisher::class, City::class,
 //val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("other/my-script.js")
 
-fun Application.configureRouting(klerk: Klerk<Context, MyCollections>, uploads: UploadPlugin<Context, MyCollections>) {
+fun Application.configureRouting(
+    klerk: Klerk<Context, MyCollections>,
+    uploads: UploadPlugin<Context, MyCollections>,
+    images: ImagePlugin<Context, MyCollections>,
+) {
     val klerkWeb = KlerkWeb(
         klerk,
         ApplicationCall::ctx,
@@ -241,19 +269,39 @@ fun Application.configureRouting(klerk: Klerk<Context, MyCollections>, uploads: 
         useTableForDetails = false
         )
     val support = WebSupport(klerk, ApplicationCall::ctx, pathProvider, layout, MyClassProvider)
+    // The two roles a flower image plays here: a thumbnail in the gallery, and the image the detail page is about.
+    val thumbnail = images.template("thumbnail", widths = flowerImageWidths, sizes = "320px")
+    val hero = images.template(
+        "hero",
+        widths = flowerImageWidths,
+        sizes = "(max-width: 700px) 100vw, 700px",
+        crop = Crop(16, 9),
+        loading = ImageLoading.Eager,
+        fetchPriority = FetchPriority.High,
+    ) {
+        // Art direction: a phone gets a tall crop of the flower rather than a letterbox strip of the same picture.
+        on(
+            "mobile",
+            media = "(max-width: 600px)",
+            widths = flowerImageWidths,
+            sizes = "100vw",
+            crop = Crop(4, 5, gravity = Gravity.North),
+        )
+    }
     val flowerForm = flowerFormTemplate(klerk, uploads)
 
     routing {
         klerkWebRoutes(klerkWeb, webModels)
         uploadRoutes(support, uploads)
+        attachedDataRoutes(support, images = images)
 
         route(pathProvider.base) {
             get(renderIndex(klerkWeb))
 
-            get("/flowers", renderFlowers(klerk))
+            get("/flowers", renderFlowers(klerk, support, thumbnail))
             get("/flowers/new", renderNewFlower(klerk, flowerForm))
             post("/flowers", createFlower(klerk, flowerForm))
-            get("/flowers/{id}/image", serveFlowerImage(klerk))
+            get("/flowers/{id}", renderFlower(klerk, support, hero))
 
 
             /*        get("/authors", renderAuthors(klerk))
@@ -306,6 +354,12 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
                 a(href = "/admin/") { +"admin UI" }
                 +" for your application."
             }
+            h2 { +"Images" }
+            p {
+                a(href = "${pathProvider.base}flowers") { +"Flowers" }
+                +" - upload an image and see it served in the size the page asks for."
+            }
+
             h2 { +"Item lists" }
             modelsNav(klerkWeb, models = webModels)
         }
@@ -381,60 +435,103 @@ private fun createFlower(
     }
 }
 
-private fun renderFlowers(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
+/**
+ * The gallery.
+ *
+ * There is no route here that serves an image: `attachedDataRoutes` does that, and the template writes the markup
+ * that points at it. The images are read as references inside the read block, so the model and what is known about
+ * each image come from the same snapshot.
+ */
+private fun renderFlowers(
+    klerk: Klerk<Context, MyCollections>,
+    support: WebSupport<Context, MyCollections>,
+    thumbnail: ImageTemplate<Context, MyCollections>,
+): suspend RoutingContext.() -> Unit = {
     val context = call.ctx(klerk)
-    val flowers = klerk.read(context) { views.flowers.all.asSequence().toList() }
-    call.respondHtml(block = layout.page("Flowers") {
-        h1 { +"Flowers" }
-        p { a(href = "${pathProvider.base}flowers/new") { +"Plant another one" } }
-        if (flowers.isEmpty()) {
-            p { +"Nothing planted yet." }
-        }
-        flowers.forEach { flower ->
-            figure {
-                img(alt = flower.props.name.value, src = "${pathProvider.base}flowers/${flower.id}/image") {
-                    width = "300"
+    val flowers = klerk.read(context) {
+        views.flowers.all.asSequence().toList().map { it to attachedData.metadata(it.props.image.id) }
+    }
+  //  call.respondHtml(block = layout.page("Flowers") {
+    call.respondHtml {
+        body {
+            h1 { +"Flowers" }
+            p { a(href = "${pathProvider.base}flowers/new") { +"Plant another one" } }
+            if (flowers.isEmpty()) {
+                p { +"Nothing planted yet." }
+            }
+            flowers.forEach { (flower, photo) ->
+                figure {
+                    a(href = "${pathProvider.base}flowers/${flower.id}") {
+                        +"Details"
+                    }
+                    with(support) {
+                        photo?.let { image(thumbnail, it, alt = flower.props.name.value) }
+                    }
+                    figcaption { +flower.props.name.value }
                 }
-                figcaption { +flower.props.name.value }
             }
         }
-    })
+    }
 }
 
 /**
- * Serves a flower's image.
+ * One flower, at every size it is served in — the page to look at when checking that the whole pipeline works.
  *
- * The content type stored with the upload is what the *client* claimed, so it is only honoured for image types that
- * are safe to render inline. Anything else is sent as a download — an HTML or SVG file served inline from this origin
- * would be a script running as the application.
+ * The first request for a size that has not been generated yet waits for the job that makes it, so what comes back
+ * is always the size that was asked for. The URLs are listed so that they can be opened, curled and checked for
+ * their caching headers.
  */
-private fun serveFlowerImage(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = rc@{
+private fun renderFlower(
+    klerk: Klerk<Context, MyCollections>,
+    support: WebSupport<Context, MyCollections>,
+    hero: ImageTemplate<Context, MyCollections>,
+): suspend RoutingContext.() -> Unit = rc@{
     val context = call.ctx(klerk)
     val id = call.parameters["id"]?.toIntOrNull()
     if (id == null) {
         call.respond(HttpStatusCode.NotFound)
         return@rc
     }
-    val image = klerk.read(context) { getOrNull(ModelID<Flower>(id))?.props?.image }
-    if (image == null) {
+    val found = klerk.read(context) {
+        val flower = getOrNull(ModelID<Flower>(id)) ?: return@read null
+        flower to attachedData.metadata(flower.props.image.id)
+    }
+    if (found == null) {
         call.respond(HttpStatusCode.NotFound)
         return@rc
     }
+    val (flower, photo) = found
+    val measured = hero.images.sidecar(photo.id, photo.hash)
 
-    // What Klerk recognised the bytes to be, not what the uploader called them. FlowerImage already refused
-    // anything that is not one of these, so this is belt and braces — but it is the belt that matters when serving.
-    val metadata = klerk.attachedData.getMetadata(image.id, context)
-    val detected = metadata.contentType
-    val inlineSafe = detected in setOf("image/png", "image/jpeg", "image/gif", "image/webp")
+    call.respondHtml(block = layout.page(flower.props.name.value) {
+        h1 { +flower.props.name.value }
 
-    call.response.header("X-Content-Type-Options", "nosniff")
-    if (!inlineSafe) {
-        call.response.header(HttpHeaders.ContentDisposition, "attachment")
-    }
-    call.respondBytes(
-        bytes = klerk.attachedData.get(image.id, context).readAllBytes(),
-        contentType = if (inlineSafe) ContentType.parse(detected!!) else ContentType.Application.OctetStream,
-    )
+        p {
+            +"Measured as ${measured?.let { "${it.width}x${it.height}" } ?: "not yet measured"}"
+        }
+
+        h2 { +"As the page would use it" }
+        with(support) { image(hero, photo, alt = flower.props.name.value) }
+
+        h2 { +"Every variant, one by one" }
+        p { +"A size that has not been generated yet is answered with a larger one; reload to get the real thing." }
+        table {
+            tr { th { +"Variant" }; th { +"URL" }; th { +"Image" } }
+            (listOf(hero.default) + hero.alternatives).forEach { rendition ->
+                rendition.widths.sorted().forEach { variantWidth ->
+                    demoFormats().forEach { format ->
+                        val segment = "${rendition.name}-$variantWidth.$format"
+                        val url = pathProvider.attachedDataPath(photo.id, photo.hash, segment)
+                        tr {
+                            td { +"${rendition.name} $variantWidth $format" }
+                            td { a(href = url) { code { +url } } }
+                            td { img(alt = segment, src = url) { attributes["width"] = "160" } }
+                        }
+                    }
+                }
+            }
+        }
+    })
 }
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {

@@ -22,9 +22,7 @@ routing {
 }
 ```
 
-The staging directory is where partial uploads accumulate. It is independent of where blobs end up — an application
-keeping blobs in the database can still upload large files — but putting it on the same filesystem as a
-`FileBlobStore` makes the last step a rename instead of a copy.
+The staging directory is where partial uploads accumulate.
 
 Then declare the field on a form with [`file()`](forms.md#files). That is the whole integration; the rest of this page
 is what happens underneath and what you can change.
@@ -51,7 +49,7 @@ waits for the scan inside the submit request, on both paths; running it as the u
 step's own reason, exactly like a size refusal, and the file is deleted.
 
 There is no state for "attached": once the bytes are a blob, the blob and its owning model are the record of it, and
-the upload is deleted.
+the upload model is deleted.
 
 ## The protocol
 
@@ -98,14 +96,14 @@ body. What is prevented there is storing the bytes, not receiving them.
 
 ## Security
 
+- **If possible, only allow uploads from authenticated and trusted users.**
 - **An upload may only be continued by the actor that started it.** One that does not exist and one that belongs to
   somebody else give the same `404`, so the endpoints cannot be used to find out which uploads exist.
 - **Every mutating request carries a CSRF token**, as a header rather than a form field.
 - **The filename and content type are the client's claims**, kept as metadata and never used as fact. The filename is
-  never used as a path — staging files are named after the model id. When serving, use `metadata.contentType`, which
-  is what Klerk recognised the bytes to be, together with `X-Content-Type-Options: nosniff` and
-  `Content-Disposition: attachment` for anything you have not deliberately allowed inline. Never serve user-supplied
-  SVG or HTML inline from the same origin as your application.
+  never used as a path — staging files are named after the model id. Serving the file back out is
+  [`attachedDataRoutes`](serving-attached-data.md), which uses what Klerk recognised the bytes to be rather than what
+  the client said, and treats anything not deliberately allowed inline as a download.
 - **What the file may be is declared on the property**, not here. `accept`, `maxSize` and `preAttachSteps` on the
   [`AttachedBlobContainer`](https://github.com/klerkframework/klerk/blob/main/docs/attached-data.md) are checked when the
   command attaches the value, so they hold for uploads and for every other caller. This plugin only applies `maxSize`

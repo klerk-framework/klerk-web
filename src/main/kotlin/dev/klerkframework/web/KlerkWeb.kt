@@ -1,10 +1,12 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.AttachedDataMetadata
 import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.web.attached.defaultAttachedDataCacheControl
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import kotlinx.html.*
@@ -23,6 +25,7 @@ private val log = KotlinLogging.logger {}
  *
  * @param canSeeAdminUI gates the Admin UI's operations pages. It is an internal tool - see [AdminUI].
  * @param eventFilter which events to generate forms for, see [AutoButtons].
+ * @param attachedDataCacheControl the `Cache-Control` for attached data, see [WebSupport].
  */
 public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
@@ -33,11 +36,12 @@ public class KlerkWeb<C : KlerkContext, V>(
     layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
     classProvider: CssClassProvider? = null,
     eventFilter: (EventReference) -> Boolean = { true },
+    attachedDataCacheControl: (AttachedDataMetadata) -> String = defaultAttachedDataCacheControl,
     private val useTableForDetails: Boolean = false,
 ) {
     /** What every generated page is built from. Pass it to your own blocks so they match. */
     public val support: WebSupport<C, V> =
-        WebSupport(klerk, contextProvider, pathProvider, layout, classProvider, eventFilter)
+        WebSupport(klerk, contextProvider, pathProvider, layout, classProvider, eventFilter, attachedDataCacheControl)
 
     public val autoButtons: AutoButtons<C, V> get() = support.autoButtons
 

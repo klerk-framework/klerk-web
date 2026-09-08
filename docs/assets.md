@@ -34,5 +34,41 @@ Follow these steps:
    })
    ```
 
+## Images
+
+A picture that ships with the application — a logo, an illustration, a splash image — is an `ImageAsset`. Give the
+plugin an [image plugin](images.md) as well and it is rendered through the same templates as an uploaded image, so a
+4000 px photograph in the jar is not what a phone downloads:
+
+```kotlin
+val splash = ImageAsset("splash.jpg")
+val hero = images.template("hero", widths = setOf(640, 1280, 2560), sizes = "100vw")
+
+SpecificationBuilder<Ctx, Views>(views).build {
+    // ...
+}.withPlugin(images).withPlugin(AssetsPlugin(setOf(css, splash), images = images))
+```
+
+```kotlin
+support.respondPage(call, "Welcome") {
+    image(hero, splash, alt = "")
+}
+```
+
+Variants are produced on demand and kept in the same `variantDirectory`, under the same budget and the same sweep as
+uploaded images, so nothing new has to be configured for them. The URL carries the content hash —
+`/_assets/splash.jpg_aB3xY/hero-1280.avif` — which is what lets a variant be cached forever; a redeploy that changes
+the file changes the hash, and the sweep collects what the old one left behind.
+
+Two things follow from an asset being part of the application rather than something a user owns. It is **public**: no
+authorization is evaluated for it, and unlike attached data the original is always served. And it is **measured at
+startup**, so `width` and `height` are rendered from the very first page and a static image never moves the layout.
+
+An asset that is missing, that is not an image, or that is larger than `ImageLimits.maxPixels` fails the startup with
+the asset named — a broken asset is a mistake by whoever wrote the application, not something to discover in
+production.
+
+Images are not Brotli-compressed: JPEG, PNG, WebP and AVIF already are.
+
 The Admin UI lists the served assets with their compressed and uncompressed sizes on its
 [plugins](plugins.md) page.
