@@ -1259,7 +1259,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             id = elementId(propertyName)
             name = propertyName
             value = "true"
-            checked = theValue.boolean
+            checked = theValue.valueOrNullIfNotAuthorized ?: false
             //  disabled = theValue == null
         }
         input(InputType.hidden) {
@@ -1277,7 +1277,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.toString()
+            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
             // required = !property.returnType.isMarkedNullable
@@ -1296,7 +1296,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(number) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.toString()
+            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
             // required = !property.returnType.isMarkedNullable
             theValue.min?.apply { min = this.toString() }
             theValue.max?.apply { max = this.toString() }
@@ -1311,7 +1311,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(number) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.toString()
+            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
             // required = !property.returnType.isMarkedNullable
             theValue.min?.apply { min = this.toString() }
             theValue.max?.apply { max = this.toString() }
@@ -1331,7 +1331,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(InputType.dateTimeLocal) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.instant.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat)
+            value = theValue.valueOrNullIfNotAuthorized
+                ?.let { theValue.instant.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat) }
+                ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
         }
@@ -1347,7 +1349,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(InputType.date) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.date.toString()
+            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.date.toString() } ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
         }
@@ -1363,7 +1365,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(number) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.duration.inWholeSeconds.toString()
+            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.duration.inWholeSeconds.toString() } ?: ""
             step = "1"
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
@@ -1383,7 +1385,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(type, classes = classes) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.string
+            value = theValue.valueOrNullIfNotAuthorized ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
             //
