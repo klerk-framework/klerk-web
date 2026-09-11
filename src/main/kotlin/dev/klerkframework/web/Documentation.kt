@@ -4,7 +4,6 @@ import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.misc.AlgorithmDocumenter
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
-import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.misc.generateFlowChart
 import dev.klerkframework.klerk.misc.generateStateDiagram
 import dev.klerkframework.klerk.statemachine.StateMachine
@@ -35,7 +34,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
             if (forModel == null) {
                 h1 { +"Documentation" }
                 apply(renderModels(klerk.spec.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
-                apply(renderAuthorizationRules(klerk.spec.authorization))
+                apply(renderAuthorizationRules(klerk.spec.authorization, context.translation.klerk))
                 apply(renderCollections(klerk.spec.views))
                 apply(renderPluginsDocumentation(klerk.spec.plugins))
                 hr()
@@ -61,7 +60,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                     a(href = call.request.uri.replace("&showUpdateNotes=true", "")) { +"Hide updates" }
                 }
                 apply(addMermaidScript())
-                apply(renderEvents(model.stateMachine, klerk))
+                apply(renderEvents(model.stateMachine, klerk, context.translation.klerk))
                 // apply(renderStates(model.stateMachine, klerk, documentationPath))
 
             }
@@ -105,7 +104,7 @@ private fun <C : KlerkContext, V> renderStatemachine(
             +generateStateDiagram(stateMachine, false, translation)
         }
     }
-    apply(renderEvents(stateMachine, klerk))
+    apply(renderEvents(stateMachine, klerk, translation))
 
 }
 
@@ -173,7 +172,8 @@ private const val noBullets = "list-style-type: none;"
 
 private fun <C : KlerkContext, V> renderEvents(
     stateMachine: StateMachine<out Any, out Enum<*>, C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
+    translation: KlerkTranslation,
 ): FlowContent.() -> Unit =
     {
         h5 { +"Events" }
@@ -241,7 +241,7 @@ private fun <C : KlerkContext, V> renderEvents(
                         ul {
                             klerk.spec.getEvent(externalEvent).getContextRules<C>().forEach {
                                 li {
-                                    +"Context: ${extractNameFromFunction(it)}"
+                                    +"Context: ${translation.function(it)}"
                                 }
                             }
                         }
@@ -252,19 +252,22 @@ private fun <C : KlerkContext, V> renderEvents(
     }
 
 
-internal fun <V> renderAuthorizationRules(specification: AuthorizationConfig<*, V>): FlowContent.() -> Unit = {
+internal fun <V> renderAuthorizationRules(
+    specification: AuthorizationConfig<*, V>,
+    translation: KlerkTranslation,
+): FlowContent.() -> Unit = {
     h2 { +"Authorization rules" }
     h3 { +"Events" }
     h4 { +"Positive" }
     ul {
         specification.eventPositiveRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
     h4 { +"Negative" }
     ul {
         specification.eventNegativeRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
 
@@ -272,13 +275,13 @@ internal fun <V> renderAuthorizationRules(specification: AuthorizationConfig<*, 
     h4 { +"Positive" }
     ul {
         specification.readModelPositiveRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
     h4 { +"Negative" }
     ul {
         specification.readModelNegativeRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
 
@@ -286,13 +289,13 @@ internal fun <V> renderAuthorizationRules(specification: AuthorizationConfig<*, 
     h4 { +"Positive" }
     ul {
         specification.readPropertyPositiveRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
     h4 { +"Negative" }
     ul {
         specification.readPropertyNegativeRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
 
@@ -300,13 +303,13 @@ internal fun <V> renderAuthorizationRules(specification: AuthorizationConfig<*, 
     h4 { +"Positive" }
     ul {
         specification.eventLogPositiveRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
     h4 { +"Negative" }
     ul {
         specification.eventLogNegativeRules.forEach {
-            li { +extractNameFromFunction(it) }
+            li { +translation.function(it) }
         }
     }
 }

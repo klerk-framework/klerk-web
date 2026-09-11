@@ -13,7 +13,6 @@ import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.misc.camelCaseToPretty
-import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
@@ -460,7 +459,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     .mapNotNull {
                          val result = it.invoke()
                          return@mapNotNull if (result is PropertyCollectionValidity.Invalid) {
-                             if (result.endUserTranslatedMessage != null) result else PropertyCollectionValidity.Invalid(extractNameFromFunction(it))
+                             if (result.endUserTranslatedMessage != null) result else PropertyCollectionValidity.Invalid(context.translation.klerk.function(it))
                          } else {
                              null
                          }
@@ -669,8 +668,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val datatypeValue: StringContainer
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
-            //val initialValue = params::class.memberProperties.single { it.name.equals(property.name) }.getter.call(params) as StringValue
-
             tag.label {
                 htmlFor = property.name
                 +labelText
@@ -698,8 +695,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val datatypeValue: IntContainer
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
-            //val initialValue = (params::class.memberProperties.single { it.name.equals(property.name) }.getter.call(params) as Datatype<*>).value.toString()
-
             tag.label {
                 htmlFor = property.name
                 +labelText
@@ -724,8 +719,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val datatypeValue: LongContainer
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
-            //val initialValue = (params::class.memberProperties.single { it.name.equals(property.name) }.getter.call(params) as Datatype<*>).value.toString()
-
             tag.label {
                 htmlFor = property.name
                 +labelText
@@ -750,8 +743,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val datatypeValue: BooleanContainer
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
-            //  val initialValue = params::class.memberProperties.single { it.name.equals(property.name) }.getter.call(params) as BooleanValue
-
             tag.label {
                 htmlFor = property.name
                 +labelText
@@ -761,7 +752,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 name = property.name
                 value = "true"
                 checked = datatypeValue.boolean
-                //  required = !property.returnType.isMarkedNullable
             }
             tag.input(InputType.hidden) {
                 name = property.name
