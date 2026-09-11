@@ -5,6 +5,7 @@ import org.jetbrains.dokka.gradle.internal.InternalDokkaGradlePluginApi
 
 plugins {
     kotlin("jvm") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.10"
     `java-library`
     `maven-publish`
     id("org.jetbrains.dokka") version "2.2.0"
@@ -12,7 +13,6 @@ plugins {
 
 val klerkVersion = "1.0.0-beta.7-SNAPSHOT"
 val ktorVersion = "3.2.3"
-val gsonVersion = "2.9.0"
 val kotlinLoggingVersion = "2.1.21"
 val sqliteJdbcVersion = "3.44.1.0"
 val slf4jVersion = "2.0.3"
@@ -31,7 +31,6 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("com.google.code.gson:gson:$gsonVersion")
     implementation("io.micrometer:micrometer-core:1.12.3") // TODO this should not be necessary? It seems to be required when copying a config (e.g. in a plugin). Do we really want all klerk-based application to require this?
     implementation("io.ktor:ktor-server-compression:${ktorVersion}") // TODO: remove?
     implementation("io.github.microutils:kotlin-logging-jvm:$kotlinLoggingVersion")
@@ -50,8 +49,6 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:${ktorVersion}")
     //testImplementation("org.jetbrains.kotlin:kotlin-test")
     //testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-
-    testImplementation("com.google.code.gson:gson:${gsonVersion}")
 }
 
 publishing {

@@ -12,7 +12,10 @@ import dev.klerkframework.web.image.ImageLoading
 import dev.klerkframework.web.image.ImagePlugin
 import dev.klerkframework.web.image.image
 import io.ktor.http.HttpStatusCode
-import com.google.gson.Gson
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import dev.klerkframework.web.image.ImageInfo
 import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImageProcessor
@@ -252,8 +255,6 @@ private class TransformerProcessor(
         install(HttpTimeout) { requestTimeoutMillis = limits.timeout.inWholeMilliseconds }
     }
 
-    private data class Metadata(val width: Int, val height: Int)
-
     override suspend fun verify() {
         val answer = runCatching { client.get("$baseUrl/health") }.getOrNull()
         checkNotNull(answer?.takeIf { it.status.isSuccess() }) { "The image transformer at $baseUrl did not answer" }
@@ -264,8 +265,8 @@ private class TransformerProcessor(
         if (!response.status.isSuccess()) {
             return null
         }
-        val meta = Gson().fromJson(response.bodyAsText(), Metadata::class.java)
-        return ImageInfo(meta.width, meta.height)
+        val meta = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return ImageInfo(meta.getValue("width").jsonPrimitive.int, meta.getValue("height").jsonPrimitive.int)
     }
 
     override suspend fun stripMetadata(source: Path, target: Path): ImageInfo {

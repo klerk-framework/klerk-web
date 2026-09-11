@@ -1,13 +1,15 @@
 package dev.klerkframework.web
 
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonParser
 import dev.klerkframework.klerk.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+
+private val prettyJson = Json { prettyPrint = true }
 
 internal suspend fun <C : KlerkContext, V> renderEventLog(
     call: ApplicationCall,
@@ -97,8 +99,7 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
                 }
             }
             h2 { +"Parameters" }
-            val gson = GsonBuilder().setPrettyPrinting().serializeNulls().create()
-            val jsonPretty = gson.toJson(JsonParser.parseString(event.params))
+            val jsonPretty = prettyJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(event.params))
             textArea {
                 disabled = true
                 rows = jsonPretty.lines().size.toString()

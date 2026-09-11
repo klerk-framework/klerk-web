@@ -1,6 +1,7 @@
 package dev.klerkframework.web
 
-import com.google.gson.Gson
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.ModelView
 import dev.klerkframework.klerk.collection.asSequence
@@ -362,10 +363,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     internal fun validate() {
         if (klerk.spec.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
-        }
-
-        parameters.all.forEach {
-            it.validate()
         }
 
         if (fileInputs.isNotEmpty() && uploads == null) {
@@ -922,11 +919,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
             val response = ValResponse(fieldProblems, collectionProblems, emptySet(), emptySet())
 
-            return Gson().toJson(response)
+            return Json.encodeToString(ValResponse.serializer(), response)
         }
     }
 }
 
+@Serializable
 internal data class ValResponse(
     val propertyProblems: List<ValidationProblemResponse>,
     val propertyCollectionProblems: List<String>,
@@ -935,6 +933,7 @@ internal data class ValResponse(
 )
 
 /** One problem in a validation response. [field] is null when the problem is not tied to a single input. */
+@Serializable
 public data class ValidationProblemResponse(public val field: String?, public val humanReadable: String)
 
 /** A form built from a [FormTemplate], ready to be rendered. Several may be rendered on the same page. */
@@ -1666,7 +1665,8 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
             call.respondText(
                 contentType = ContentType.Application.Json,
                 status = HttpStatusCode.UnprocessableEntity,
-                text = Gson().toJson(
+                text = Json.encodeToString(
+                    ValidationResponse.serializer(),
                     ValidationResponse(
                         propertyProblems = fieldProblems,
                         propertyCollectionProblems = propertyCollectionProblems,
@@ -1684,6 +1684,7 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
 /**
  * The JSON that the bundled form validation script expects. Note that [ValResponse] must have the same shape.
  */
+@Serializable
 public data class ValidationResponse(
     val propertyProblems: List<ValidationProblemResponse>,
     val propertyCollectionProblems: List<String>,

@@ -122,7 +122,8 @@ fun main() {
             call.respondText(
                 contentType = ContentType.Application.Json,
                 status = HttpStatusCode.UnprocessableEntity,
-                text = Gson().toJson(
+                text = Json.encodeToString(
+                    ValidationResponse.serializer(),
                     ValidationResponse(
                         fieldProblems = fieldProblems,
                         formProblems = emptyList(),

@@ -1,6 +1,7 @@
 package dev.klerkframework.web.image
 
-import com.google.gson.Gson
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import java.nio.file.Files
 import java.nio.file.Path
@@ -8,9 +9,9 @@ import java.nio.file.StandardCopyOption
 import java.util.Collections
 
 private val log = KotlinLogging.logger {}
-private val gson = Gson()
 
 /** What the generator learned about an image while it had it decoded. */
+@Serializable
 public data class ImageSidecar(
     val width: Int,
     val height: Int,
@@ -64,7 +65,7 @@ internal class VariantStore(private val root: Path) {
             return null
         }
         return try {
-            gson.fromJson(Files.readString(file), ImageSidecar::class.java)?.also { sidecars[key] = it }
+            Json.decodeFromString(ImageSidecar.serializer(), Files.readString(file)).also { sidecars[key] = it }
         } catch (e: Exception) {
             log.warn(e) { "Could not read the sidecar of $key" }
             null
@@ -74,7 +75,7 @@ internal class VariantStore(private val root: Path) {
     fun writeSidecar(id: String, hash: String, sidecar: ImageSidecar) {
         val directory = directoryFor(id, hash)
         Files.createDirectories(directory)
-        writeAtomically(directory.resolve(SIDECAR)) { Files.writeString(it, gson.toJson(sidecar)) }
+        writeAtomically(directory.resolve(SIDECAR)) { Files.writeString(it, Json.encodeToString(ImageSidecar.serializer(), sidecar)) }
         sidecars[key(id, hash)] = sidecar
     }
 

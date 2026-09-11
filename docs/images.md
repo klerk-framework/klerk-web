@@ -432,8 +432,6 @@ class TransformerProcessor(
         install(HttpTimeout) { requestTimeoutMillis = limits.timeout.inWholeMilliseconds }
     }
 
-    private data class Metadata(val width: Int, val height: Int)
-
     override suspend fun verify() {
         val answer = runCatching { client.get("$baseUrl/health") }.getOrNull()
         checkNotNull(answer?.takeIf { it.status.isSuccess() }) { "The image transformer at $baseUrl did not answer" }
@@ -444,8 +442,8 @@ class TransformerProcessor(
         if (!response.status.isSuccess()) {
             return null
         }
-        val meta = Gson().fromJson(response.bodyAsText(), Metadata::class.java)
-        return ImageInfo(meta.width, meta.height)
+        val meta = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return ImageInfo(meta.getValue("width").jsonPrimitive.int, meta.getValue("height").jsonPrimitive.int)
     }
 
     override suspend fun stripMetadata(source: Path, target: Path): ImageInfo {
