@@ -2,8 +2,8 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.collection.*
-import dev.klerkframework.klerk.misc.ReflectedModel
-import dev.klerkframework.klerk.misc.ReflectedProperty
+import dev.klerkframework.klerk.misc.ModelDisplay
+import dev.klerkframework.klerk.misc.DisplayProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.statemachine.VoidState
@@ -21,7 +21,7 @@ import kotlinx.html.*
 import java.net.URLDecoder
 import java.nio.charset.Charset
 import kotlin.reflect.KClass
-import kotlin.reflect.full.declaredMemberProperties
+import dev.klerkframework.klerk.misc.ObjectSchema
 
 
 internal const val NON_BREAKING_SPACE = "&nbsp;"
@@ -90,14 +90,14 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     }
 
     /*
-    val refModels = list(modelView.all()) { passesFilter(it, call) }.map { ReflectedModel(it) }
+    val refModels = list(modelView.all()) { passesFilter(it, call) }.map { ModelDisplay(it) }
             refModels.forEach {
                 apply(it.populateRelations())
             }
      */
 
 
-    private fun renderPieChart(reflectedModels: List<ReflectedModel<T>>): DIV.() -> Unit = {
+    private fun renderPieChart(reflectedModels: List<ModelDisplay<T>>): DIV.() -> Unit = {
         pre(classes = "mermaid") {
             unsafe {
                 +"""pie title By state
@@ -294,7 +294,7 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
 }
 
 
-internal fun ReflectedProperty.renderValueNonBreakingHtml(): HTMLTag.() -> Unit = {
+internal fun DisplayProperty.renderValueNonBreakingHtml(): HTMLTag.() -> Unit = {
     val temporal = renderTemporalContainer(value)
     if (temporal != null) {
         unsafe { +temporal.replace("-", NON_BREAKING_HYPHEN) }
@@ -308,7 +308,7 @@ internal fun ReflectedProperty.renderValueNonBreakingHtml(): HTMLTag.() -> Unit 
     }
 }
 
-internal fun ReflectedProperty.renderNameNonBreakingHtml(): HTMLTag.() -> Unit = {
+internal fun DisplayProperty.renderNameNonBreakingHtml(): HTMLTag.() -> Unit = {
     unsafe { +name().replace("-", NON_BREAKING_HYPHEN).replace(" ", NON_BREAKING_SPACE) }
 }
 
@@ -378,8 +378,8 @@ private fun <T : Any> createMetaFilter(queryParameters: Parameters): ((Model<T>)
             }
             if (it.startsWith("contains=")) {
                 val textToFind = it.split("=").last()
-                if (model.props::class.declaredMemberProperties.none { prop ->
-                        prop.getter.call(model.props).toString().contains(textToFind)
+                if (ObjectSchema.of(model.props::class).fields.none { field ->
+                        field.get(model.props).toString().contains(textToFind)
                     }) {
                     return false
                 }

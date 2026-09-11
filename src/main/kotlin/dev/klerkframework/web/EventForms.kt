@@ -5,7 +5,8 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
-import dev.klerkframework.klerk.misc.EventParameters
+import dev.klerkframework.klerk.misc.PropertyType
+import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -20,11 +21,6 @@ import mu.KotlinLogging
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.reflect.KClass
-import kotlin.reflect.KType
-import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.full.starProjectedType
-import kotlin.reflect.full.withNullability
-import kotlin.reflect.jvm.jvmErasure
 
 private val logger = KotlinLogging.logger {}
 
@@ -111,7 +107,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
                 // TODO: this if statement should not check for "Update", that specification should be injected into the template somehow. A function?
-                val params = if (eventReference.eventName.contains("Update") && eventReference.modelName == eventWithParameters.parameters.raw.simpleName && id != null) get(id).props else null
+                val params = if (eventReference.eventName.contains("Update") && eventReference.modelName == eventWithParameters.parameters.kClass.simpleName && id != null) get(id).props else null
                 template.build(
                     call,
                     params = params,
@@ -287,113 +283,50 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
 internal class AuthenticationException(message: String? = null) : RuntimeException(message)
 
-@Suppress("UNCHECKED_CAST")
-private fun container(type: KType, value: Any): dev.klerkframework.klerk.datatypes.DataContainer<*> =
-    dev.klerkframework.klerk.datatypes.DataContainer.create(
-        type.jvmErasure as kotlin.reflect.KClass<out dev.klerkframework.klerk.datatypes.DataContainer<*>>, value
-    )
-
-internal fun valueWithCorrectType(value: String?, type: KType): Any? {
-    if (type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(true)) ||
-        type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(false))
-    ) {
-        if (value == null) {
-            return if (!type.isMarkedNullable) {
-                container(type, false)
-            } else {
-                null
-            }
-        }
+/**
+ * The value submitted for [field], as what the parameters class takes: a DataContainer, a ModelID or an
+ * AttachedBlobID. Null if nothing, or an empty selection, was submitted.
+ */
+internal fun valueWithCorrectType(value: String?, field: SchemaField): Any? {
+    if (field.type == PropertyType.Boolean) {
         // If multiple values are sent (checkbox + hidden), Ktor's callParams[name] returns the first one.
         // If checkbox is checked, it's "true". If unchecked, only "false" (from hidden) is present.
-        return container(type, value.toBoolean())
+        if (value == null) {
+            return if (field.isNullable) null else field.createContainer(false)
+        }
+        return field.createContainer(value.toBoolean())
     }
-
     if (value == null) {
         return null
     }
-
-    if (type.isSubtypeOf(AttachedBlobContainer::class.starProjectedType.withNullability(true))) {
-        // The parameter is the application's own container class, so build one around the blob the form resolved.
-        return if (value.isEmpty()) null else container(type, AttachedBlobID(value.toInt()))
-    }
-    if (type.isSubtypeOf(AttachedBlobID::class.starProjectedType.withNullability(true))) {
-        return if (value.isEmpty()) null else AttachedBlobID(value.toInt())
-    }
-    if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false))) {
-        return ModelID<Any>(value.toInt())
-    }
-    if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))) {
-        return if (value.isEmpty()) null else ModelID<Any>(value.toInt())
-    }
-    if (type.isSubtypeOf(Enum::class.starProjectedType)) {
-        @Suppress("UNCHECKED_CAST")
-        val enumClz = type.jvmErasure.java.enumConstants as Array<Enum<*>>
-        return enumClz.first { it.name == value }
-    }
-
-    if (type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return container(type, value)
-    }
-    if (type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(true))
-    ) {
-        try {
-            return container(type, value.toInt())
-        } catch (e: NumberFormatException) {
-            throw RuntimeException("Could not parse $type", e)
-        }
-    }
-    if (type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return container(type, value.toLong())
-    }
-
-    if (type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return container(type, value.toFloat())
-    }
-
-    if (type.isSubtypeOf(InstantContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(InstantContainer::class.starProjectedType.withNullability(true))
-    ) {
-        // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
-        val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
-        return container(type, local.toInstant(TimeZone.currentSystemDefault()))
-    }
-
-    if (type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return container(type, LocalDate.parse(value))
-    }
-
-    if (type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(true))
-    ) {
-        return container(type, value.toLong().seconds)
-    }
-
-    if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(true))
-    ) {
-        val enumClass = type.jvmErasure.supertypes
-            .first { it.jvmErasure == EnumContainer::class }
-            .arguments.first().type!!.jvmErasure.java
-        @Suppress("UNCHECKED_CAST")
-        val enum = java.lang.Enum.valueOf(enumClass as Class<out Enum<*>>, value)
-        return container(type, enum)
-    }
-
     try {
-        return container(type, value)
-    } catch (e: Exception) {
-        logger.error(e) { "Could not extract value from '$value' for type: $type " }
-        throw e
+        return when (field.type) {
+            PropertyType.Ref -> if (value.isEmpty()) null else ModelID<Any>(value.toInt())
+            // The application's own container class, or a bare id, around the blob the form resolved.
+            PropertyType.AttachedDataRef -> when {
+                value.isEmpty() -> null
+                field.valueClass == AttachedBlobID::class -> AttachedBlobID(value.toInt())
+                else -> field.createContainer(AttachedBlobID(value.toInt()))
+            }
+
+            PropertyType.Enum ->
+                if (value.isEmpty()) null else field.createContainer(field.enumConstants.first { it.name == value })
+
+            PropertyType.Int -> field.createContainer(value.toInt())
+            PropertyType.Long -> field.createContainer(value.toLong())
+            PropertyType.Float -> field.createContainer(value.toFloat())
+            PropertyType.Instant -> {
+                // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
+                val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
+                field.createContainer(local.toInstant(TimeZone.currentSystemDefault()))
+            }
+
+            PropertyType.Date -> field.createContainer(LocalDate.parse(value))
+            PropertyType.Duration -> field.createContainer(value.toLong().seconds)
+            else -> field.createContainer(value)
+        }
+    } catch (e: NumberFormatException) {
+        throw IllegalArgumentException("Could not parse '${field.name}'", e)
     }
 }
 
@@ -410,31 +343,7 @@ private suspend fun <C : KlerkContext, V> isCrudUpdate(
 ): Boolean {
     if (id == null) return false
     val model = klerk.read(context) { get(id) }
-    return model.props::class == e.parameters?.raw
-}
-
-private suspend fun getPossibleReferenceValues(
-    eventInputs: EventParameters<*>?,
-    actor: ActorIdentity?
-): Map<String, List<Model<Any>>> {
-    return emptyMap()
-    /*
-    if (eventInputs == null) {
-        return emptyMap()
-    }
-    logger.warn { "Will not try to find possible reference values due to bug below" }
-    return emptyMap()
-    val context = Context(actor)
-    val map = mutableMapOf<String, List<Model<Any>>>()
-    eventInputs.all
-        .filter { it.type == PropertyType.Ref }
-        .forEach { p ->
-            val suitableModelsIds = data.spec.getViewList(p.raw.type, "all")
-            val suitableModels = data.models.read(context) { list(suitableModelsIds) }
-            map[p.name] = suitableModels
-        }
-    return map
-     */
+    return model.props::class == e.parameters.kClass
 }
 
 private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): FlowContent.() -> Unit = {

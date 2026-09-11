@@ -4,7 +4,6 @@ import dev.klerkframework.klerk.ActorIdentity
 import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.datatypes.DataContainer
-import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.web.ParseResult.*
 import dev.klerkframework.web.config.*
 import io.ktor.server.application.ApplicationCall
@@ -29,10 +28,7 @@ fun main() {
     }
 
     val template = FormTemplate(
-        EventWithParameters(
-            CreateAuthor.id,
-            EventParameters(CreateAuthorParams::class),
-        ),
+        EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
         klerk,
         "/",
         classProvider = myClassProvider,

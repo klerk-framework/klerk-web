@@ -5,8 +5,8 @@ import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.datatypes.AttachedDataContainer
 import dev.klerkframework.klerk.datatypes.AttachedStringContainer
 import dev.klerkframework.klerk.read.Reader
-import dev.klerkframework.klerk.misc.ReflectedModel
-import dev.klerkframework.klerk.misc.ReflectedProperty
+import dev.klerkframework.klerk.misc.ModelDisplay
+import dev.klerkframework.klerk.misc.DisplayProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -54,7 +54,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         val (reflected, model, attachedHashes) = try {
             klerk.read(context) {
                 val model = get(id)
-                val reflectedModel = ReflectedModel(model)
+                val reflectedModel = ModelDisplay(model)
                 apply(reflectedModel.populateRelations())
                 Triple(reflectedModel, model, attachedDataHashes(reflectedModel))
             }
@@ -100,7 +100,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         support.classProvider.attr(UiPart.ModelDetails, element, property)
 
     /** The name, with the description as a tooltip when there is one. */
-    private fun propertyName(property: ReflectedProperty, context: C): FlowOrPhrasingContent.() -> Unit = {
+    private fun propertyName(property: DisplayProperty, context: C): FlowOrPhrasingContent.() -> Unit = {
         val description = property.describe(context.translation.klerk)
         if (description != null) {
             span(classes = "tooltip") {
@@ -118,7 +118,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
      *
      * Read inside the read block, so that the hashes come from the same snapshot as the model itself.
      */
-    private fun Reader<C, V>.attachedDataHashes(reflected: ReflectedModel<Any>): Map<Any, String> {
+    private fun Reader<C, V>.attachedDataHashes(reflected: ModelDisplay<Any>): Map<Any, String> {
         val result = mutableMapOf<Any, String>()
         reflected.getProperties().forEach { property ->
             val value = property.value
@@ -137,7 +137,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
 
     /** The value, linked to its own detail page when it is a reference, or to its bytes when it is attached data. */
     private fun propertyValue(
-        property: ReflectedProperty,
+        property: DisplayProperty,
         attachedHashes: Map<Any, String>,
     ): FlowOrPhrasingContent.() -> Unit = {
         val modelId = property.value
@@ -159,7 +159,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     }
 
     private fun renderProperties(
-        reflected: ReflectedModel<Any>,
+        reflected: ModelDisplay<Any>,
         context: C,
         attachedHashes: Map<Any, String>,
     ): FlowContent.() -> Unit = {
@@ -184,7 +184,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun renderMeta(reflected: ReflectedModel<Any>): FlowContent.() -> Unit = {
+    private fun renderMeta(reflected: ModelDisplay<Any>): FlowContent.() -> Unit = {
         details {
             summary { +"Meta" }
             dl {
@@ -199,7 +199,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun renderRelations(reflected: ReflectedModel<Any>): FlowContent.() -> Unit = {
+    private fun renderRelations(reflected: ModelDisplay<Any>): FlowContent.() -> Unit = {
         reflected.referencesPretty().forEach { relatedList ->
             details {
                 summary { +relatedList.key }

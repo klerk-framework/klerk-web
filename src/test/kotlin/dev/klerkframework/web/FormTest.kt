@@ -9,7 +9,6 @@ import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
-import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.klerk.validation.PropertyValidation.Valid
 import dev.klerkframework.web.ParseResult.DryRun
@@ -51,9 +50,8 @@ fun main() {
 
             generateSampleData(50, 3, klerk)
         }
-            val eventParams = EventParameters(CreateAuthorParams::class)
             val template = FormTemplate(
-                defaultValues = EventWithParameters(CreateAuthor.id, eventParams),
+                defaultValues = EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
                 klerk, "/noklerkvalidation",
                 classProvider = null,
                 pathProvider = DefaultPathProvider(),

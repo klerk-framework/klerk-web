@@ -2,7 +2,7 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.misc.AlgorithmDocumenter
-import dev.klerkframework.klerk.misc.EventParameters
+import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.misc.generateFlowChart
@@ -112,7 +112,7 @@ private fun <C : KlerkContext, V> renderStatemachine(
 private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String, csrfToken: String): FlowContent.() -> Unit = {
     h4 { +"Properties" }
     ul {
-        EventParameters(kClass).all.forEach { prop ->
+        ObjectSchema.of(kClass).fields.forEach { prop ->
             li { +prop.name }
             table {
                 tr {
@@ -127,7 +127,7 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                     td { +"Container" }
                     td {
                         span {
-                            title = prop.qualifiedName
+                            title = prop.valueClass.qualifiedName.orEmpty()
                             +prop.name
                         }
                     }
@@ -140,7 +140,7 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                 }
             }
 
-            val propClass = prop.qualifiedName
+            val propClass = prop.valueClass.qualifiedName.orEmpty()
             if (prop.type == PropertyType.String) {
                 form("$documentationPath/functionInvocation", method = FormMethod.post) {
                     with(Csrf) { tokenInput(csrfToken) }
@@ -190,7 +190,7 @@ private fun <C : KlerkContext, V> renderEvents(
                             summary { +"Parameters" }
                             ul {
                                 style = noBullets
-                                parameters.all.forEach { parameter ->
+                                parameters.fields.forEach { parameter ->
                                     details {
                                         summary { +parameter.name }
                                         table {
@@ -210,7 +210,7 @@ private fun <C : KlerkContext, V> renderEvents(
                                                 td { +"Container" }
                                                 td {
                                                     span {
-                                                        title = parameter.qualifiedName
+                                                        title = parameter.valueClass.qualifiedName.orEmpty()
                                                         +parameter.name
                                                     }
                                                 }

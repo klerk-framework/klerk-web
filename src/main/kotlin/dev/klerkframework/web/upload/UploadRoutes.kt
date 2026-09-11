@@ -19,9 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import java.util.Base64
-import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.isSubclassOf
-import kotlin.reflect.jvm.jvmErasure
 
 private val log = KotlinLogging.logger {}
 
@@ -258,15 +256,10 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
     }
     return runCatching {
         val parameters = klerk.spec.getParameters(EventReference.from(event)) ?: return null
-        val kClass = parameters.raw.declaredMemberProperties
-            .singleOrNull { it.name == property }
-            ?.returnType?.jvmErasure ?: return null
-        if (!kClass.isSubclassOf(AttachedBlobContainer::class)) {
+        val field = parameters.field(property)?.takeIf { !it.isCollection } ?: return null
+        if (!field.valueClass.isSubclassOf(AttachedBlobContainer::class)) {
             return null
         }
-        @Suppress("UNCHECKED_CAST")
-        dev.klerkframework.klerk.datatypes.DataContainer.create(
-            kClass as kotlin.reflect.KClass<out AttachedBlobContainer>, AttachedBlobID(0)
-        )
+        field.dummyContainer() as AttachedBlobContainer
     }.onFailure { log.debug(it) { "Could not read the declaration of $property on $event" } }.getOrNull()
 }

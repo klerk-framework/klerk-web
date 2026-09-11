@@ -940,9 +940,9 @@ class SwedishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation 
 
     override fun mustBeAtLeast(value: Number): String = "Måste vara minst $value"
 
-    override fun propertyDescription(property: String): String? {
+    override fun propertyDescription(property: KProperty1<*, *>): String? {
         return when (property) {
-            "firstName" -> "Det namn som kommer först"
+            CreateAuthorParams::firstName -> "Det namn som kommer först"
             else -> null
         }
     }

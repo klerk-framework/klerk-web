@@ -2,16 +2,12 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.datatypes.DataContainer
-import dev.klerkframework.klerk.datatypes.StringContainer
+import dev.klerkframework.klerk.misc.ObjectSchema
+import dev.klerkframework.klerk.misc.PropertyType
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
 import kotlinx.html.body
-import kotlin.reflect.KClass
-import kotlin.reflect.full.isSubtypeOf
-import kotlin.reflect.full.memberProperties
-import kotlin.reflect.full.starProjectedType
 
 internal const val FUNCTION_KIND = "function-kind"
 internal const val DATA_CONTAINER_VALIDATION = "data-container-validation"
@@ -32,25 +28,20 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         val property = requestParams[DATA_CONTAINER_CLASS] ?: throw IllegalArgumentException("No class provided")
         val name = requestParams["name"] ?: throw IllegalArgumentException("No name provided")
         val value = requestParams["value"] ?: throw IllegalArgumentException("No value provided")
-        val prop = klerk.spec.managedModels.flatMap { it.kClass.memberProperties }
-            .firstOrNull { it.returnType.toString() == property }
-        if (prop == null) {
+        val field = klerk.spec.managedModels.flatMap { ObjectSchema.of(it.kClass).fields }
+            .firstOrNull { it.type == PropertyType.String && it.valueClass.qualifiedName == property }
+        if (field == null) {
             support.respondPage(call, "Function") { +"No property found with name $property" }
             return
         }
 
-        if (prop.returnType.isSubtypeOf(StringContainer::class.starProjectedType)) {
-            @Suppress("UNCHECKED_CAST")
-            val container = DataContainer.create(prop.returnType.classifier as KClass<out DataContainer<*>>, value)
-            val problem = container.validate(name, context.translation)
-            if (problem != null) {
-                support.respondPage(call, "Function") { +"Validation problem: $problem" }
-                return
-            }
-            support.respondPage(call, "Function") { +"Validation successful" }
+        val problem = field.createContainer(value).validate(name, context.translation)
+        if (problem != null) {
+            support.respondPage(call, "Function") { +"Validation problem: $problem" }
             return
         }
-
+        support.respondPage(call, "Function") { +"Validation successful" }
+        return
     }
     support.respondPage(call, "Function") { +"Not implemented" }
 

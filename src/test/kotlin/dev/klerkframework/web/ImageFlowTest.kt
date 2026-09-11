@@ -7,7 +7,6 @@ import dev.klerkframework.klerk.collection.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.web.attached.attachedDataRoutes
 import dev.klerkframework.web.config.*
 import dev.klerkframework.web.image.Crop
@@ -98,7 +97,7 @@ class ImageFlowTest {
         val support = WebSupport(klerk, { _, _ -> actor })
         val layout = Layout()
         val form = FormTemplate(
-            EventWithParameters(CreateFlower.id, EventParameters(CreateFlowerParams::class)),
+            EventWithParameters(CreateFlower.id, CreateFlowerParams::class),
             klerk,
             postPath = "/flowers",
             pathProvider = DefaultPathProvider(),

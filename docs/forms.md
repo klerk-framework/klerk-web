@@ -28,8 +28,8 @@ We now want to render a form for CreateAuthorParams.
 
 ## The parameter class is the form's only source of truth
 
-A form contains exactly the parameters of its event, nothing else. If a field cannot be expressed as an
-`EventParameter`, it does not belong in a `FormTemplate` - render that form yourself. (The CSRF token and the
+A form contains exactly the parameters of its event, nothing else. If a field cannot be expressed as a parameter of
+the event, it does not belong in a `FormTemplate` - render that form yourself. (The CSRF token and the
 idempotence key are transport mechanics, not fields, which is why they are allowed.)
 
 This keeps the UI from pushing things into your domain model that do not belong there.
@@ -45,7 +45,7 @@ If you don't care about the order of the fields, just pass `remaining()` in the 
 and then the remaining fields:
 ```kotlin
 val template = FormTemplate(
-    EventWithParameters(CreateAuthor.id, EventParameters(CreateAuthorParams::class)),
+    EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
     klerk,
     postPath = "/path/to/handle/submission",
     pathProvider = support.pathProvider,
@@ -88,7 +88,7 @@ A parameter that is an `AttachedBlobContainer` is declared with `file()`, and ne
 
 ```kotlin
 val template = FormTemplate(
-    EventWithParameters(CreateDocument.id, EventParameters(CreateDocumentParams::class)),
+    EventWithParameters(CreateDocument.id, CreateDocumentParams::class),
     klerk,
     postPath = "/documents",
     pathProvider = support.pathProvider,

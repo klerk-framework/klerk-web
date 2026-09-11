@@ -36,7 +36,6 @@ import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.job.JobAgent
-import dev.klerkframework.klerk.misc.EventParameters
 import io.ktor.http.*
 import io.ktor.server.response.*
 import java.nio.file.Path
@@ -377,7 +376,7 @@ private fun flowerFormTemplate(
     klerk: Klerk<Context, MyCollections>,
     uploads: UploadPlugin<Context, MyCollections>,
 ) = FormTemplate(
-    EventWithParameters(CreateFlower.id, EventParameters(CreateFlowerParams::class)),
+    EventWithParameters(CreateFlower.id, CreateFlowerParams::class),
     klerk,
     postPath = "${pathProvider.base}flowers",
     pathProvider = pathProvider,

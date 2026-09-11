@@ -1,9 +1,9 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.misc.ReflectedModel
+import dev.klerkframework.klerk.misc.ObjectSchema
+import dev.klerkframework.klerk.misc.ModelDisplay
 import kotlinx.html.*
-import kotlin.reflect.full.memberProperties
 
 /**
  * Renders the properties of one model as a table. Use [ModelDetailPage] instead when you also want event buttons and
@@ -16,13 +16,13 @@ public fun <M : Any> FlowContent.modelProperties(
 ) {
     fun classesFor(element: String) = classProvider.attr(UiPart.ModelDetails, element, model = model)
 
-    val reflected = ReflectedModel(model)
+    val reflected = ModelDisplay(model)
     table(classesFor("table")) {
         tbody(classesFor("tbody")) {
-            (model.props::class).memberProperties.forEach { field ->
+            ObjectSchema.of(model.props::class).fields.forEach { field ->
                 tr(classesFor("tr")) {
                     td(classesFor("td")) { +field.name }
-                    td(classesFor("td")) { +field.getter.call(model.props).toString() }
+                    td(classesFor("td")) { +field.get(model.props).toString() }
                 }
             }
         }

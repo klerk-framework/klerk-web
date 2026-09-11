@@ -3,7 +3,6 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.web.config.*
 import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
@@ -28,7 +27,7 @@ import kotlin.test.assertTrue
 class MultipleFormsTest {
 
     private fun template(klerk: Klerk<Context, MyCollections>) = FormTemplate(
-        EventWithParameters(ChangeName.id, EventParameters(ChangeNameParams::class)),
+        EventWithParameters(ChangeName.id, ChangeNameParams::class),
         klerk,
         postPath = "/submit",
         pathProvider = DefaultPathProvider(),

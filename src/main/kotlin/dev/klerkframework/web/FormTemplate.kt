@@ -9,9 +9,9 @@ import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
-import dev.klerkframework.klerk.misc.EventParameter
-import dev.klerkframework.klerk.misc.EventParameters
+import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
+import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.misc.extractNameFromFunction
 import dev.klerkframework.klerk.read.Reader
@@ -43,11 +43,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.io.InputStream
 import kotlin.reflect.KClass
-import kotlin.reflect.KParameter
 import kotlin.reflect.KProperty1
-import kotlin.reflect.KTypeProjection
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.jvmErasure
+import kotlin.reflect.full.isSubclassOf
 import kotlin.time.Duration.Companion.minutes
 
 private val fileLog = KotlinLogging.logger {}
@@ -84,7 +81,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 ) {
     private val log = KotlinLogging.logger {}
 
-    internal val parameters: EventParameters<T> = defaultValues.parameters
+    internal val parameters: ObjectSchema<T> = defaultValues.parameters
 
     /*private val items = mutableListOf<Item<T>>()
     private val hidden = mutableMapOf<String, Any>()
@@ -109,53 +106,53 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         inputs.add(Pair(property.name, text))
     }
 
-    private fun text(parameter: EventParameter) = inputs.add(Pair(parameter.name, text))
+    private fun text(parameter: SchemaField) = inputs.add(Pair(parameter.name, text))
 
     public fun email(property: KProperty1<*, StringContainer?>): Unit {
         inputs.add(Pair(property.name, email))
     }
 
-    private fun email(parameter: EventParameter) =
+    private fun email(parameter: SchemaField) =
         inputs.add(Pair(parameter.name, email)) // use <input type="text" inputmode="email"> instead?
 
     public fun password(property: KProperty1<*, StringContainer?>): Unit {
         inputs.add(Pair(property.name, password))
     }
 
-    private fun password(parameter: EventParameter) = inputs.add(Pair(parameter.name, password))
+    private fun password(parameter: SchemaField) = inputs.add(Pair(parameter.name, password))
 
     public fun number(property: KProperty1<*, DataContainer<*>?>): Unit {
         inputs.add(Pair(property.name, number))
     }
 
-    private fun number(parameter: EventParameter) = inputs.add(Pair(parameter.name, number))
+    private fun number(parameter: SchemaField) = inputs.add(Pair(parameter.name, number))
 
     public fun checkbox(property: KProperty1<*, BooleanContainer?>): Unit {
         inputs.add(Pair(property.name, checkBox))
     }
 
-    private fun checkbox(parameter: EventParameter) = inputs.add(Pair(parameter.name, checkBox))
+    private fun checkbox(parameter: SchemaField) = inputs.add(Pair(parameter.name, checkBox))
 
     /** A `datetime-local` input. The value is interpreted in the browser's time zone. */
     public fun dateTime(property: KProperty1<*, InstantContainer?>): Unit {
         inputs.add(Pair(property.name, dateTimeLocal))
     }
 
-    private fun dateTime(parameter: EventParameter) = inputs.add(Pair(parameter.name, dateTimeLocal))
+    private fun dateTime(parameter: SchemaField) = inputs.add(Pair(parameter.name, dateTimeLocal))
 
     /** A `date` input — a calendar date with no time of day or time zone. */
     public fun date(property: KProperty1<*, DateContainer?>): Unit {
         inputs.add(Pair(property.name, InputType.date))
     }
 
-    private fun date(parameter: EventParameter) = inputs.add(Pair(parameter.name, InputType.date))
+    private fun date(parameter: SchemaField) = inputs.add(Pair(parameter.name, InputType.date))
 
     /** A number of seconds. */
     public fun duration(property: KProperty1<*, DurationContainer?>): Unit {
         inputs.add(Pair(property.name, number))
     }
 
-    private fun duration(parameter: EventParameter) = inputs.add(Pair(parameter.name, number))
+    private fun duration(parameter: SchemaField) = inputs.add(Pair(parameter.name, number))
 
     public fun hidden(property: KProperty1<*, Any?>): Unit {
         inputs.add(Pair(property.name, hidden))
@@ -184,11 +181,9 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      */
     @Suppress("UNCHECKED_CAST")
     internal fun blobClassFor(propertyName: String): KClass<out AttachedBlobContainer> {
-        val kClass = parameters.raw.declaredMemberProperties
-            .singleOrNull { it.name == propertyName }
-            ?.returnType?.jvmErasure
+        val kClass = parameters.field(propertyName)?.takeIf { !it.isCollection }?.valueClass
         require(kClass != null && kClass.isSubclassOf(AttachedBlobContainer::class)) {
-            "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but ${parameters.raw.simpleName}." +
+            "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but ${parameters.kClass.simpleName}." +
                     "$propertyName is ${kClass?.simpleName ?: "not a parameter at all"}"
         }
         return kClass as KClass<out AttachedBlobContainer>
@@ -200,28 +195,24 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * The blob id it is given is a placeholder: what is wanted here is the declaration, not a particular value.
      */
     internal fun blobDeclarationFor(propertyName: String): AttachedBlobContainer? {
-        val kClass = parameters.raw.declaredMemberProperties
-            .singleOrNull { it.name == propertyName }
-            ?.returnType?.jvmErasure ?: return null
-        if (!kClass.isSubclassOf(AttachedBlobContainer::class)) {
+        val field = parameters.field(propertyName)?.takeIf { !it.isCollection } ?: return null
+        if (!field.valueClass.isSubclassOf(AttachedBlobContainer::class)) {
             return null
         }
-        return runCatching {
-            @Suppress("UNCHECKED_CAST")
-            DataContainer.create(kClass as KClass<out AttachedBlobContainer>, AttachedBlobID(0))
-        }.onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
+        return runCatching { field.dummyContainer() as AttachedBlobContainer }
+            .onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
     }
 
     public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit {
         selectReferences.add(property.name)
     }
 
-    private fun selectReference(parameter: EventParameter) = selectReferences.add(parameter.name)
+    private fun selectReference(parameter: SchemaField) = selectReferences.add(parameter.name)
 
-    private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
+    private fun selectEnum(parameter: SchemaField) = selectEnums.add(parameter.name)
 
     /*    fun selectEnum(property: KProperty1<*, EnumContainer<*>>) = selectEnums.add(property.name)
-        private fun selectEnum(parameter: EventParameter) = selectEnums.add(parameter.name)
+        private fun selectEnum(parameter: SchemaField) = selectEnums.add(parameter.name)
      */
 
     public fun populatedAfterSubmit(property: KProperty1<*, Any?>): Unit {
@@ -230,7 +221,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     public fun remaining(inHtmlDetails: String? = null): Unit {
         htmlDetailsSummary = inHtmlDetails
-        val remaining = parameters.all
+        val remaining = parameters.fields
             .filter { p -> inputs.none { input -> input.first == p.name } }
             .filter { p -> selectReferences.none { select -> select == p.name } }
             .filter { p -> selectEnums.none { select -> select == p.name } }
@@ -304,25 +295,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     private fun populateEnumSelects(): Set<EnumPropertyWithOptions> {
         val result = mutableSetOf<EnumPropertyWithOptions>()
-        parameters.all
+        parameters.fields
             .filter { selectEnums.contains(it.name) }
             .forEach { eventParameter ->
-                val validEnums =
-                    klerk.spec.getValidEnumsFor(defaultValues.eventReference, eventParameter) ?: getEnumEntries(
-                        eventParameter.valueClass.supertypes.first { it.classifier == EnumContainer::class }.arguments.first()
-                    )
+                val validEnums = klerk.spec.getValidEnumsFor(defaultValues.eventReference, eventParameter)
+                    ?: eventParameter.enumConstants.toSet()
                 result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
             }
         return result
-    }
-
-    private fun getEnumEntries(projection: KTypeProjection): Set<Enum<*>>  {
-        val kType = projection.type ?: error("Projection has no type")
-        val kClass = kType.classifier as? KClass<*> ?: error("Not a class type")
-        if (!kClass.java.isEnum) {
-            error("Type is not an enum")
-        }
-        return kClass.java.enumConstants.toSet() as Set<Enum<*>>
     }
 
     private fun populateMissingReferenceSelects(
@@ -332,8 +312,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         context: C,
     ): Set<ReferencePropertyWithOptions> {
         val result = mutableSetOf<ReferencePropertyWithOptions>()
-        parameters.all
-            .filter { it.raw.type.withNullability(false).isSubtypeOf(ModelID::class.starProjectedType) }
+        parameters.fields
+            .filter { it.type == PropertyType.Ref }
             .map { eventParameter ->
                 val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
@@ -345,7 +325,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     TODO("Too many options")
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
-                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.spec.getPossibleVoidEvents(eventParameter.raw.type.arguments.single().type!!.jvmErasure, context)
+                    val referencedModel = eventParameter.referencedModel
+                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else klerk.spec.getPossibleVoidEvents(referencedModel, context)
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -373,7 +354,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             )
         }
 
-        val missing = parameters.all
+        val missing = parameters.fields
             .filterNot { prop -> inputs.map { i -> i.first }.contains(prop.name) }
             .filterNot { prop -> selectReferences.contains(prop.name) }
             .filterNot { prop -> selectEnums.contains(prop.name) }
@@ -381,17 +362,17 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .filterNot { prop -> fileInputs.contains(prop.name) }
         if (missing.isNotEmpty()) {
             throw IllegalStateException(
-                "Form for class ${parameters.raw} is missing declaration for ${
+                "Form for class ${parameters.kClass} is missing declaration for ${
                     missing.map { it.name }.joinToString(", ")
                 }"
             )
         }
         val tooMany = inputs        // also selects and other stuff...
             .map { i -> i.first }
-            .filterNot { i -> parameters.all.map { it.name }.contains(i) }
+            .filterNot { i -> parameters.fields.map { it.name }.contains(i) }
         if (tooMany.isNotEmpty()) {
             throw IllegalStateException(
-                "Form for class ${parameters.raw} contains too many declarations: ${
+                "Form for class ${parameters.kClass} contains too many declarations: ${
                     tooMany.joinToString(
                         ", "
                     )
@@ -460,18 +441,13 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         // someday maybe: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#verifying-origin-with-standard-headers
         try {
             @Suppress("UNCHECKED_CAST")
-            val paramsClass = createParamClassFromCallParameters(parameters.raw, allParams) as T
+            val paramsClass = createParamClassFromCallParameters(parameters, allParams) as T
 
             // Level 1: each property on its own.
             val propertyValidationProblems = mutableSetOf<InvalidPropertyProblem>()
-            paramsClass::class.memberProperties.forEach { property ->
-                if (property.returnType.isSubtypeOf(DataContainer::class.starProjectedType)) {
-                    val problem =
-                        (property.getter.call(paramsClass) as DataContainer<*>).validate(property.name, context.translation)
-                    if (problem != null) {
-                        propertyValidationProblems.add(problem)
-                    }
-                }
+            parameters.fields.forEach { field ->
+                val container = field.get(paramsClass) as? DataContainer<*> ?: return@forEach
+                container.validate(field.name, context.translation)?.let { propertyValidationProblems.add(it) }
             }
 
             if (propertyValidationProblems.isNotEmpty()) {
@@ -980,7 +956,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             id = labelId(propertyName)
             attributes["data-label-for"] = propertyName
             htmlFor = elementId(propertyName)
-            val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
+            val property = requireNotNull(template.parameters.field(propertyName)).property
             +(template.labelProvider?.invoke(
                 UIElementData(propertyName, dummyContainerFor(propertyName), true)
             ) ?: translator.klerk.property(property))
@@ -992,7 +968,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             // takes over, so the bytes are not sent twice.
             name = propertyName
             attributes["data-klerk-file"] = propertyName
-            required = !template.parameters.all.single { it.name == propertyName }.isNullable
+            required = !template.parameters.fields.single { it.name == propertyName }.isNullable
             // Derived from the property's AttachedBlobContainer, the same way maxlength is derived from a StringContainer.
             // It only helps the user pick the right file; what actually keeps a wrong one out is the check the
             // command makes against the bytes.
@@ -1011,7 +987,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     }
 
     private fun dummyContainerFor(propertyName: String): DataContainer<*> =
-        template.parameters.all.single { it.name == propertyName }.getDummyInstance()
+        template.parameters.fields.single { it.name == propertyName }.dummyContainer()
 
     private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): FlowContent.() -> Unit = {
         label {
@@ -1083,12 +1059,12 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun renderInput(
         propertyName: String,
         type: InputType,
-        parameters: EventParameters<T>,
+        parameters: ObjectSchema<T>,
         params: T?,
         classProvider: CssClassProvider?,
     ): FlowContent.() -> Unit =
         {
-            val prop = parameters.all.single { it.name == propertyName }
+            val prop = parameters.fields.single { it.name == propertyName }
             val isNullable = prop.isNullable
             // A prefilled value can legitimately be null (a nullable param that isn't set); fall back to a default so
             // there is still a container to derive the input type and constraints from.
@@ -1096,8 +1072,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             val hasValue = params == null || prefilled != null
             val value: DataContainer<*> = prefilled
                 ?: prop.kotlinDefaultInstance
-                ?: prop.recommendedDefaultValue?.let { prop.getInstance(it) }
-                ?: prop.getDummyInstance()
+                ?: prop.recommendedDefaultValue?.let { prop.createContainer(it) }
+                ?: prop.dummyContainer()
 
             if (isNullable && type != InputType.hidden) {
                 apply(renderNullableToggle(propertyName, hasValue))
@@ -1165,14 +1141,10 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             }
         }
 
-    private fun getModelId(propertyName: String, params: T): ModelID<*>? {
-        val prop = params::class.memberProperties.single { it.name == propertyName }
-        return try {
-            prop.getter.call(params) as ModelID<*>
-        } catch (e: Exception) {
-            null
-        }
-    }
+    private fun paramValue(propertyName: String, params: T): Any? =
+        requireNotNull(template.parameters.field(propertyName)).get(params)
+
+    private fun getModelId(propertyName: String, params: T): ModelID<*>? = paramValue(propertyName, params) as? ModelID<*>
 
     private fun createLabel(
         propertyName: String,
@@ -1180,7 +1152,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         //enabled: Boolean
     ): FlowContent.() -> Unit = {
         //val elementData = UIElementData(propertyName, typeInstance, enabled)
-        val description = translator.klerk.propertyDescription(propertyName)
+        val description =
+            translator.klerk.propertyDescription(requireNotNull(template.parameters.field(propertyName)).property)
         if (description != null) {
             label(classes = "tooltip") {
                 attributes["data-description"] = description
@@ -1192,7 +1165,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                 //}
                 //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
 //            +translator.translateProperty(propertyName)
-                val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
+                val property = requireNotNull(template.parameters.field(propertyName)).property
                 +translator.klerk.property(property)
                 //+camelCaseToPretty(propertyName)
                 }
@@ -1207,7 +1180,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             //}
             //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
 //            +translator.translateProperty(propertyName)
-            val property = template.parameters.raw.declaredMemberProperties.single { it.name == propertyName }
+            val property = requireNotNull(template.parameters.field(propertyName)).property
             +translator.klerk.property(property)
             //+camelCaseToPretty(propertyName)
         }
@@ -1403,20 +1376,13 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         apply(createErrorPlaceholder(propertyName))
     }
 
-    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? {
-        val prop = params::class.memberProperties.single { it.name == propertyName }
-        return prop.getter.call(params) as DataContainer<*>?
-    }
+    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? =
+        paramValue(propertyName, params) as DataContainer<*>?
 
-    private fun getModelIdValue(propertyName: String, params: T): Int? {
-        val prop = params::class.memberProperties.single { it.name == propertyName }
-        return (prop.getter.call(params) as? ModelID<*>)?.value
-    }
+    private fun getModelIdValue(propertyName: String, params: T): Int? = getModelId(propertyName, params)?.value
 
-    private fun getEnumValue(propertyName: String, params: T): String? {
-        val prop = params::class.memberProperties.single { it.name == propertyName }
-        return (prop.getter.call(params) as? Enum<*>)?.name
-    }
+    private fun getEnumValue(propertyName: String, params: T): String? =
+        (paramValue(propertyName, params) as? EnumContainer<*>)?.valueOrNullIfNotAuthorized
 
     internal fun renderInto(tag: FlowContent, postPath: String? = null) {
         val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
@@ -1598,37 +1564,26 @@ private fun ParametersBuilder.appendBlob(name: String, blob: AttachedBlobID) {
     append("null-toggle-$name", "on")
 }
 
-internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {
-    val constructor = requireNotNull(parameterClass.primaryConstructor) { "${parameterClass.simpleName} has no primary constructor" }
-    val parameters = mutableMapOf<KParameter, Any?>()
-
-    constructor.parameters
-        .forEach {
-            // A nullable reference (renderReferenceSelect) or enum (renderEnumSelect) is a <select> with its own
-            // "(none)" option, not a renderInput() field -- so unlike those, it never gets a null-toggle checkbox.
-            // Without this check, every nullable reference/enum select was silently forced to null on submit,
-            // regardless of what the user picked, since callParams[nullToggleKey] is always absent for them.
-            val isReferenceOrEnumSelect = it.type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true)) ||
-                    it.type.withNullability(false).isSubtypeOf(Enum::class.starProjectedType)
-            val nullToggleKey = "null-toggle-${it.name!!}"
-            val isNullToggled = callParams[nullToggleKey] != "on"
-            if (!isReferenceOrEnumSelect && isNullToggled && it.type.isMarkedNullable) {
-                parameters[it] = null
-            } else {
-                val value = valueWithCorrectType(callParams[it.name!!], it.type)
-                if (value != null) {
-                    parameters[it] = value
-                    //    log.debug { "set ${it.name} to $value}" }
-                } else {
-                    if (it.type.isMarkedNullable) {
-                        parameters[it] = value
-                    } else {
-                        // throw IllegalArgumentException("${it.name} is null but it is not nullable and it is not optional")
-                    }
-                }
+/** A field left out of the submission gets its default value, if it has one. */
+internal fun createParamClassFromCallParameters(schema: ObjectSchema<*>, callParams: Parameters): Any {
+    val values = mutableMapOf<String, Any?>()
+    schema.fields.forEach { field ->
+        // A nullable reference (renderReferenceSelect) or enum (renderEnumSelect) is a <select> with its own
+        // "(none)" option, not a renderInput() field -- so unlike those, it never gets a null-toggle checkbox.
+        // Without this check, every nullable reference/enum select was silently forced to null on submit,
+        // regardless of what the user picked, since callParams[nullToggleKey] is always absent for them.
+        val isReferenceOrEnumSelect = field.type == PropertyType.Ref || field.type == PropertyType.Enum
+        val isNullToggled = callParams["null-toggle-${field.name}"] != "on"
+        if (!isReferenceOrEnumSelect && isNullToggled && field.isNullable) {
+            values[field.name] = null
+        } else {
+            val value = valueWithCorrectType(callParams[field.name], field)
+            if (value != null || field.isNullable) {
+                values[field.name] = value
             }
         }
-    return constructor.callBy(parameters)
+    }
+    return schema.create(values)
 }
 
 /**

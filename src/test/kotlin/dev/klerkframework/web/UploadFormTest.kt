@@ -8,7 +8,6 @@ import dev.klerkframework.klerk.collection.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.misc.EventParameters
 import dev.klerkframework.web.config.*
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
@@ -49,7 +48,7 @@ class UploadFormTest {
         val support = WebSupport(klerk, { _, _ -> context() })
 
         val template = FormTemplate(
-            EventWithParameters(CreateDocument.id, EventParameters(CreateDocumentParams::class)),
+            EventWithParameters(CreateDocument.id, CreateDocumentParams::class),
             klerk,
             postPath = "/documents",
             pathProvider = DefaultPathProvider(),
@@ -60,7 +59,7 @@ class UploadFormTest {
         }
 
         val noteTemplate = FormTemplate(
-            EventWithParameters(CreateNote.id, EventParameters(CreateNoteParams::class)),
+            EventWithParameters(CreateNote.id, CreateNoteParams::class),
             klerk,
             postPath = "/notes",
             pathProvider = DefaultPathProvider(),
@@ -484,7 +483,7 @@ class UploadFormTest {
 
         // FlowerImage declares image types and a maximum size
         val template = FormTemplate(
-            EventWithParameters(CreateFlower.id, EventParameters(CreateFlowerParams::class)),
+            EventWithParameters(CreateFlower.id, CreateFlowerParams::class),
             klerk,
             postPath = "/flowers",
             pathProvider = DefaultPathProvider(),
