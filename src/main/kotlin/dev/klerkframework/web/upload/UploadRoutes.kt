@@ -19,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mu.KotlinLogging
 import java.util.Base64
-import kotlin.reflect.full.isSubclassOf
 
 private val log = KotlinLogging.logger {}
 
@@ -257,7 +256,7 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
     return runCatching {
         val parameters = klerk.spec.getParameters(EventReference.from(event)) ?: return null
         val field = parameters.field(property)?.takeIf { !it.isCollection } ?: return null
-        if (!field.valueClass.isSubclassOf(AttachedBlobContainer::class)) {
+        if (field.blobDeclaration == null) {
             return null
         }
         field.dummyContainer() as AttachedBlobContainer

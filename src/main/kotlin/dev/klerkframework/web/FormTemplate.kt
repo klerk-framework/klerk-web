@@ -43,7 +43,6 @@ import java.time.format.FormatStyle
 import java.io.InputStream
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
-import kotlin.reflect.full.isSubclassOf
 import kotlin.time.Duration.Companion.minutes
 
 private val fileLog = KotlinLogging.logger {}
@@ -178,14 +177,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      *
      * [blobDeclarationFor] answers "what does this property declare"; this answers "which declaration is it".
      */
-    @Suppress("UNCHECKED_CAST")
     internal fun blobClassFor(propertyName: String): KClass<out AttachedBlobContainer> {
-        val kClass = parameters.field(propertyName)?.takeIf { !it.isCollection }?.valueClass
-        require(kClass != null && kClass.isSubclassOf(AttachedBlobContainer::class)) {
+        val field = parameters.field(propertyName)?.takeIf { !it.isCollection }
+        return field?.blobDeclaration ?: throw IllegalArgumentException(
             "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but ${parameters.kClass.simpleName}." +
-                    "$propertyName is ${kClass?.simpleName ?: "not a parameter at all"}"
-        }
-        return kClass as KClass<out AttachedBlobContainer>
+                    "$propertyName is ${field?.valueClass?.simpleName ?: "not a parameter at all"}"
+        )
     }
 
     /**
@@ -195,7 +192,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      */
     internal fun blobDeclarationFor(propertyName: String): AttachedBlobContainer? {
         val field = parameters.field(propertyName)?.takeIf { !it.isCollection } ?: return null
-        if (!field.valueClass.isSubclassOf(AttachedBlobContainer::class)) {
+        if (field.blobDeclaration == null) {
             return null
         }
         return runCatching { field.dummyContainer() as AttachedBlobContainer }

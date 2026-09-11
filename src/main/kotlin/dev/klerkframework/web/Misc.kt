@@ -26,7 +26,6 @@ import kotlinx.html.*
 import kotlinx.html.stream.appendHTML
 import java.security.SecureRandom
 import kotlin.reflect.KClass
-import kotlin.reflect.KType
 
 internal val secureRandom = SecureRandom.getInstanceStrong()
 
@@ -36,10 +35,6 @@ internal fun autoRefresh(seconds: Int): HEAD.() -> Unit = {
     meta { httpEquiv = "refresh"; content = seconds.toString() }
 }
 
-
-internal fun isModelId(type: KType): Boolean {
-    return type.toString().startsWith(ModelID::class.qualifiedName!!, false)
-}
 
 internal fun FlowContent.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
     val name = camelCaseToPretty(requireNotNull(clazz.simpleName))
