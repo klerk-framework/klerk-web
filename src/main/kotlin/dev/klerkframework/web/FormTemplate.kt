@@ -207,7 +207,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             return null
         }
         return runCatching {
-            kClass.constructors.single { c -> c.parameters.size == 1 }.call(AttachedBlobID(0)) as AttachedBlobContainer
+            @Suppress("UNCHECKED_CAST")
+            DataContainer.create(kClass as KClass<out AttachedBlobContainer>, AttachedBlobID(0))
         }.onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
     }
 
@@ -344,7 +345,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     TODO("Too many options")
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
-                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.spec.getPossibleVoidEvents(Class.forName(eventParameter.modelIDType).kotlin, context)
+                    val suggestedEvents = if (options.isNotEmpty()) emptyList() else klerk.spec.getPossibleVoidEvents(eventParameter.raw.type.arguments.single().type!!.jvmErasure, context)
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -1598,10 +1599,10 @@ private fun ParametersBuilder.appendBlob(name: String, blob: AttachedBlobID) {
 }
 
 internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callParams: Parameters): Any {
-    val constructors = parameterClass.constructors
+    val constructor = requireNotNull(parameterClass.primaryConstructor) { "${parameterClass.simpleName} has no primary constructor" }
     val parameters = mutableMapOf<KParameter, Any?>()
 
-    constructors.first().parameters
+    constructor.parameters
         .forEach {
             // A nullable reference (renderReferenceSelect) or enum (renderEnumSelect) is a <select> with its own
             // "(none)" option, not a renderInput() field -- so unlike those, it never gets a null-toggle checkbox.
@@ -1627,7 +1628,7 @@ internal fun createParamClassFromCallParameters(parameterClass: KClass<*>, callP
                 }
             }
         }
-    return constructors.first().callBy(parameters)
+    return constructor.callBy(parameters)
 }
 
 /**

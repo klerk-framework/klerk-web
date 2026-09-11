@@ -287,20 +287,26 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
 internal class AuthenticationException(message: String? = null) : RuntimeException(message)
 
+@Suppress("UNCHECKED_CAST")
+private fun container(type: KType, value: Any): dev.klerkframework.klerk.datatypes.DataContainer<*> =
+    dev.klerkframework.klerk.datatypes.DataContainer.create(
+        type.jvmErasure as kotlin.reflect.KClass<out dev.klerkframework.klerk.datatypes.DataContainer<*>>, value
+    )
+
 internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     if (type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(true)) ||
         type.isSubtypeOf(BooleanContainer::class.starProjectedType.withNullability(false))
     ) {
         if (value == null) {
             return if (!type.isMarkedNullable) {
-                type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(false)
+                container(type, false)
             } else {
                 null
             }
         }
         // If multiple values are sent (checkbox + hidden), Ktor's callParams[name] returns the first one.
         // If checkbox is checked, it's "true". If unchecked, only "false" (from hidden) is present.
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toBoolean())
+        return container(type, value.toBoolean())
     }
 
     if (value == null) {
@@ -309,9 +315,7 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
 
     if (type.isSubtypeOf(AttachedBlobContainer::class.starProjectedType.withNullability(true))) {
         // The parameter is the application's own container class, so build one around the blob the form resolved.
-        return if (value.isEmpty()) null else type.jvmErasure.constructors
-            .single { it.parameters.size == 1 }
-            .call(AttachedBlobID(value.toInt()))
+        return if (value.isEmpty()) null else container(type, AttachedBlobID(value.toInt()))
     }
     if (type.isSubtypeOf(AttachedBlobID::class.starProjectedType.withNullability(true))) {
         return if (value.isEmpty()) null else AttachedBlobID(value.toInt())
@@ -324,20 +328,20 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     }
     if (type.isSubtypeOf(Enum::class.starProjectedType)) {
         @Suppress("UNCHECKED_CAST")
-        val enumClz = Class.forName(type.toString()).enumConstants as Array<Enum<*>>
+        val enumClz = type.jvmErasure.java.enumConstants as Array<Enum<*>>
         return enumClz.first { it.name == value }
     }
 
     if (type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(StringContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value)
+        return container(type, value)
     }
     if (type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(IntContainer::class.starProjectedType.withNullability(true))
     ) {
         try {
-            return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toInt())
+            return container(type, value.toInt())
         } catch (e: NumberFormatException) {
             throw RuntimeException("Could not parse $type", e)
         }
@@ -345,13 +349,13 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     if (type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(LongContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toLong())
+        return container(type, value.toLong())
     }
 
     if (type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(FloatContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toFloat())
+        return container(type, value.toFloat())
     }
 
     if (type.isSubtypeOf(InstantContainer::class.starProjectedType.withNullability(false)) ||
@@ -359,20 +363,19 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
     ) {
         // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
         val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }
-            .call(local.toInstant(TimeZone.currentSystemDefault()))
+        return container(type, local.toInstant(TimeZone.currentSystemDefault()))
     }
 
     if (type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(DateContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(LocalDate.parse(value))
+        return container(type, LocalDate.parse(value))
     }
 
     if (type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(false)) ||
         type.isSubtypeOf(DurationContainer::class.starProjectedType.withNullability(true))
     ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value.toLong().seconds)
+        return container(type, value.toLong().seconds)
     }
 
     if (type.isSubtypeOf(EnumContainer::class.starProjectedType.withNullability(false)) ||
@@ -383,17 +386,11 @@ internal fun valueWithCorrectType(value: String?, type: KType): Any? {
             .arguments.first().type!!.jvmErasure.java
         @Suppress("UNCHECKED_CAST")
         val enum = java.lang.Enum.valueOf(enumClass as Class<out Enum<*>>, value)
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(enum)
-    }
-
-    if (type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(false)) ||
-        type.isSubtypeOf(ModelID::class.starProjectedType.withNullability(true))
-    ) {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(ModelID<Any>(value.toInt()))
+        return container(type, enum)
     }
 
     try {
-        return type.jvmErasure.constructors.single { it.parameters.size == 1 }.call(value)
+        return container(type, value)
     } catch (e: Exception) {
         logger.error(e) { "Could not extract value from '$value' for type: $type " }
         throw e

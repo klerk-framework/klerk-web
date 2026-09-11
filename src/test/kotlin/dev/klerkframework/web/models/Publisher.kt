@@ -33,7 +33,7 @@ fun publisherStateMachine(views: MyCollections): StateMachine<Publisher, Publish
         }
 
         event(UpdatePublisher) {
-            validReferences(CreatePublisherParams::city, views.cities.all)
+            validReferences(Publisher::city, views.cities.all)
         }
 
         voidState {

@@ -264,6 +264,9 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
         if (!kClass.isSubclassOf(AttachedBlobContainer::class)) {
             return null
         }
-        kClass.constructors.single { it.parameters.size == 1 }.call(AttachedBlobID(0)) as AttachedBlobContainer
+        @Suppress("UNCHECKED_CAST")
+        dev.klerkframework.klerk.datatypes.DataContainer.create(
+            kClass as kotlin.reflect.KClass<out AttachedBlobContainer>, AttachedBlobID(0)
+        )
     }.onFailure { log.debug(it) { "Could not read the declaration of $property on $event" } }.getOrNull()
 }

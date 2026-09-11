@@ -40,8 +40,8 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         }
 
         if (prop.returnType.isSubtypeOf(StringContainer::class.starProjectedType)) {
-            val container =
-                (prop.returnType.classifier as KClass<*>).constructors.single { it.parameters.size == 1 }.call(value) as DataContainer<*>
+            @Suppress("UNCHECKED_CAST")
+            val container = DataContainer.create(prop.returnType.classifier as KClass<out DataContainer<*>>, value)
             val problem = container.validate(name, context.translation)
             if (problem != null) {
                 support.respondPage(call, "Function") { +"Validation problem: $problem" }
