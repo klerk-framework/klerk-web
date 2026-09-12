@@ -13,7 +13,7 @@ import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.misc.camelCaseToPretty
-import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.formJs
@@ -260,7 +260,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     public fun build(
         call: ApplicationCall,
         params: T?,
-        reader: Reader<C, *>,
+        reader: ModelReader<C, *>,
         modelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>> = emptyMap(),
         // enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>? = null,
         path: String? = null,
@@ -303,7 +303,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     private fun populateMissingReferenceSelects(
         developerProvidedModelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>>,
-        reader: Reader<C, *>,
+        reader: ModelReader<C, *>,
         inputs: List<Pair<String, InputType>>,
         context: C,
     ): Set<ReferencePropertyWithOptions> {

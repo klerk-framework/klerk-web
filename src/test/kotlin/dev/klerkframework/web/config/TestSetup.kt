@@ -23,7 +23,7 @@ import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
-import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
 import dev.klerkframework.klerk.storage.AttachedBlobStore
@@ -594,9 +594,8 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
             ),
         ),
         Context.system(),
-        ProcessingOptions(CommandToken.simple()),
     )
-    return requireNotNull(result.orThrow().primaryModel)
+    return requireNotNull(result.getOrThrow().primaryModel)
 }
 
 suspend fun createAuthorAstrid(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
@@ -607,10 +606,9 @@ suspend fun createAuthorAstrid(klerk: Klerk<Context, MyCollections>): ModelID<Au
             params = createAstridParameters,
         ),
         Context.system(),
-        ProcessingOptions(CommandToken.simple()),
     )
     @Suppress("UNCHECKED_CAST")
-    return result.orThrow().createdModels.single() as ModelID<Author>
+    return result.getOrThrow().createdModels.single() as ModelID<Author>
 }
 
 val createAstridParameters = CreateAuthorParams(
@@ -638,9 +636,8 @@ suspend fun createBookHarryPotter1(klerk: Klerk<Context, MyCollections>, author:
             ),
         ),
         Context.system(),
-        ProcessingOptions(CommandToken.simple())
     )
-    return requireNotNull(result.orThrow().primaryModel)
+    return requireNotNull(result.getOrThrow().primaryModel)
 }
 
 suspend fun createBookHarryPotter2(
@@ -663,9 +660,8 @@ suspend fun createBookHarryPotter2(
             ),
         ),
         Context.system(),
-        ProcessingOptions(CommandToken.simple()),
     )
-    return requireNotNull(result.orThrow().primaryModel)
+    return requireNotNull(result.getOrThrow().primaryModel)
 }
 
 class PhoneNumber(value: String) : StringContainer(value) {
@@ -986,7 +982,7 @@ class AuthorsWithAtLeastTwoBooks<V>(
     private val books: AllModelView<Book, Context>,
 ) : ModelView<Author, Context>(authors) {
 
-    override fun <V> memberIds(reader: Reader<Context, V>): Sequence<ModelID<Author>> {
+    override fun <V> memberIds(reader: ModelReader<Context, V>): Sequence<ModelID<Author>> {
         val authorsWithTwoBooks = books.withReader(reader)
             .groupingBy { it.props.author }
             .eachCount()
@@ -995,7 +991,7 @@ class AuthorsWithAtLeastTwoBooks<V>(
         return authors.memberIds(reader).filter { authorsWithTwoBooks.contains(it) }
     }
 
-    override fun <V> contains(value: ModelID<*>, reader: Reader<Context, V>): Boolean =
+    override fun <V> contains(value: ModelID<*>, reader: ModelReader<Context, V>): Boolean =
         memberIds(reader).any { it.value == value.value }
 
 }
@@ -1024,14 +1020,13 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                 ),
             ),
             Context.system(),
-            ProcessingOptions(CommandToken.simple()),
         )
 
         if (i % 10 == 0) {
             klerk.handle(
                 Command(
                     event = ImproveAuthor,
-                    model = result.orThrow().primaryModel,
+                    model = result.getOrThrow().primaryModel,
                     params = null
                 ),
                 context = Context.system(),
@@ -1041,7 +1036,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
             )
         }
 
-        val authorRef = requireNotNull(result.orThrow().primaryModel)
+        val authorRef = requireNotNull(result.getOrThrow().primaryModel)
         println("Author: $authorRef")
 
         val author = klerk.read(Context.system()) { get(authorRef) }
@@ -1061,7 +1056,6 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     ),
                 ),
                 Context.system(),
-                ProcessingOptions(CommandToken.simple())
             )
         }
     }

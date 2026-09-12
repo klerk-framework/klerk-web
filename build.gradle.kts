@@ -73,6 +73,11 @@ kotlin {
     explicitApi = ExplicitApiMode.Strict
 }
 
+// The admin UI renders Klerk's experimental algorithm documentation.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.optIn.add("dev.klerkframework.klerk.ExperimentalKlerkApi")
+}
+
 
 // Declares Markdown Gradle plugin
 @OptIn(InternalDokkaGradlePluginApi::class)

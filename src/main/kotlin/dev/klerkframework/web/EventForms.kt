@@ -348,9 +348,8 @@ private suspend fun <C : KlerkContext, V> isCrudUpdate(
 
 private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): FlowContent.() -> Unit = {
     result.createdModels.forEach { p { +"Model (id: $it) was created" } }
-    result.modelsWithUpdatedProps.forEach { p { +"Model (id: $it) was updated" } }
+    result.updatedModels.forEach { p { +"Model (id: $it) was updated" } }
     result.deletedModels.forEach { p { +"Model (id: $it) was deleted" } }
-    result.secondaryEvents.forEach { p { +"Secondary event executed: $it" } }
     result.jobs.forEach { p { +"Job (id: $it) was created" } }
 }
 

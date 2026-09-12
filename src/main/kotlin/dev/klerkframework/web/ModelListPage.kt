@@ -5,7 +5,7 @@ import dev.klerkframework.klerk.collection.*
 import dev.klerkframework.klerk.misc.ModelDisplay
 import dev.klerkframework.klerk.misc.DisplayProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
-import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.statemachine.VoidState
 import dev.klerkframework.web.assets.CssAsset
 import io.ktor.client.request.request
@@ -478,7 +478,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
 
     public fun build(
         source: ModelView<T, C>,
-        reader: Reader<C, V>,
+        reader: ModelReader<C, V>,
         call: ApplicationCall,
     ): Table<T, C, V> {
         val queryOptions = createQueryOptions(call.request.queryParameters, pageSize)

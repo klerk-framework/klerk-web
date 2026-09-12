@@ -24,9 +24,9 @@ internal suspend fun <C : KlerkContext, V> renderLog(
                     // anymore. So we can only use the template and facts here. (but for now we have to use toLogMessage())
 
                     details {
-                        summary { +"${dateTimeFormatter.format(entry.time.toLocalDateTime(TimeZone.currentSystemDefault()))} ${entry.getHeading()}" }
+                        summary { +"${dateTimeFormatter.format(entry.time.toLocalDateTime(TimeZone.currentSystemDefault()))} ${entry.heading}" }
                         table {
-                            entry.getContent()?.let {
+                            entry.content?.let {
                                 tr {
                                     td { +"Content" }
                                     td { +it }

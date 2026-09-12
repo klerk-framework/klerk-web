@@ -101,10 +101,9 @@ class ImageVariantsTest {
                 params = CreatePublicationParams(PublicCover(cover), PublicBody(body), null),
             ),
             author,
-            ProcessingOptions(CommandToken.simple()),
         )
         @Suppress("UNCHECKED_CAST")
-        return requireNotNull(result.orThrow().primaryModel) as ModelID<Publication>
+        return requireNotNull(result.getOrThrow().primaryModel) as ModelID<Publication>
     }
 
     private suspend fun coverPath(id: ModelID<Publication>, variant: String?): String {
@@ -364,8 +363,7 @@ class ImageVariantsTest {
         klerk.handle(
             Command(event = DeletePublication, model = id, params = null),
             author,
-            ProcessingOptions(CommandToken.simple()),
-        ).orThrow()
+        ).getOrThrow()
         images.sweep()
 
         assertTrue(listing().none { it == "320.png" }, "the variants outlived their blob: ${listing()}")

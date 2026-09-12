@@ -120,9 +120,8 @@ public class UploadPlugin<C : KlerkContext, V>(
                 ),
             ),
             context,
-            ProcessingOptions(CommandToken.simple()),
         )
-        return requireNotNull(result.orThrow().primaryModel)
+        return requireNotNull(result.getOrThrow().primaryModel)
     }
 
     /**
@@ -239,8 +238,7 @@ public class UploadPlugin<C : KlerkContext, V>(
                     params = RecordUploadedBytesParams(ByteCount(written)),
                 ),
                 systemContext(),
-                ProcessingOptions(CommandToken.simple()),
-            ).orThrow()
+            ).getOrThrow()
             written
         } catch (e: Exception) {
             staging.truncateTo(id.value, offset)
@@ -303,8 +301,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         klerk.handle(
             Command(event = DeleteUpload, model = id, params = null),
             systemContext(),
-            ProcessingOptions(CommandToken.simple()),
-        ).orThrow()
+        ).getOrThrow()
         staging.delete(id.value)
         return blob
     }
@@ -322,8 +319,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         klerk.handle(
             Command(event = DeleteUpload, model = id, params = null),
             systemContext(),
-            ProcessingOptions(CommandToken.simple()),
-        ).orThrow()
+        ).getOrThrow()
         staging.delete(id.value)
     }
 

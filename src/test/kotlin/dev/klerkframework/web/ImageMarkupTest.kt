@@ -476,8 +476,7 @@ class ImageMarkupTest {
             val photoID = setup.klerk.handle(
                 Command(event = CreatePhoto, model = null, params = CreatePhotoParams(DescribedImage(blob))),
                 actor,
-                ProcessingOptions(CommandToken.simple()),
-            ).orThrow().primaryModel as ModelID<Photo>
+            ).getOrThrow().primaryModel as ModelID<Photo>
 
             val meta = setup.klerk.read(actor) { attachedData.metadata(get(photoID).props.image.id) }
 

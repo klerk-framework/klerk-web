@@ -104,7 +104,7 @@ class UploadFormTest {
                                 ctx,
                                 ProcessingOptions(parsed.key),
                             )
-                            val id = requireNotNull(result.orThrow().primaryModel)
+                            val id = requireNotNull(result.getOrThrow().primaryModel)
                             val blob = requireNotNull(klerk.read(ctx) { get(id).props.content })
                             call.respondText(String(klerk.attachedData.get(blob.id, ctx).readAllBytes()))
                         }

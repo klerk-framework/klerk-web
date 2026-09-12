@@ -110,7 +110,6 @@ public class AssetsPlugin<C : KlerkContext, V>(
                             )
                         ),
                         context,
-                        ProcessingOptions(CommandToken.simple())
                     )
                 }
             }

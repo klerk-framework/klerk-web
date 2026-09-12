@@ -74,10 +74,9 @@ class AttachedDataRoutesTest {
                 params = CreatePublicationParams(PublicCover(cover), PublicBody(body), SecretDraft(draft)),
             ),
             author,
-            ProcessingOptions(CommandToken.simple()),
         )
         @Suppress("UNCHECKED_CAST")
-        return requireNotNull(result.orThrow().primaryModel) as ModelID<Publication>
+        return requireNotNull(result.getOrThrow().primaryModel) as ModelID<Publication>
     }
 
     @Test
@@ -217,8 +216,7 @@ class AttachedDataRoutesTest {
         klerk.handle(
             Command(event = DeletePublication, model = id, params = null),
             author,
-            ProcessingOptions(CommandToken.simple()),
-        ).orThrow()
+        ).getOrThrow()
 
         assertEquals(HttpStatusCode.NotFound, client.get(path).status)
         klerk.meta.stop()

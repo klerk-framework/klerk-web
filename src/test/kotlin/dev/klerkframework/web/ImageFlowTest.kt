@@ -125,7 +125,7 @@ class ImageFlowTest {
                                 Command(CreateFlower, null, parsed.params),
                                 actor,
                                 ProcessingOptions(parsed.key),
-                            ).orThrow()
+                            ).getOrThrow()
                             call.respond(HttpStatusCode.OK)
                         }
                     }
