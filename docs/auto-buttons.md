@@ -56,7 +56,7 @@ page that renders a form. That form is what carries the CSRF token.
 
 ## Where to go afterwards
 
-`render` takes optional paths that control where the browser goes once the form has been handled:
+`eventButton` takes optional paths that control where the browser goes once the form has been handled:
 
 * `onCancelPath`: if the user cancels the form.
 * `onSuccessAndModelExistPath`: after a successful event, if the model still exists.
