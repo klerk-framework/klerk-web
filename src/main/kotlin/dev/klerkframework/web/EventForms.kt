@@ -41,7 +41,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     private val template: FormTemplate<out Any, C, V>
 
     init {
-        val parameters = requireNotNull(klerk.spec.getParameters(eventReference))
+        val parameters = requireNotNull(klerk.specification.getParameters(eventReference))
         try {
             template = FormTemplate(
                 EventWithParameters(eventReference, parameters),
@@ -82,7 +82,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val completionPaths = CompletionPaths.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
-            val parameters = klerk.spec.getParameters(eventReference)
+            val parameters = klerk.specification.getParameters(eventReference)
 
             val eventHeading = headingFor(eventReference)
             if (parameters == null) {
@@ -182,9 +182,9 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
-            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.spec.getParameters(eventReference)))
-            val parameters = klerk.spec.getParameters(eventReference)
-            val event = klerk.spec.getEvent(eventReference)
+            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.getParameters(eventReference)))
+            val parameters = klerk.specification.getParameters(eventReference)
+            val event = klerk.specification.getEvent(eventReference)
 
             val template = createCommandsWithParams.singleOrNull { it.eventReference == eventReference }?.template
 
@@ -346,7 +346,7 @@ private suspend fun <C : KlerkContext, V> isCrudUpdate(
     return model.props::class == e.parameters.kClass
 }
 
-private fun renderSuccess(result: CommandResult.Success<out Any, *, *>): FlowContent.() -> Unit = {
+private fun renderSuccess(result: CommandResult.Success<out Any>): FlowContent.() -> Unit = {
     result.createdModels.forEach { p { +"Model (id: $it) was created" } }
     result.updatedModels.forEach { p { +"Model (id: $it) was updated" } }
     result.deletedModels.forEach { p { +"Model (id: $it) was deleted" } }

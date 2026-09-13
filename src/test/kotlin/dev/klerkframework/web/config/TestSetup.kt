@@ -156,8 +156,8 @@ fun testSettings(
     jobs = JobSettings(execution = jobExecution),
 )
 
-fun myContextProvider(systemIdentity: SystemIdentity): Context {
-    return Context(systemIdentity)
+fun myContextProvider(): Context {
+    return Context(SystemIdentity)
 }
 
 fun cannotReadAstrid(args: ArgsForPropertyAuth<Context, MyCollections>): NegativeAuthorization {
@@ -222,7 +222,7 @@ class BookCollections : ModelViews<Book, Context>() {
     }
 }
 
-class AuthorCollections<V>(val allBooks: AllModelView<Book, Context>) : ModelViews<Author, Context>() {
+class AuthorCollections<V>(val allBooks: ModelView<Book, Context>) : ModelViews<Author, Context>() {
 
     private val greatAuthorNames = setOf("Linus", "Bertil")
 
@@ -979,7 +979,7 @@ class AverageScore(value: Float) : FloatContainer(value) {
 
 class AuthorsWithAtLeastTwoBooks<V>(
     private val authors: ModelView<Author, Context>,
-    private val books: AllModelView<Book, Context>,
+    private val books: ModelView<Book, Context>,
 ) : ModelView<Author, Context>(authors) {
 
     override fun <V> memberIds(reader: ModelReader<Context, V>): Sequence<ModelID<Author>> {

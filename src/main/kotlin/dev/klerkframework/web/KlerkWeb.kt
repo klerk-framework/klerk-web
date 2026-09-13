@@ -57,7 +57,7 @@ public class KlerkWeb<C : KlerkContext, V>(
     ): FlowContent.() -> Unit = {
         nav {
             ul {
-                klerk.spec.managedModels.filter { it.kClass in models }.sortedBy { it.kClass.simpleName }.forEach { model ->
+                klerk.specification.managedModels.filter { it.kClass in models }.sortedBy { it.kClass.simpleName }.forEach { model ->
                     li {
                         a(href = pathProvider.pathForCollection(model.kClass)) { +translator(model) }
                     }
@@ -69,7 +69,7 @@ public class KlerkWeb<C : KlerkContext, V>(
     internal fun registerInto(route: Route, models: Set<KClass<*>>) {
         route.autoButtonsRoutes(support.autoButtons)
         route.adminUiRoutes(adminUI)
-        klerk.spec.managedModels.filter { it.kClass in models }.forEach { model ->
+        klerk.specification.managedModels.filter { it.kClass in models }.forEach { model ->
             val humanName = camelCaseToPretty(model.kClass.simpleName ?: "")
             log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
             route.modelListRoutes(

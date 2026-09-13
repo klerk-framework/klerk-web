@@ -66,7 +66,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
 
     override suspend fun start(klerk: Klerk<C, V>) {
         _klerk = klerk
-        var context = _klerk.spec.systemContextProvider(SystemIdentity)
+        var context = _klerk.specification.systemContextProvider()
         textAssets = _klerk.read(context) {
             textAssetCollections.all.asSequence().toList()
         }
@@ -91,7 +91,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
                 // at startup: should delete any existing future job
 
                 if (textAssets.none { ta -> ta.props.hash == base64hash }) {
-                    context = _klerk.spec.systemContextProvider(SystemIdentity)
+                    context = _klerk.specification.systemContextProvider()
 
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
@@ -150,7 +150,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
                         model = it.id,
                         params = null
                     ),
-                    context = _klerk.spec.systemContextProvider(SystemIdentity),
+                    context = _klerk.specification.systemContextProvider(),
                     ProcessingOptions(
                         CommandToken.simple()
                     )
@@ -306,7 +306,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
 
     private suspend fun serveBrotli(call: RoutingCall, id: AttachedBlobID, contentType: ContentType) {
         call.response.headers.append(ContentEncoding, contentEncodingBrotli)
-        val ctx = _klerk.spec.systemContextProvider(SystemIdentity)
+        val ctx = _klerk.specification.systemContextProvider()
         val inputStream = _klerk.attachedData.get(id, ctx)
         setCacheControl(call)
         call.suppressCompression()

@@ -294,7 +294,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.fields
             .filter { selectEnums.contains(it.name) }
             .forEach { eventParameter ->
-                val validEnums = klerk.spec.getValidEnumsFor(defaultValues.eventReference, eventParameter)
+                val validEnums = klerk.specification.getValidEnumsFor(defaultValues.eventReference, eventParameter)
                     ?: eventParameter.enumConstants.toSet()
                 result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
             }
@@ -311,7 +311,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.fields
             .filter { it.type == PropertyType.Ref }
             .map { eventParameter ->
-                val ls = klerk.spec.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
+                val ls = klerk.specification.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 // Only offer references the actor may read; an unreadable row must not turn the form into a 500.
                 // One past the limit, so "too many" can be told from "exactly the limit" -- and lazily, so a large
@@ -322,7 +322,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
                     val referencedModel = eventParameter.referencedModel
-                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else klerk.spec.getPossibleVoidEvents(referencedModel, context)
+                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else klerk.specification.getPossibleVoidEvents(referencedModel, context)
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -339,7 +339,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     internal fun validate() {
-        if (klerk.spec.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
+        if (klerk.specification.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
         }
 
@@ -464,7 +464,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             } else mutableSetOf()
 
             if (validationProblems.isNotEmpty()) {
-                return ParseResult.Invalid(validationProblems.map { it.toProblem() }.toSet())
+                return ParseResult.Invalid(validationProblems.map {
+                    InvalidPropertyCollectionProblem(
+                        endUserTranslatedMessage = it.endUserTranslatedMessage
+                            ?: context.translation.klerk.invalid,
+                        fieldsMustBeNull = setOfNotNull(it.fieldMustBeNull),
+                        fieldsMustNotBeNull = setOfNotNull(it.fieldMustNotBeNull),
+                    )
+                }.toSet())
             }
 
 
@@ -1369,7 +1376,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     private fun getModelIdValue(propertyName: String, params: T): Int? = getModelId(propertyName, params)?.value
 
     private fun getEnumValue(propertyName: String, params: T): String? =
-        (paramValue(propertyName, params) as? EnumContainer<*>)?.valueOrNullIfNotAuthorized
+        (paramValue(propertyName, params) as? EnumContainer<*>)?.valueOrNullIfNotAuthorized?.name
 
     internal fun renderInto(tag: FlowContent, postPath: String? = null) {
         val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }

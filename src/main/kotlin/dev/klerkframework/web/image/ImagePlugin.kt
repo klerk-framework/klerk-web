@@ -541,7 +541,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         }
     }
 
-    private fun systemContext(): C = klerk.spec.systemContextProvider(SystemIdentity)
+    private fun systemContext(): C = klerk.specification.systemContextProvider()
 
     /** Deletes what belongs to attached data that is gone, or whose content has been replaced. */
     internal suspend fun sweep() {
