@@ -165,9 +165,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     job.reason?.let { reason ->
                         tr { td { +"Reason" }; td { +reason } }
                     }
-                    job.ownerActorId?.let { ownerId ->
-                        tr { td { +"Owner" }; td { +ownerId.toString() } }
-                    }
+                    tr { td { +"Owner" }; td { +job.owner.toString() } }
                 }
             }
 

@@ -1,7 +1,7 @@
 package dev.klerkframework.web.config
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.EventVisibility.EXTERNAL
+import dev.klerkframework.klerk.EventVisibility.External
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
 import dev.klerkframework.klerk.PropertyCollectionValidity.Invalid
@@ -815,20 +815,20 @@ object SQLiteInMemory {
 }
 
 object CreateAuthor :
-    VoidEventWithParameters<Author, CreateAuthorParams>(Author::class, EXTERNAL, CreateAuthorParams::class)
+    VoidEventWithParameters<Author, CreateAuthorParams>(Author::class, External, CreateAuthorParams::class)
 
-object UpdateAuthor : InstanceEventWithParameters<Author, Author>(Author::class, EXTERNAL, Author::class) {
+object UpdateAuthor : InstanceEventWithParameters<Author, Author>(Author::class, External, Author::class) {
 
 }
 
-object DeleteAuthor : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
+object DeleteAuthor : InstanceEventNoParameters<Author>(Author::class, External)
 
-object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
+object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, External)
 
-object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, EXTERNAL)
+object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, External)
 
 object ChangeName :
-    InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, EXTERNAL, ChangeNameParams::class)
+    InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, External, ChangeNameParams::class)
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
@@ -883,7 +883,7 @@ data class Context(
 
 data class User(val name: FirstName)
 
-object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, EXTERNAL)
+object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, External)
 
 // A plain String cursor is used (rather than a custom data class) because this module has no kotlinx.serialization
 // compiler plugin applied, and String has a serializer built into kotlinx-serialization-core without it.
@@ -957,11 +957,11 @@ open class EnglishKlerkTranslation(val default: KlerkTranslation) : KlerkTransla
 }
 
 
-object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(Book::class, EXTERNAL, CreateBookParams::class)
+object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(Book::class, External, CreateBookParams::class)
 
-object PublishBook : InstanceEventNoParameters<Book>(Book::class, EXTERNAL)
+object PublishBook : InstanceEventNoParameters<Book>(Book::class, External)
 
-object DeleteBook : InstanceEventNoParameters<Book>(Book::class, EXTERNAL)
+object DeleteBook : InstanceEventNoParameters<Book>(Book::class, External)
 
 data class CreateBookParams(
     val title: BookTitle,
@@ -1158,10 +1158,10 @@ class DocumentTitle(value: String) : StringContainer(value) {
 data class CreateDocumentParams(val title: DocumentTitle, val content: DocumentContent?)
 
 object CreateDocument : VoidEventWithParameters<Document, CreateDocumentParams>(
-    Document::class, EventVisibility.EXTERNAL, CreateDocumentParams::class
+    Document::class, EventVisibility.External, CreateDocumentParams::class
 )
 
-object DeleteDocument : InstanceEventNoParameters<Document>(Document::class, EventVisibility.EXTERNAL)
+object DeleteDocument : InstanceEventNoParameters<Document>(Document::class, EventVisibility.External)
 
 fun documentStateMachine(): StateMachine<Document, DocumentStates, Context, MyCollections> = stateMachine {
     event(CreateDocument) {}
@@ -1192,10 +1192,10 @@ class FlowerName(value: String) : StringContainer(value) {
 data class CreateFlowerParams(val name: FlowerName, val image: FlowerImage)
 
 object CreateFlower : VoidEventWithParameters<Flower, CreateFlowerParams>(
-    Flower::class, EventVisibility.EXTERNAL, CreateFlowerParams::class
+    Flower::class, EventVisibility.External, CreateFlowerParams::class
 )
 
-object DeleteFlower : InstanceEventNoParameters<Flower>(Flower::class, EventVisibility.EXTERNAL)
+object DeleteFlower : InstanceEventNoParameters<Flower>(Flower::class, EventVisibility.External)
 
 fun flowerStateMachine(): StateMachine<Flower, FlowerStates, Context, MyCollections> = stateMachine {
     event(CreateFlower) {}
@@ -1265,7 +1265,7 @@ class SmallNote(id: AttachedBlobID) : AttachedBlobContainer(id) {
 
 data class CreateNoteParams(val title: DocumentTitle, val content: SmallNote)
 
-object CreateNote : VoidEventWithParameters<Note, CreateNoteParams>(Note::class, EventVisibility.EXTERNAL, CreateNoteParams::class)
+object CreateNote : VoidEventWithParameters<Note, CreateNoteParams>(Note::class, EventVisibility.External, CreateNoteParams::class)
 
 fun noteStateMachine(): StateMachine<Note, NoteStates, Context, MyCollections> = stateMachine {
     event(CreateNote) {}
@@ -1315,10 +1315,10 @@ class SecretDraft(id: AttachedStringID) : AttachedStringContainer(id)
 data class CreatePublicationParams(val cover: PublicCover, val body: PublicBody, val draft: SecretDraft?)
 
 object CreatePublication : VoidEventWithParameters<Publication, CreatePublicationParams>(
-    Publication::class, EventVisibility.EXTERNAL, CreatePublicationParams::class
+    Publication::class, EventVisibility.External, CreatePublicationParams::class
 )
 
-object DeletePublication : InstanceEventNoParameters<Publication>(Publication::class, EventVisibility.EXTERNAL)
+object DeletePublication : InstanceEventNoParameters<Publication>(Publication::class, EventVisibility.External)
 
 fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Context, MyCollections> = stateMachine {
     event(CreatePublication) {}
@@ -1357,7 +1357,7 @@ suspend fun describeTestImage(args: BlobPreAttachStepArgs): BlobPreAttachStepRes
 data class CreatePhotoParams(val image: DescribedImage)
 
 object CreatePhoto : VoidEventWithParameters<Photo, CreatePhotoParams>(
-    Photo::class, EventVisibility.EXTERNAL, CreatePhotoParams::class
+    Photo::class, EventVisibility.External, CreatePhotoParams::class
 )
 
 fun photoStateMachine(): StateMachine<Photo, PhotoStates, Context, MyCollections> = stateMachine {

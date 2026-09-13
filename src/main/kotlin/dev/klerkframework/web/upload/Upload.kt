@@ -33,7 +33,7 @@ public data class Upload(
     val declaredSize: ByteCount,
     val receivedBytes: ByteCount,
     /** [dev.klerkframework.klerk.ActorIdentity.type] of whoever created the upload. */
-    val actorType: ActorType,
+    val actorType: UploaderActorType,
     /** [dev.klerkframework.klerk.ActorIdentity.id], when the actor is a model. */
     val actorReference: ActorReference?,
     /** [dev.klerkframework.klerk.ActorIdentity.externalId], when the actor has one. */
@@ -100,19 +100,19 @@ internal fun <C : KlerkContext, V> uploadStateMachine(lifetime: Duration): State
 /** Issued by [UploadPlugin] when an upload starts. Not meant to be rendered by klerk-web. */
 public object CreateUpload : VoidEventWithParameters<Upload, CreateUploadParams>(
     Upload::class,
-    EventVisibility.CODE,
+    EventVisibility.Code,
     CreateUploadParams::class,
 )
 
 /** Issued by [UploadPlugin] after each chunk has been written to the staging file. */
 public object RecordUploadedBytes : InstanceEventWithParameters<Upload, RecordUploadedBytesParams>(
     Upload::class,
-    EventVisibility.CODE,
+    EventVisibility.Code,
     RecordUploadedBytesParams::class,
 )
 
 /** Issued by [UploadPlugin] when an upload is terminated by the client, or once its bytes have been attached. */
-public object DeleteUpload : InstanceEventNoParameters<Upload>(Upload::class, EventVisibility.CODE)
+public object DeleteUpload : InstanceEventNoParameters<Upload>(Upload::class, EventVisibility.Code)
 
 /**
  * Parameters of [CreateUpload].
@@ -141,7 +141,7 @@ private fun <C : KlerkContext, V> newUpload(args: ArgForVoidEvent<Upload, Create
         declaredSize = params.declaredSize,
         receivedBytes = ByteCount(0),
         // Taken from the context, never from the parameters: an upload belongs to whoever started it.
-        actorType = ActorType(actor.type),
+        actorType = UploaderActorType(actor.type.storedValue),
         actorReference = actor.id?.let { ActorReference(it.value) },
         actorExternalId = actor.externalId?.let { ActorExternalId(it) },
     )
@@ -180,7 +180,7 @@ public class ByteCount(value: Long) : LongContainer(value) {
 }
 
 /** The [dev.klerkframework.klerk.ActorIdentity.type] of the actor that created an upload. */
-public class ActorType(value: Int) : IntContainer(value) {
+public class UploaderActorType(value: Int) : IntContainer(value) {
     override val min: Int = 0
     override val max: Int = Int.MAX_VALUE
 }

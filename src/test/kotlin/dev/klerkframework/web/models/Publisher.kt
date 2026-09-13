@@ -52,9 +52,9 @@ fun publisherStateMachine(views: MyCollections): StateMachine<Publisher, Publish
 
     }
 
-object CreatePublisher : VoidEventWithParameters<Publisher, CreatePublisherParams>(Publisher::class, EventVisibility.EXTERNAL, CreatePublisherParams::class)
+object CreatePublisher : VoidEventWithParameters<Publisher, CreatePublisherParams>(Publisher::class, EventVisibility.External, CreatePublisherParams::class)
 
-object UpdatePublisher : InstanceEventWithParameters<Publisher, Publisher>(Publisher::class, EventVisibility.EXTERNAL, Publisher::class)
+object UpdatePublisher : InstanceEventWithParameters<Publisher, Publisher>(Publisher::class, EventVisibility.External, Publisher::class)
 
 fun newPublisher(args: ArgForVoidEvent<Publisher, CreatePublisherParams, Context, MyCollections>): Publisher {
     return Publisher(args.command.params.city, NumberOfOffices(2))

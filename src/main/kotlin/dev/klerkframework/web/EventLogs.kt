@@ -108,16 +108,8 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
     }
 }
 
-internal fun describeActor(actorType: Byte, actorReference: Int?, actorExternalId: Long?): String {
-    val type = when (actorType) {
-        ActorIdentity.systemType.toByte() -> "system"
-        ActorIdentity.authentication.toByte() -> "authentication"
-        ActorIdentity.modelType.toByte() -> "model"
-        ActorIdentity.modelReferenceType.toByte() -> "modelReference"
-        ActorIdentity.unauthenticatedType.toByte() -> "unauthenticated"
-        ActorIdentity.customType.toByte() -> "custom"
-        else -> error("Unknown ActorIdentity $actorType")
-    }
+internal fun describeActor(actorType: ActorType, actorReference: Int?, actorExternalId: Long?): String {
+    val type = actorType.name
     val modelReference = if (actorReference == null) "" else "Model reference: $actorReference"
     val externalId = if (actorExternalId == null) "" else "External ID: $actorExternalId"
     return "$type $modelReference $externalId"

@@ -383,6 +383,6 @@ public class UploadPlugin<C : KlerkContext, V>(
 
 /** Whether this upload was started by [actor]. */
 internal fun Upload.belongsTo(actor: ActorIdentity): Boolean =
-    actorType.valueWithoutAuthorization == actor.type &&
+    actorType.valueWithoutAuthorization == actor.type.storedValue &&
             actorReference?.valueWithoutAuthorization == actor.id?.value &&
             actorExternalId?.valueWithoutAuthorization == actor.externalId
