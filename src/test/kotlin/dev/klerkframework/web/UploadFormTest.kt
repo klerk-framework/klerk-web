@@ -1,7 +1,6 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.CustomIdentity
-import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.view.asSequence
@@ -244,7 +243,7 @@ class UploadFormTest {
         assertEquals(HttpStatusCode.OK, dry.status, dry.bodyAsText())
         assertEquals(
             0,
-            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            klerk.jobs.all(context()).count { it.name.value == "klerk-process-attached-data" },
             "a dry run should not prepare the file",
         )
 
@@ -263,7 +262,7 @@ class UploadFormTest {
         assertEquals("hello world", response.bodyAsText())
         assertEquals(
             1,
-            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            klerk.jobs.all(context()).count { it.name.value == "klerk-process-attached-data" },
             "the file should be prepared exactly once",
         )
         klerk.meta.stop()
@@ -296,7 +295,7 @@ class UploadFormTest {
         assertEquals(HttpStatusCode.OK, dry.status, dry.bodyAsText())
         assertEquals(
             0,
-            klerk.jobs.getAllJobs(context()).count { it.name.value == "klerk-process-attached-data" },
+            klerk.jobs.all(context()).count { it.name.value == "klerk-process-attached-data" },
             "a dry run should not store the file",
         )
         klerk.meta.stop()

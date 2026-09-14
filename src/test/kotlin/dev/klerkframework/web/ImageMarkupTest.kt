@@ -478,7 +478,7 @@ class ImageMarkupTest {
                 actor,
             ).getOrThrow().primaryModel as ModelID<Photo>
 
-            val meta = setup.klerk.read(actor) { attachedData.metadata(get(photoID).props.image.id) }
+            val meta = setup.klerk.read(actor) { attachedData.getMetadata(get(photoID).props.image.id) }
 
             val sidecar = assertNotNull(
                 setup.images.sidecar(meta.id, meta.hash),

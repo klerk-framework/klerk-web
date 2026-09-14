@@ -7,7 +7,7 @@ import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.DateContainer
 import dev.klerkframework.klerk.datatypes.DurationContainer
 import dev.klerkframework.klerk.datatypes.InstantContainer
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.Reader
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode

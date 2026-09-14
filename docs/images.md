@@ -134,7 +134,7 @@ Read the image's metadata inside a read block — the same metadata any
 ```kotlin
 val (flower, metadata) = klerk.read(context) {
     val flower = get(flowerID)
-    flower to attachedData.metadata(flower.props.image.id)
+    flower to attachedData.getMetadata(flower.props.image.id)
 }
 ```
 

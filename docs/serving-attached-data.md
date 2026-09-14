@@ -20,7 +20,7 @@ outside one:
 
 ```kotlin
 val src = klerk.read(context) {
-    pathProvider.attachedDataPath(attachedData.metadata(get(flowerID).props.image.id))
+    pathProvider.attachedDataPath(attachedData.getMetadata(get(flowerID).props.image.id))
 }
 ```
 

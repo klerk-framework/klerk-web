@@ -1,6 +1,5 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.view.asSequence
@@ -133,7 +132,7 @@ class ImageFlowTest {
 
                 get("/flowers") {
                     val flowers = klerk.read(actor) {
-                        views.flowers.all.asSequence().toList().map { it to attachedData.metadata(it.props.image.id) }
+                        views.flowers.all.asSequence().toList().map { it to attachedData.getMetadata(it.props.image.id) }
                     }
                     call.respondHtml(block = layout.page("Flowers") {
                         h1 { +"Flowers" }

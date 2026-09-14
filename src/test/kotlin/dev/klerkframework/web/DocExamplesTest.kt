@@ -199,7 +199,7 @@ class DocExamplesTest {
                     val flowerID = ModelID<Flower>(call.parameters["id"]!!.toInt())
                     val found = klerk.read(context) {
                         val flower = getOrNull(flowerID) ?: return@read null
-                        flower to attachedData.metadata(flower.props.image.id)
+                        flower to attachedData.getMetadata(flower.props.image.id)
                     }
                     if (found == null) {
                         call.respond(HttpStatusCode.NotFound)

@@ -67,7 +67,7 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
 ) {
     val context = support.contextProvider(call, klerk)
     val sequenceNumber = requireNotNull(call.parameters["id"]).toLong()
-    val event = klerk.read(context) { eventLog(sequenceNumber = sequenceNumber) }.get().single()
+    val event = requireNotNull(klerk.read(context) { eventLogEntry(sequenceNumber) }.get())
 
     support.respondPage(call, "Event log entry") {
             header {

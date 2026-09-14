@@ -35,7 +35,7 @@ public enum class ImageLoading { Lazy, Eager }
  * ```kotlin
  * val (flower, cover) = klerk.read(context) {
  *     val flower = get(flowerID)
- *     flower to attachedData.metadata(flower.props.image.id)
+ *     flower to attachedData.getMetadata(flower.props.image.id)
  * }
  *
  * support.respondPage(call, "A flower") {

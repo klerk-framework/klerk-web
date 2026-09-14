@@ -5,9 +5,7 @@ import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.datatypes.AttachedDataContainer
 import dev.klerkframework.klerk.datatypes.AttachedStringContainer
 import dev.klerkframework.klerk.read.Reader
-import dev.klerkframework.klerk.misc.ModelDisplay
-import dev.klerkframework.klerk.misc.DisplayProperty
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
@@ -55,7 +53,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             klerk.read(context) {
                 val model = get(id)
                 val reflectedModel = ModelDisplay(model)
-                apply(reflectedModel.populateRelations())
+                reflectedModel.populateRelations(this)
                 Triple(reflectedModel, model, attachedDataHashes(reflectedModel))
             }
         } catch (e: NoSuchElementException) {
@@ -126,8 +124,8 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
                 return@forEach
             }
             val entry: Pair<Any, String>? = when (value) {
-                is AttachedBlobContainer -> attachedData.metadataOrNull(value.id.untyped())?.let { value.id to it.hash }
-                is AttachedStringContainer -> attachedData.metadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                is AttachedBlobContainer -> attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                is AttachedStringContainer -> attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
                 else -> null
             }
             entry?.let { result[it.first] = it.second }

@@ -1,6 +1,5 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.config.*

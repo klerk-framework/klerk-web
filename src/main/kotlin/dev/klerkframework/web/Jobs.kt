@@ -26,7 +26,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
     }
     // Enabled by default: only an explicit "false" turns it off, so a first visit (no query params at all) has it on.
     val autoRefresh = call.request.queryParameters["autorefresh"] != "false"
-    val jobs = klerk.jobs.getAllJobs(context).filter { statusFilter == null || it.status == statusFilter }
+    val jobs = klerk.jobs.all(context).filter { statusFilter == null || it.status == statusFilter }
 
     fun jobsUrl(status: JobStatus?, autoRefreshValue: Boolean): String {
         val params = buildList {
@@ -91,7 +91,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                                     }
                                 }
                                 td { apply(jobProgressBar(job)) }
-                                td { +dateTimeFormatter.format(job.created.toLocalDateTime(TimeZone.currentSystemDefault())) }
+                                td { +dateTimeFormatter.format(job.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) }
                             }
                         }
                     }
@@ -109,8 +109,8 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
     klerk: Klerk<C, V>
 ) {
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toInt())
-    val job = klerk.jobs.getJob(id, context)
+    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
+    val job = klerk.jobs.get(id, context)
     val csrfToken = Csrf.issue(call)
 
     support.respondPage(
@@ -133,7 +133,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     tr { td { +"Status" }; td { apply(jobStatusBadge(job.status)) } }
                     tr { td { +"Priority" }; td { +job.priority.name } }
                     tr { td { +"Step / attempt" }; td { +"${job.step} / ${job.attempt}" } }
-                    tr { td { +"Created" }; td { +dateTimeFormatter.format(job.created.toLocalDateTime(TimeZone.currentSystemDefault())) } }
+                    tr { td { +"Created" }; td { +dateTimeFormatter.format(job.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) } }
                     job.parent?.let { parentId ->
                         tr { td { +"Parent" }; td { a(href = "$jobsPath/$parentId") { +parentId.toString() } } }
                     }
@@ -263,7 +263,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
 internal suspend fun <C : KlerkContext, V> handleJobCancel(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toInt())
+    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.cancel(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
@@ -271,7 +271,7 @@ internal suspend fun <C : KlerkContext, V> handleJobCancel(call: ApplicationCall
 internal suspend fun <C : KlerkContext, V> handleJobResume(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toInt())
+    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.resume(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
@@ -279,7 +279,7 @@ internal suspend fun <C : KlerkContext, V> handleJobResume(call: ApplicationCall
 internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toInt())
+    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.delete(id, context)
     call.respondRedirect(jobsPath)
 }

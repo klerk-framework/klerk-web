@@ -2,9 +2,7 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.view.*
-import dev.klerkframework.klerk.misc.ModelDisplay
-import dev.klerkframework.klerk.misc.DisplayProperty
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.statemachine.VoidState
 import dev.klerkframework.web.assets.CssAsset
@@ -98,7 +96,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     /*
     val refModels = list(modelView.all()) { passesFilter(it, call) }.map { ModelDisplay(it) }
             refModels.forEach {
-                apply(it.populateRelations())
+                it.populateRelations(this)
             }
      */
 

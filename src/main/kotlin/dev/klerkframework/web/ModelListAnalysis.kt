@@ -1,5 +1,6 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.view.asSequenceOrThrow
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import io.ktor.server.application.*
@@ -24,7 +25,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                 h2 { +"Views" }
                 modelView.getViews().forEach { collection ->
                     h6 { +(collection.id.toString()) }
-                    val groupedByState = collection.withReader(this@read).groupBy { it.state }
+                    val groupedByState = with(this@read) { collection.asSequenceOrThrow() }.groupBy { it.state }
                     val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
                     +"Total count: ${countPerState.values.sum()}"
                     ul {

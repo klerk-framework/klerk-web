@@ -59,7 +59,7 @@ public data class CreateTextAssetParams(
     val brotli: CompressedAsset?
 )
 
-private fun <C : KlerkContext, V> newTextAsset(args: ArgForVoidEvent<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
+private fun <C : KlerkContext, V> newTextAsset(args: VoidEventArgs<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
     val params = args.command.params
     return TextAsset(params.path, params.contentType, params.hash, params.brotli)
 }

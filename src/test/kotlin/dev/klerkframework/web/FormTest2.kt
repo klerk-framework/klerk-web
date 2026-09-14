@@ -1,7 +1,6 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.ActorIdentity
-import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.web.ParseResult.*

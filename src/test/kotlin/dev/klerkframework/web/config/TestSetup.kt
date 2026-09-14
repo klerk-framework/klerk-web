@@ -160,47 +160,47 @@ fun myContextProvider(): Context {
     return Context(SystemIdentity)
 }
 
-fun cannotReadAstrid(args: ArgsForPropertyAuth<Context, MyCollections>): NegativeAuthorization {
+fun cannotReadAstrid(args: PropertyReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     return if (args.property is FirstName && args.property.valueWithoutAuthorization == "Astrid") Deny else Pass
 }
 
-fun canReadAllProperties(args: ArgsForPropertyAuth<Context, MyCollections>): PositiveAuthorization {
+fun canReadAllProperties(args: PropertyReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
-fun unauthenticatedCannotReadAstrid(args: ArgModelContextReader<Context, MyCollections>): NegativeAuthorization {
+fun unauthenticatedCannotReadAstrid(args: ModelReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     val props = args.model.props
     return if (props is Author && props.firstName.value == "Astrid" && args.context.actor is Unauthenticated) Deny else Pass
 }
 
-fun `Everybody can do everything`(argCommandContextReader: ArgCommandContextReader<*, Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can do everything`(argCommandContextReader: CommandRuleArgs<*, Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
 
-fun `Everybody can read event log`(args: ArgContextReader<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can read event log`(args: EventLogRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
-fun `Everybody can read jobs`(args: ArgsForJobRead<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can read jobs`(args: JobReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
-fun `Everybody can read attached data`(args: ArgsForAttachedDataRead<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can read attached data`(args: AttachedDataReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
 /** An upload becomes attached data, so an application with file uploads needs a rule like this one. */
-fun `Everybody can prepare attached data`(args: ArgsForAttachedDataWrite<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can prepare attached data`(args: AttachedDataWriteRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
-fun `Everybody can read`(args: ArgModelContextReader<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can read`(args: ModelReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
 fun pelleCannotReadOnMornings(
-    args: ArgModelContextReader<Context, MyCollections>
+    args: ModelReadRuleArgs<Context, MyCollections>
 ): NegativeAuthorization {
     try {
         if (args.context.user?.props?.name?.value.equals("Pelle")) {
@@ -416,7 +416,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
 
     }
 
-fun sayCongratulations(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCollections>) {
+fun sayCongratulations(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>) {
     println("Congratulations")
 }
 
@@ -451,7 +451,7 @@ fun onEnterImprovingStateAction(args: LifecycleArgs<Author, Context, MyCollectio
 }
 
 
-fun showNotification(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCollections>) {
+fun showNotification(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>) {
     println("It was decided that we should show a notification")
 }
 
@@ -462,18 +462,18 @@ fun onEnterAmateurStateAction(args: LifecycleArgs<Author, Context, MyCollections
 }
 
 
-fun notifyBookStores(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
+fun notifyBookStores(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
     return listOf(MyJob.declare(""))
 }
 
-fun changeNameOfAuthor(args: ArgForInstanceEvent<Author, ChangeNameParams, Context, MyCollections>): Author {
+fun changeNameOfAuthor(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): Author {
     return args.model.props.copy(
         firstName = args.command.params.updatedFirstName,
         lastName = args.command.params.updatedLastName
     )
 }
 
-fun eventsToDeleteAuthorAndBooks(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCollections>): List<Command<Any, Any>> {
+fun eventsToDeleteAuthorAndBooks(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>): List<Command<Any, Any>> {
     args.reader.apply {
         val result: MutableList<Command<Any, Any>> = mutableListOf()
         val books = referencing(Book::class, requireNotNull(args.model.id))
@@ -492,7 +492,7 @@ fun eventsToDeleteAuthorAndBooks(args: ArgForInstanceEvent<Author, Nothing?, Con
     }
 }
 
-fun newAuthor(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): Author {
+fun newAuthor(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): Author {
     val params = args.command.params
     return Author(
         firstName = params.firstName,
@@ -503,26 +503,26 @@ fun newAuthor(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyColle
     )
 }
 
-fun newAuthor2(args: ArgForVoidEvent<Author, Nothing?, Context, MyCollections>): Author {
+fun newAuthor2(args: VoidEventArgs<Author, Nothing?, Context, MyCollections>): Author {
     return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")), DarkThemePreference(false),
         primaryLanguage = PrimaryLanguage(Languages.English),)
 }
 
 
-fun updateAuthor(args: ArgForInstanceEvent<Author, Author, Context, MyCollections>): Author {
+fun updateAuthor(args: InstanceEventArgs<Author, Author, Context, MyCollections>): Author {
     return args.command.params
 }
 
 
-fun onlyAuthenticationIdentityCanCreateDaniel(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
+fun onlyAuthenticationIdentityCanCreateDaniel(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value == "Daniel" && args.context.actor != AuthenticationIdentity) Invalid() else Valid
 }
 
-fun cannotHaveAnAwfulName(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
+fun cannotHaveAnAwfulName(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value == "Mike" && args.command.params.lastName.value == "Litoris") Invalid() else Valid
 }
 
-fun secretTokenShouldBeZeroIfNameStartsWithM(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
+fun secretTokenShouldBeZeroIfNameStartsWithM(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     return if (args.command.params.firstName.value.startsWith("M") && args.command.params.secretToken.value != 0L) Invalid() else Valid
 }
 
@@ -530,7 +530,7 @@ fun preventUnauthenticated(context: Context): PropertyCollectionValidity {
     return if (context.actor == Unauthenticated) Invalid() else Valid
 }
 
-fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: ArgForVoidEvent<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
+fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
     args.reader.apply {
         if (args.command.params.firstName.value != "Astrid") {
             return Valid
@@ -540,7 +540,7 @@ fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: ArgForVoidEvent<Author, Cr
     }
 }
 
-fun newBook(args: ArgForVoidEvent<Book, CreateBookParams, Context, MyCollections>): Book {
+fun newBook(args: VoidEventArgs<Book, CreateBookParams, Context, MyCollections>): Book {
     val params = args.command.params
     return Book(
         title = params.title,
@@ -826,20 +826,20 @@ object ChangeName :
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
-    override val function: (ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>) -> Boolean
-) : Decision<Boolean, ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>> {
+    override val function: (InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>) -> Boolean
+) : Decision<Boolean, InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>> {
     data object Something : AlwaysFalseDecisions("This will always be false", ::alwaysFalse)
 }
 
-fun alwaysFalse(args: ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>): Boolean {
+fun alwaysFalse(args: InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>): Boolean {
     return false
 }
 
 
 object AlwaysFalseAlgorithm :
-    FlowChartAlgorithm<ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>, Boolean>("Always false") {
+    FlowChartAlgorithm<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>("Always false") {
 
-    override fun configure(): AlgorithmBuilder<ArgForInstanceEvent<Author, CreateAuthorParams, Context, MyCollections>, Boolean>.() -> Unit =
+    override fun configure(): AlgorithmBuilder<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>.() -> Unit =
         {
             start(Something)
             booleanNode(Something) {
@@ -977,7 +977,7 @@ class AuthorsWithAtLeastTwoBooks<V>(
 ) : ModelView<Author, Context>(authors) {
 
     override fun <V> memberIds(reader: ModelReader<Context, V>): Sequence<ModelID<Author>> {
-        val authorsWithTwoBooks = books.withReader(reader)
+        val authorsWithTwoBooks = with(reader) { books.asSequenceOrThrow() }
             .groupingBy { it.props.author }
             .eachCount()
             .filterValues { it >= 2 }
@@ -1109,7 +1109,7 @@ fun bookStateMachine(
 
     }
 
-fun setPublishTime(args: ArgForInstanceEvent<Book, Nothing?, Context, MyCollections>): Book {
+fun setPublishTime(args: InstanceEventArgs<Book, Nothing?, Context, MyCollections>): Book {
     return args.model.props.copy(publishedAt = BookWrittenAt(args.context.time))
 }
 
@@ -1163,7 +1163,7 @@ fun documentStateMachine(): StateMachine<Document, DocumentStates, Context, MyCo
     }
 }
 
-private fun newDocument(args: ArgForVoidEvent<Document, CreateDocumentParams, Context, MyCollections>): Document =
+private fun newDocument(args: VoidEventArgs<Document, CreateDocumentParams, Context, MyCollections>): Document =
     Document(args.command.params.title, args.command.params.content)
 
 // A flower has a name and a picture of it. The image is required: a flower without one is not much of an entry, and
@@ -1195,7 +1195,7 @@ fun flowerStateMachine(): StateMachine<Flower, FlowerStates, Context, MyCollecti
     }
 }
 
-private fun newFlower(args: ArgForVoidEvent<Flower, CreateFlowerParams, Context, MyCollections>): Flower =
+private fun newFlower(args: VoidEventArgs<Flower, CreateFlowerParams, Context, MyCollections>): Flower =
     Flower(args.command.params.name, args.command.params.image)
 
 /** Anything at all, so that the form tests can post text files — but it does have a step, so that the pipeline is
@@ -1262,7 +1262,7 @@ fun noteStateMachine(): StateMachine<Note, NoteStates, Context, MyCollections> =
     state(NoteStates.Written) {}
 }
 
-private fun newNote(args: ArgForVoidEvent<Note, CreateNoteParams, Context, MyCollections>): Note =
+private fun newNote(args: VoidEventArgs<Note, CreateNoteParams, Context, MyCollections>): Note =
     Note(args.command.params.title, args.command.params.content)
 
 /**
@@ -1273,7 +1273,7 @@ private fun newNote(args: ArgForVoidEvent<Note, CreateNoteParams, Context, MyCol
  * browser it may pick a 10 MB file, and the rule then refuses it with a bare `403` that says nothing about why.
  */
 fun noUploadLargerThanTenMegabytes(
-    args: ArgCommandContextReader<*, Context, MyCollections>
+    args: CommandRuleArgs<*, Context, MyCollections>
 ): NegativeAuthorization {
     val params = args.command.params
     if (params !is CreateUploadParams) {
@@ -1316,7 +1316,7 @@ fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Cont
     }
 }
 
-private fun newPublication(args: ArgForVoidEvent<Publication, CreatePublicationParams, Context, MyCollections>): Publication =
+private fun newPublication(args: VoidEventArgs<Publication, CreatePublicationParams, Context, MyCollections>): Publication =
     Publication(args.command.params.cover, args.command.params.body, args.command.params.draft)
 
 // An image that klerk-web has measured while it was being attached, so that a page can be laid out before any
@@ -1351,14 +1351,14 @@ fun photoStateMachine(): StateMachine<Photo, PhotoStates, Context, MyCollections
     state(PhotoStates.Taken) {}
 }
 
-private fun newPhoto(args: ArgForVoidEvent<Photo, CreatePhotoParams, Context, MyCollections>): Photo =
+private fun newPhoto(args: VoidEventArgs<Photo, CreatePhotoParams, Context, MyCollections>): Photo =
     Photo(args.command.params.image)
 
 /**
  * Only actor 1 may read a publication's private data, so that a denial can be told from a hit. The public properties
  * of the same model are unaffected: no read rule is evaluated for public data, not even a negative one.
  */
-fun `Only the author can read a publication`(args: ArgsForAttachedDataRead<Context, MyCollections>): NegativeAuthorization {
+fun `Only the author can read a publication`(args: AttachedDataReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     if (args.owner.props !is Publication) {
         return Pass
     }

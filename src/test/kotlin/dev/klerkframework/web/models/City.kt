@@ -1,6 +1,6 @@
 package dev.klerkframework.web.models
 
-import dev.klerkframework.klerk.ArgForVoidEvent
+import dev.klerkframework.klerk.VoidEventArgs
 import dev.klerkframework.klerk.EventVisibility
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.VoidEventNoParameters
@@ -42,6 +42,6 @@ fun cityStateMachine(views: MyCollections): StateMachine<City, CityStates, Conte
 
 object CreateCity : VoidEventNoParameters<City>(EventVisibility.External)
 
-fun newCity(args: ArgForVoidEvent<City, Nothing?, Context, MyCollections>): City {
+fun newCity(args: VoidEventArgs<City, Nothing?, Context, MyCollections>): City {
     return City(FirstName("Stockholm"))
 }

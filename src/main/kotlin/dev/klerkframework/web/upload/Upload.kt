@@ -1,7 +1,7 @@
 package dev.klerkframework.web.upload
 
-import dev.klerkframework.klerk.ArgForInstanceEvent
-import dev.klerkframework.klerk.ArgForVoidEvent
+import dev.klerkframework.klerk.InstanceEventArgs
+import dev.klerkframework.klerk.VoidEventArgs
 import dev.klerkframework.klerk.EventVisibility
 import dev.klerkframework.klerk.InstanceEventNoParameters
 import dev.klerkframework.klerk.InstanceEventWithParameters
@@ -124,7 +124,7 @@ public data class RecordUploadedBytesParams(
     val receivedBytes: ByteCount,
 )
 
-private fun <C : KlerkContext, V> newUpload(args: ArgForVoidEvent<Upload, CreateUploadParams, C, V>): Upload {
+private fun <C : KlerkContext, V> newUpload(args: VoidEventArgs<Upload, CreateUploadParams, C, V>): Upload {
     val params = args.command.params
     val actor = args.context.actor
     return Upload(
@@ -140,14 +140,14 @@ private fun <C : KlerkContext, V> newUpload(args: ArgForVoidEvent<Upload, Create
 }
 
 private fun <C : KlerkContext, V> withReceivedBytes(
-    args: ArgForInstanceEvent<Upload, RecordUploadedBytesParams, C, V>
+    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>
 ): Upload = args.model.props.copy(receivedBytes = args.command.params.receivedBytes)
 
 /**
  * Decided from the parameters rather than the model, since the update above has not been applied to [args] yet.
  */
 private fun <C : KlerkContext, V> completesTheUpload(
-    args: ArgForInstanceEvent<Upload, RecordUploadedBytesParams, C, V>
+    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>
 ): Boolean = args.command.params.receivedBytes.value >=
         args.model.props.declaredSize.value
 

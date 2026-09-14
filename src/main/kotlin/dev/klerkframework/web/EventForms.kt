@@ -7,7 +7,7 @@ import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*

@@ -311,7 +311,7 @@ class ImageVariantsTest {
 
         coroutineScope { (1..10).map { async { client.get(path) } }.awaitAll() }
 
-        val scheduled = klerk.jobs.getAllJobs(author).count { it.name.value == "klerk-web-image-variant" }
+        val scheduled = klerk.jobs.all(author).count { it.name.value == "klerk-web-image-variant" }
         assertEquals(1, scheduled, "ten misses should mean one job")
         klerk.meta.stop()
     }

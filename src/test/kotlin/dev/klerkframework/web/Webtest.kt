@@ -11,7 +11,7 @@ import dev.klerkframework.klerk.job.JobProgress
 import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelModification.*
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.web.assets.CssAsset
@@ -31,7 +31,6 @@ import dev.klerkframework.web.models.City
 import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
-import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -76,7 +75,7 @@ private data class YieldProgress(val total: Int, val completed: Int) {
  * way — including an occasional uncaught exception (which klerk treats as [JobResult.Fail]).
  *
  * klerk's `cron()` scheduling is minute-granularity, so this instead reschedules itself. Step 0 immediately spawns
- * the next generation — timed 15 seconds from `context.time` *now*, not `job.created` (which is when this instance
+ * the next generation — timed 15 seconds from `context.time` *now*, not `job.createdAt` (which is when this instance
  * was spawned, i.e. when the *previous* generation finished, which would make each generation fire 5 seconds early)
  * — so the periodic cadence continues no matter what this generation's random outcome below turns out to be.
  *
@@ -448,7 +447,7 @@ private fun renderFlowers(
 ): suspend RoutingContext.() -> Unit = {
     val context = call.ctx(klerk)
     val flowers = klerk.read(context) {
-        views.flowers.all.asSequence().toList().map { it to attachedData.metadata(it.props.image.id) }
+        views.flowers.all.asSequence().toList().map { it to attachedData.getMetadata(it.props.image.id) }
     }
   //  call.respondHtml(block = layout.page("Flowers") {
     call.respondHtml {
@@ -493,7 +492,7 @@ private fun renderFlower(
     }
     val found = klerk.read(context) {
         val flower = getOrNull(ModelID<Flower>(id)) ?: return@read null
-        flower to attachedData.metadata(flower.props.image.id)
+        flower to attachedData.getMetadata(flower.props.image.id)
     }
     if (found == null) {
         call.respond(HttpStatusCode.NotFound)

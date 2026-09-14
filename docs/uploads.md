@@ -78,7 +78,7 @@ A limit that depends on *who is asking* is an ordinary authorization rule. The d
 is accepted, so the rule can see it:
 
 ```kotlin
-fun normalUsersCanUploadUpTo10MB(args: ArgCommandContextReader<*, Context, MyViews>): NegativeAuthorization {
+fun normalUsersCanUploadUpTo10MB(args: CommandRuleArgs<*, Context, MyViews>): NegativeAuthorization {
     val params = args.command.params
     if (params !is CreateUploadParams) return Pass
     return if (params.context.isNormalUser && params.declaredSize.value > 10_000_000) Deny else Pass

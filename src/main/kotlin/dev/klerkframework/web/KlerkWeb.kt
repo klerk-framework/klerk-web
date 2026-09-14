@@ -5,7 +5,7 @@ import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ManagedModel
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.web.attached.defaultAttachedDataCacheControl
 import io.ktor.server.application.*
 import io.ktor.server.routing.*

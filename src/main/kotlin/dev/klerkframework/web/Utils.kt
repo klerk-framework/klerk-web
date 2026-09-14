@@ -2,7 +2,6 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.misc.ObjectSchema
-import dev.klerkframework.klerk.misc.ModelDisplay
 import kotlinx.html.*
 
 /**

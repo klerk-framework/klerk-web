@@ -12,7 +12,7 @@ import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
-import dev.klerkframework.klerk.misc.camelCaseToPretty
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.validation.PropertyValidation

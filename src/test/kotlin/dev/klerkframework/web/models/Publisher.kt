@@ -1,7 +1,7 @@
 package dev.klerkframework.web.models
 
-import dev.klerkframework.klerk.ArgForInstanceEvent
-import dev.klerkframework.klerk.ArgForVoidEvent
+import dev.klerkframework.klerk.InstanceEventArgs
+import dev.klerkframework.klerk.VoidEventArgs
 import dev.klerkframework.klerk.EventVisibility
 import dev.klerkframework.klerk.InstanceEventWithParameters
 import dev.klerkframework.klerk.ModelID
@@ -56,11 +56,11 @@ object CreatePublisher : VoidEventWithParameters<Publisher, CreatePublisherParam
 
 object UpdatePublisher : InstanceEventWithParameters<Publisher, Publisher>(EventVisibility.External)
 
-fun newPublisher(args: ArgForVoidEvent<Publisher, CreatePublisherParams, Context, MyCollections>): Publisher {
+fun newPublisher(args: VoidEventArgs<Publisher, CreatePublisherParams, Context, MyCollections>): Publisher {
     return Publisher(args.command.params.city, NumberOfOffices(2))
 }
 
-fun updatePublisher(args: ArgForInstanceEvent<Publisher, Publisher, Context, MyCollections>): Publisher {
+fun updatePublisher(args: InstanceEventArgs<Publisher, Publisher, Context, MyCollections>): Publisher {
     return Publisher(args.command.params.city, args.command.params.numberOfOffices)
 }
 

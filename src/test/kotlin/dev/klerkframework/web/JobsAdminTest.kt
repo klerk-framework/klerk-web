@@ -86,7 +86,7 @@ class JobsAdminTest {
         assertTrue(cancelResponse.status.value in 200..399)
 
         klerk.jobs.runUntilIdle()
-        val job = klerk.jobs.getJob(jobId, Context.system())
+        val job = klerk.jobs.get(jobId, Context.system())
         assertTrue(job.status == JobStatus.Cancelled || job.status == JobStatus.Cancelling)
     }
 
@@ -97,7 +97,7 @@ class JobsAdminTest {
         klerk.meta.start()
         val jobId = klerk.jobs.schedule(MyJob.declare(""), Context.system())
         klerk.jobs.runUntilIdle()
-        assertTrue(klerk.jobs.getJob(jobId, Context.system()).status == JobStatus.Succeeded)
+        assertTrue(klerk.jobs.get(jobId, Context.system()).status == JobStatus.Succeeded)
 
         application { routing { klerkWebRoutes(klerkWeb) } }
         val client = createClient { install(HttpCookies) }
@@ -109,7 +109,7 @@ class JobsAdminTest {
         )
         assertTrue(deleteResponse.status.value in 200..399)
 
-        val remaining = klerk.jobs.getAllJobs(Context.system())
+        val remaining = klerk.jobs.all(Context.system())
         assertTrue(remaining.none { it.id == jobId })
     }
 
