@@ -95,7 +95,7 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
     override val maxDepth: Int = Int.MAX_VALUE
     override val maxDescendants: Int = Int.MAX_VALUE
 
-    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String> {
+    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String, Context, MyCollections> {
         if (args.job.step == 0 && args.job.attempt == 0) {
             val nextRun = args.context.time + 15.seconds
             return JobResult.Yield(
@@ -216,7 +216,7 @@ fun main() {
 
         embeddedServer.start(wait = false)
 
-        klerk.models.subscribe(Context.system(), null).collect {
+        klerk.modelChanges.subscribe(null, Context.system()).collect {
             when (it) {
                 is Created -> println("${it.id} was created")
                 is PropsUpdated -> println("${it.id} had props updated")

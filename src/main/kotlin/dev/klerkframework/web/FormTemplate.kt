@@ -234,9 +234,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 when (p.type) {
                     PropertyType.String -> text(p)
                     PropertyType.Boolean -> checkbox(p)
-                    PropertyType.Int -> number(p)
-                    PropertyType.Long -> number(p)
-                    PropertyType.Float -> number(p)
+                    PropertyType.Int, PropertyType.Long, PropertyType.Short, PropertyType.Byte,
+                    PropertyType.UInt, PropertyType.ULong, PropertyType.UShort, PropertyType.UByte,
+                    PropertyType.Float, PropertyType.Double -> number(p)
+
                     PropertyType.Ref -> selectReference(p)
                     PropertyType.Enum -> selectEnum(p)
                     PropertyType.Instant -> dateTime(p)
@@ -693,54 +694,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         override fun getName() = property.name
     }
 
-    private class IntInputItem<T>(
-        val type: InputType,
-        val property: KProperty1<*, DataContainer<*>?>,
-        val labelText: String,
-        val datatypeValue: IntContainer
-    ) : Item<T> {
-        override fun render(tag: HtmlBlockTag, params: T) {
-            tag.label {
-                htmlFor = property.name
-                +labelText
-            }
-            tag.input(type) {
-                id = property.name
-                name = property.name
-                value = datatypeValue.value.toString()
-                required = !property.returnType.isMarkedNullable
-                datatypeValue.min?.apply { min = this.toString() }
-                datatypeValue.max?.apply { max = this.toString() }
-            }
-        }
-
-        override fun getName() = property.name
-    }
-
-    private class LongInputItem<T>(
-        val type: InputType,
-        val property: KProperty1<*, DataContainer<*>?>,
-        val labelText: String,
-        val datatypeValue: LongContainer
-    ) : Item<T> {
-        override fun render(tag: HtmlBlockTag, params: T) {
-            tag.label {
-                htmlFor = property.name
-                +labelText
-            }
-            tag.input(type) {
-                id = property.name
-                name = property.name
-                value = datatypeValue.value.toString()
-                required = !property.returnType.isMarkedNullable
-                datatypeValue.min?.apply { min = this.toString() }
-                datatypeValue.max?.apply { max = this.toString() }
-            }
-        }
-
-        override fun getName() = property.name
-    }
-
     private class CheckboxInputItem<T>(
         val type: InputType,
         val property: KProperty1<*, DataContainer<*>?>,
@@ -1066,8 +1019,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             val prefilled: DataContainer<*>? = if (params == null) null else getParamDatatype(propertyName, params)
             val hasValue = params == null || prefilled != null
             val value: DataContainer<*> = prefilled
-                ?: prop.kotlinDefaultInstance
-                ?: prop.recommendedDefaultValue?.let { prop.createContainer(it) }
+                ?: prop.defaultContainer
                 ?: prop.dummyContainer()
 
             if (isNullable && type != InputType.hidden) {
@@ -1103,9 +1055,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 
                 number -> {
                     when (value) {
-                        is IntContainer -> this.apply(renderIntNumberInput(propertyName, value))
-                        is LongContainer -> this.apply(renderLongNumberInput(propertyName, value))
-                        is FloatContainer -> this.apply(renderFloatNumberInput(propertyName, value))
+                        is NumberContainer<*> -> this.apply(renderNumberInput(propertyName, value))
                         is DurationContainer -> this.apply(renderDurationInput(propertyName, value))
                         else -> throw IllegalStateException(
                             "Cannot render '$propertyName' as a number: it is a ${value::class.simpleName}"
@@ -1238,9 +1188,9 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         // required = !property.returnType.isMarkedNullable
     }
 
-    private fun renderIntNumberInput(
+    private fun renderNumberInput(
         propertyName: String,
-        theValue: IntContainer,
+        theValue: NumberContainer<*>,
     ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         input(number) {     // perhaps use `type=text inputmode=numeric` instead?
@@ -1250,43 +1200,15 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
             // required = !property.returnType.isMarkedNullable
-            theValue.min?.apply { min = this.toString() }
-            theValue.max?.apply { max = this.toString() }
+            min = theValue.minAsText
+            max = theValue.maxAsText
+            if (theValue.hasDecimals) {
+                step = "any"
+            }
         }
         apply(createErrorPlaceholder(propertyName))
     }
 
-
-    private fun renderLongNumberInput(
-        propertyName: String,
-        theValue: LongContainer,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(number) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
-            // required = !property.returnType.isMarkedNullable
-            theValue.min?.apply { min = this.toString() }
-            theValue.max?.apply { max = this.toString() }
-        }
-    }
-
-    private fun renderFloatNumberInput(
-        propertyName: String,
-        theValue: FloatContainer,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(number) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
-            // required = !property.returnType.isMarkedNullable
-            theValue.min?.apply { min = this.toString() }
-            theValue.max?.apply { max = this.toString() }
-            step = "any"
-        }
-    }
 
     /**
      * A `datetime-local` input. The browser sends local time without a zone, so the submitted value is interpreted

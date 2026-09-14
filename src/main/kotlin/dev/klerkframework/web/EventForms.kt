@@ -309,7 +309,14 @@ internal fun valueWithCorrectType(value: String?, field: SchemaField): Any? {
 
             PropertyType.Int -> field.createContainer(value.toInt())
             PropertyType.Long -> field.createContainer(value.toLong())
+            PropertyType.Short -> field.createContainer(value.toShort())
+            PropertyType.Byte -> field.createContainer(value.toByte())
+            PropertyType.UInt -> field.createContainer(value.toUInt())
+            PropertyType.ULong -> field.createContainer(value.toULong())
+            PropertyType.UShort -> field.createContainer(value.toUShort())
+            PropertyType.UByte -> field.createContainer(value.toUByte())
             PropertyType.Float -> field.createContainer(value.toFloat())
+            PropertyType.Double -> field.createContainer(value.toDouble())
             PropertyType.Instant -> {
                 // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
                 val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)

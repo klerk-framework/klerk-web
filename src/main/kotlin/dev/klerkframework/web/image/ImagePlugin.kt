@@ -591,7 +591,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         override val agent: JobAgent = JobAgent.System
         override val maxConcurrent: Int = maxConcurrentRenders
 
-        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String> {
+        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String, C, V> {
             val parsed = parse(args.cursor) ?: return JobResult.Abort(
                 "'${args.cursor}' is not id|hash|width|format|crop",
                 runHook = false,
@@ -704,7 +704,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         override val name: JobName = JobName("klerk-web-image-sweep")
         override val agent: JobAgent = JobAgent.System
 
-        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String> {
+        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String, C, V> {
             sweep()
             return JobResult.Success(log = listOf(args.info("Swept the image variant directory")))
         }

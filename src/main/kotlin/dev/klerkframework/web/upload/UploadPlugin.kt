@@ -372,7 +372,7 @@ public class UploadPlugin<C : KlerkContext, V>(
         override val name: JobName = JobName("klerk-web-upload-sweep")
         override val agent: JobAgent = JobAgent.System
 
-        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String> {
+        override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String, C, V> {
             sweep()
             return JobResult.Success(log = listOf(args.info("Swept the upload staging directory")))
         }

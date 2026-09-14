@@ -670,8 +670,8 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
 
     override val validators = setOf(::mustBeEven)
 
-    fun mustBeEven(translation: Translation): PropertyValidation {
-        if (valueWithoutAuthorization % 2 == 0) {
+    fun mustBeEven(value: Int, translation: Translation): PropertyValidation {
+        if (value % 2 == 0) {
             return PropertyValidation.Valid
         }
         return PropertyValidation.Invalid("Must be even")
@@ -685,11 +685,11 @@ class FirstName(value: String) : StringContainer(value) {
     override val maxLines = 1
     override val recommendedDefault = "John"
 
-    override val validators: Set<(translator: Translation) -> PropertyValidation> =
+    override val validators: Set<(String, Translation) -> PropertyValidation> =
         setOf(::mustNotHavePelleInName)
 
-    fun mustNotHavePelleInName(translation: Translation): PropertyValidation {
-        return if (valueWithoutAuthorization.contains("Pelle", ignoreCase = true))
+    fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidation {
+        return if (name.contains("Pelle", ignoreCase = true))
             PropertyValidation.Invalid("Must not contain 'Pelle'") else
             PropertyValidation.Valid
     }
@@ -708,14 +708,14 @@ class BookTitle(value: String) : StringContainer(value) {
     override val regexPattern = ".*"
     override val validators = setOf(::`title must not contain 'alpha'`, ::`title must not start with 'beta'`)
 
-    private fun `title must not contain 'alpha'`(translation: Translation): PropertyValidation {
-        return if (valueWithoutAuthorization.contains("alpha")) {
+    private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidation {
+        return if (title.contains("alpha")) {
             PropertyValidation.Invalid()
         } else PropertyValidation.Valid
     }
 
-    private fun `title must not start with 'beta'`(translation: Translation): PropertyValidation {
-        return if (valueWithoutAuthorization.lowercase().startsWith("beta")) {
+    private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidation {
+        return if (title.lowercase().startsWith("beta")) {
             PropertyValidation.Invalid("'beta' must not be the first word")
         } else PropertyValidation.Valid
     }
@@ -885,7 +885,7 @@ object MyJob : JobType.Local<String, Context, MyCollections>() {
     override val name: JobName = JobName("my-job")
     override val agent: JobAgent = JobAgent.System
 
-    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String> {
+    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String, Context, MyCollections> {
         println("Did MyJob")
         return JobResult.Success()
     }
@@ -1117,12 +1117,12 @@ class PrimeNumber(value: Int) : IntContainer(value) {
     override val min: Int = 1
     override val max: Int = Int.MAX_VALUE
 
-    override val validators: Set<(translator: Translation) -> PropertyValidation> = setOf(::mustBePrime)
+    override val validators: Set<(Int, Translation) -> PropertyValidation> = setOf(::mustBePrime)
 
     private val primeNumbers = setOf(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
 
-    fun mustBePrime(translation: Translation): PropertyValidation {
-        return if (primeNumbers.contains(valueWithoutAuthorization)) PropertyValidation.Valid else PropertyValidation.Invalid()
+    fun mustBePrime(value: Int, translation: Translation): PropertyValidation {
+        return if (primeNumbers.contains(value)) PropertyValidation.Valid else PropertyValidation.Invalid()
     }
 
 }

@@ -215,9 +215,9 @@ private fun <C : KlerkContext, V> renderEvents(
                                                     }
                                                 }
                                             }
-                                            parameter.recommendedDefaultValue?.let {
+                                            parameter.defaultContainer?.let {
                                                 tr {
-                                                    td { +"Recommended default value" }
+                                                    td { +"Default value" }
                                                     td { +it.toString() }
                                                 }
                                             }
