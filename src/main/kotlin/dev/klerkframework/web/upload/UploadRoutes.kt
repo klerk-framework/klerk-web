@@ -254,7 +254,7 @@ internal fun <C : KlerkContext, V> blobDeclarationFor(
         return null
     }
     return runCatching {
-        val parameters = klerk.specification.getParameters(EventReference.parse(event)) ?: return null
+        val parameters = klerk.specification.parametersSchema(EventReference.parse(event)) ?: return null
         val field = parameters.field(property)?.takeIf { !it.isCollection } ?: return null
         if (field.blobDeclaration == null) {
             return null

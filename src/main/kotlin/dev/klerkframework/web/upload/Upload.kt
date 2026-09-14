@@ -98,21 +98,13 @@ internal fun <C : KlerkContext, V> uploadStateMachine(lifetime: Duration): State
     }
 
 /** Issued by [UploadPlugin] when an upload starts. Not meant to be rendered by klerk-web. */
-public object CreateUpload : VoidEventWithParameters<Upload, CreateUploadParams>(
-    Upload::class,
-    EventVisibility.Code,
-    CreateUploadParams::class,
-)
+public object CreateUpload : VoidEventWithParameters<Upload, CreateUploadParams>(EventVisibility.Code)
 
 /** Issued by [UploadPlugin] after each chunk has been written to the staging file. */
-public object RecordUploadedBytes : InstanceEventWithParameters<Upload, RecordUploadedBytesParams>(
-    Upload::class,
-    EventVisibility.Code,
-    RecordUploadedBytesParams::class,
-)
+public object RecordUploadedBytes : InstanceEventWithParameters<Upload, RecordUploadedBytesParams>(EventVisibility.Code)
 
 /** Issued by [UploadPlugin] when an upload is terminated by the client, or once its bytes have been attached. */
-public object DeleteUpload : InstanceEventNoParameters<Upload>(Upload::class, EventVisibility.Code)
+public object DeleteUpload : InstanceEventNoParameters<Upload>(EventVisibility.Code)
 
 /**
  * Parameters of [CreateUpload].

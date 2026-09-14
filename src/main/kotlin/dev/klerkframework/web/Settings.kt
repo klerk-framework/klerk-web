@@ -24,7 +24,7 @@ internal suspend fun <C : KlerkContext, V> renderSettings(
         SettingRow("Attached blob store", "attachedBlobStore", settings.attachedBlobStore?.let { it::class.simpleName } ?: "none"),
         SettingRow("Clock", "clock", settings.clock::class.simpleName ?: "?"),
         SettingRow("Allow unsafe operations", "allowUnsafeOperations", settings.allowUnsafeOperations.toString()),
-        SettingRow("Unclaimed attached data lifetime", "unclaimedAttachedDataLifetime", settings.unclaimedAttachedDataLifetime.toString()),
+        SettingRow("Default attached data lease", "defaultAttachedDataLease", settings.defaultAttachedDataLease.toString()),
         SettingRow("Max attached data lease", "maxAttachedDataLease", settings.maxAttachedDataLease.toString()),
         SettingRow("Content type detector", "contentTypeDetector", settings.contentTypeDetector::class.simpleName ?: "?"),
         SettingRow("Model cache: max resident models", "modelCache.maxResidentModels", settings.modelCache.maxResidentModels.toString()),

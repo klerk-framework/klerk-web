@@ -1,7 +1,7 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.collection.*
+import dev.klerkframework.klerk.view.*
 import dev.klerkframework.klerk.misc.ModelDisplay
 import dev.klerkframework.klerk.misc.DisplayProperty
 import dev.klerkframework.klerk.misc.camelCaseToPretty
@@ -43,12 +43,18 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     private val pathProvider: PathProvider = support.pathProvider
     private val tableTemplate = TableTemplate<T, C, V>(klerk, kClass, support = support)
 
+    // The page is always constructed as ModelListPage<Any, ...> from a KClass<out Any> the specification handed us,
+    // so T is Any here and the cast holds. Kept on this side rather than in Specification, which cannot know it.
+    @Suppress("UNCHECKED_CAST")
+    private val modelViews: ModelViews<T, C>
+        get() = klerk.specification.getModelViews(kClass) as ModelViews<T, C>
+
     internal fun registerInto(route: Route): Unit = with(route) {
-        get(pathProvider.pathForCollection(kClass)) {
+        get(pathProvider.pathForList(kClass)) {
             respond(call)
         }
 
-        get("${pathProvider.pathForCollection(kClass)}/analysis") {
+        get("${pathProvider.pathForList(kClass)}/analysis") {
             renderListAnalysis<T, V, C>(call, support, klerk, kClass)
         }
     }
@@ -60,12 +66,12 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     /** Responds with the page. */
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
-        val modelView = klerk.specification.getView<T>(kClass)
-        val collection = getCollection(call.request.queryParameters, modelView)
+        val modelView = modelViews
+        val view = selectedView(call.request.queryParameters, modelView)
 
         val (table, voidEvents) = klerk.read(context) {
             Pair(
-                tableTemplate.build(collection, this, call),
+                tableTemplate.build(view, this, call),
                 getPossibleVoidEvents(kClass)
             )
         }
@@ -80,13 +86,13 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun getCollection(
+    private fun selectedView(
         queryParameters: Parameters,
-        ModelViews: ModelViews<T, C>
+        modelViews: ModelViews<T, C>,
     ): ModelView<T, C> {
-        val collectionId = queryParameters["collection"] ?: return ModelViews.all
-        val decoded = CollectionId.parse(URLDecoder.decode(collectionId, Charset.forName("utf-8")))
-        return klerk.specification.getView<T>(kClass).getCollections().single { it.getFullId() == decoded }
+        val viewId = queryParameters["view"] ?: return modelViews.all
+        val decoded = ViewId.parse(URLDecoder.decode(viewId, Charset.forName("utf-8")))
+        return modelViews.getViews().single { it.id == decoded }
     }
 
     /*
@@ -146,7 +152,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         }
 
         if (renderListDetails) {
-            a(href = "${pathProvider.pathForCollection(kClass)}/analysis") { +"(More details about the list)" }
+            a(href = "${pathProvider.pathForList(kClass)}/analysis") { +"(More details about the list)" }
         }
     }
 
@@ -171,23 +177,23 @@ private fun <C : KlerkContext, V> renderFilter(
 
                     p {
                         label {
-                            htmlFor = "collectionselect"
-                            +"Collection"
+                            htmlFor = "viewselect"
+                            +"View"
                         }
                         br()
                         select {
-                            id = "collectionselect"
-                            name = "collection"
-                            klerk.specification.getCollections().filter { it.first == kClass }.map { it.second }.forEach {
+                            id = "viewselect"
+                            name = "view"
+                            klerk.specification.getViews().filter { it.modelClass == kClass }.map { it.view }.forEach {
                                 option {
-                                    value = it.getFullId().toString()
-                                    if (call.request.queryParameters["collection"]?.equals(
-                                            it.getFullId().toString()
+                                    value = it.id.toString()
+                                    if (call.request.queryParameters["view"]?.equals(
+                                            it.id.toString()
                                         ) == true
                                     ) {
                                         selected = true
                                     }
-                                    +camelCaseToPretty(it.getId())
+                                    +camelCaseToPretty(it.id.shortId)
                                 }
                             }
                         }

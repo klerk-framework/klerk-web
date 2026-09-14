@@ -4,8 +4,8 @@ import dev.klerkframework.klerk.CommandResult
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.collection.asSequence
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobProgress
 import dev.klerkframework.klerk.job.JobResult

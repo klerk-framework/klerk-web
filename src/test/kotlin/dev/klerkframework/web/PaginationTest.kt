@@ -1,7 +1,7 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.config.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -156,7 +156,7 @@ class PaginationTest {
     @Test
     fun `withQueryParam replaces one parameter and leaves the rest alone`() {
         assertEquals("/author?cursor=abc", withQueryParam("/author", "cursor", "abc"))
-        assertEquals("/author?collection=x&cursor=abc", withQueryParam("/author?collection=x", "cursor", "abc"))
+        assertEquals("/author?view=x&cursor=abc", withQueryParam("/author?view=x", "cursor", "abc"))
         assertEquals("/author?cursor=new", withQueryParam("/author?cursor=old", "cursor", "new"))
         // The parameter name also occurs in the path and in another parameter's value.
         assertEquals(

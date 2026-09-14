@@ -41,7 +41,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     private val template: FormTemplate<out Any, C, V>
 
     init {
-        val parameters = requireNotNull(klerk.specification.getParameters(eventReference))
+        val parameters = requireNotNull(klerk.specification.parametersSchema(eventReference))
         try {
             template = FormTemplate(
                 EventWithParameters(eventReference, parameters),
@@ -66,7 +66,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
     override fun toString(): String = eventReference.toString()
 
     internal fun getUrl(): String {
-        return "$path?eventId=${eventReference.id().encodeURLPathPart()}"
+        return "$path?eventId=${eventReference.toString().encodeURLPathPart()}"
     }
 
     internal companion object {
@@ -82,7 +82,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val completionPaths = CompletionPaths.parse(call, null)
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             val eventReference = EventReference.urlDecode(requireNotNull(queryParameters["eventId"]))
-            val parameters = klerk.specification.getParameters(eventReference)
+            val parameters = klerk.specification.parametersSchema(eventReference)
 
             val eventHeading = headingFor(eventReference)
             if (parameters == null) {
@@ -182,8 +182,8 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.parse(requireNotNull(queryParameters["eventId"]))
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
-            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.getParameters(eventReference)))
-            val parameters = klerk.specification.getParameters(eventReference)
+            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.parametersSchema(eventReference)))
+            val parameters = klerk.specification.parametersSchema(eventReference)
             val event = klerk.specification.getEvent(eventReference)
 
             val template = createCommandsWithParams.singleOrNull { it.eventReference == eventReference }?.template

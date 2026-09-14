@@ -9,8 +9,8 @@ import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.SystemIdentity
-import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.collection.asSequence
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobName

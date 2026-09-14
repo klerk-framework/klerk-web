@@ -52,7 +52,7 @@ internal suspend fun <C : KlerkContext, V> renderEventLog(
                             td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
                             td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
                             td { a(href = "_eventlog/${event.sequenceNumber}") { +event.eventReference.eventName } }
-                            if (forModel == null) td { +(ModelID<Any>(event.reference).toString()) }
+                            if (forModel == null) td { +event.model.toString() }
                         }
                     }
                 }
@@ -95,7 +95,7 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
                 }
                 tr {
                     td { +"Model ID" }
-                    td { +"${ModelID<Any>(event.reference)} (${event.reference})" }
+                    td { +"${event.model} (${event.model.value})" }
                 }
             }
             h2 { +"Parameters" }

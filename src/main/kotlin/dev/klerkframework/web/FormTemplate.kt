@@ -3,8 +3,8 @@ package dev.klerkframework.web
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.collection.ModelView
-import dev.klerkframework.klerk.collection.asSequence
+import dev.klerkframework.klerk.view.ModelView
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -14,6 +14,7 @@ import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.misc.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelReader
+import dev.klerkframework.klerk.read.Reader
 import dev.klerkframework.klerk.validation.PropertyValidation
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.formJs
@@ -260,7 +261,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     public fun build(
         call: ApplicationCall,
         params: T?,
-        reader: ModelReader<C, *>,
+        reader: Reader<C, *>,
         modelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>> = emptyMap(),
         // enumSelects: Map<KProperty1<*, EnumContainer<*>>, Array<out Enum<*>>>? = null,
         path: String? = null,
@@ -294,7 +295,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.fields
             .filter { selectEnums.contains(it.name) }
             .forEach { eventParameter ->
-                val validEnums = klerk.specification.getValidEnumsFor(defaultValues.eventReference, eventParameter)
+                val validEnums = klerk.specification.validEnumsFor(defaultValues.eventReference, eventParameter)
                     ?: eventParameter.enumConstants.toSet()
                 result.add(EnumPropertyWithOptions(eventParameter.name, eventParameter.isNullable, validEnums))
             }
@@ -303,7 +304,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
     private fun populateMissingReferenceSelects(
         developerProvidedModelIDSelects: Map<KProperty1<*, ModelID<out Any>?>, ModelView<out Any, C>>,
-        reader: ModelReader<C, *>,
+        reader: Reader<C, *>,
         inputs: List<Pair<String, InputType>>,
         context: C,
     ): Set<ReferencePropertyWithOptions> {
@@ -311,7 +312,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         parameters.fields
             .filter { it.type == PropertyType.Ref }
             .map { eventParameter ->
-                val ls = klerk.specification.getValidationCollectionFor(defaultValues.eventReference, eventParameter)
+                val ls = klerk.specification.validReferencesFor(defaultValues.eventReference, eventParameter)
                     ?: return@map
                 // Only offer references the actor may read; an unreadable row must not turn the form into a 500.
                 // One past the limit, so "too many" can be told from "exactly the limit" -- and lazily, so a large
@@ -322,7 +323,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
                     val referencedModel = eventParameter.referencedModel
-                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else klerk.specification.getPossibleVoidEvents(referencedModel, context)
+                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else with(reader) { getPossibleVoidEvents(referencedModel) }
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -339,7 +340,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     }
 
     internal fun validate() {
-        if (klerk.specification.getParameters(defaultValues.eventReference) != defaultValues.parameters) {
+        if (klerk.specification.parametersSchema(defaultValues.eventReference) != defaultValues.parameters) {
             log.warn { "Trying to make a form for an event that doesn't match the parameters" }
         }
 
@@ -1424,7 +1425,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
                     attributes["data-klerk-upload-path"] = template.uploads?.mountedAt
                         ?: error("The form has a file field but the uploads plugin has no routes registered")
                     // Lets the upload endpoint apply the property's own limit before accepting any bytes.
-                    attributes["data-klerk-event"] = template.defaultValues.eventReference.id()
+                    attributes["data-klerk-event"] = template.defaultValues.eventReference.toString()
                 }
                 +System.lineSeparator()
 

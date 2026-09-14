@@ -239,7 +239,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     }
 }
 
-internal fun EventReference.urlEncode(): String = id().encodeURLPathPart()
+internal fun EventReference.urlEncode(): String = toString().encodeURLPathPart()
 
 internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = parse(encoded.decodeURLPart())
 

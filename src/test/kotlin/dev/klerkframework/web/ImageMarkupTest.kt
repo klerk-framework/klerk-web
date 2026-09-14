@@ -7,7 +7,7 @@ import dev.klerkframework.klerk.AttachedDataVisibility
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions

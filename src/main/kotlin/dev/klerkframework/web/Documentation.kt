@@ -35,7 +35,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 h1 { +"Documentation" }
                 apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
                 apply(renderAuthorizationRules(klerk.specification.authorization, context.translation.klerk))
-                apply(renderCollections(klerk.specification.views))
+                apply(renderViews(klerk.specification.views))
                 apply(renderPluginsDocumentation(klerk.specification.plugins))
                 hr()
                 ul {
@@ -155,8 +155,8 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
     }
 }
 
-private fun <V> renderCollections(collections: V): FlowContent.() -> Unit = {
-    h2 { +"Collections" }
+private fun <V> renderViews(views: V): FlowContent.() -> Unit = {
+    h2 { +"Views" }
 
 }
 
@@ -178,8 +178,8 @@ private fun <C : KlerkContext, V> renderEvents(
     {
         h5 { +"Events" }
         stateMachine.getAllEvents().forEach { externalEvent ->
-            val parameters = klerk.specification.getParameters(externalEvent)
-            h6 { +externalEvent.id() }
+            val parameters = klerk.specification.parametersSchema(externalEvent)
+            h6 { +externalEvent.toString() }
             ul {
                 style = noBullets
                 li {
@@ -239,7 +239,7 @@ private fun <C : KlerkContext, V> renderEvents(
                     details {
                         summary { +"Validation rules" }
                         ul {
-                            klerk.specification.getEvent(externalEvent).getContextRules<C>().forEach {
+                            klerk.specification.contextRulesFor(externalEvent).forEach {
                                 li {
                                     +"Context: ${translation.function(it)}"
                                 }

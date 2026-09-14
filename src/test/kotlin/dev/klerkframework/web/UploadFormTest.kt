@@ -3,8 +3,8 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.EventWithParameters
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.collection.ModelViews
-import dev.klerkframework.klerk.collection.asSequence
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions

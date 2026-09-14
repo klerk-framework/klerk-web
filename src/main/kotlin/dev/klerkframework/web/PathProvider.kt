@@ -13,7 +13,7 @@ import kotlin.reflect.KClass
  * [Layout].
  *
  * @param base Base path for the application, typically "/"
- * @param prefix Prefix for collections, e.g. "admin/"
+ * @param prefix Prefix for the generated pages, e.g. "admin/"
  */
 public interface PathProvider {
     public val base: String
@@ -23,7 +23,9 @@ public interface PathProvider {
 
     /** Where [dev.klerkframework.web.attached.attachedDataRoutes] is mounted. */
     public val attachedDataBase: String get() = "${base}_attached"
-    public fun pathForCollection(kClass: KClass<out Any>): String {
+
+    /** The path to the list page for [kClass] — every instance of that model. Pairs with [pathForItem]. */
+    public fun pathForList(kClass: KClass<out Any>): String {
         return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
     }
 
@@ -80,11 +82,11 @@ public data class DefaultPathProvider(
     override val autoButtons: String = "${base}_autobuttons"
 
     override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String? {
-        return "${pathForCollection(kClass)}/${id.value}"
+        return "${pathForList(kClass)}/${id.value}"
     }
 
     override fun pathForItem(kClass: KClass<out Any>, id: String): String? {
-        return "${pathForCollection(kClass)}/$id"
+        return "${pathForList(kClass)}/$id"
     }
 
     init {

@@ -40,7 +40,7 @@ fun cityStateMachine(views: MyCollections): StateMachine<City, CityStates, Conte
 
     }
 
-object CreateCity : VoidEventNoParameters<City>(City::class, EventVisibility.External)
+object CreateCity : VoidEventNoParameters<City>(EventVisibility.External)
 
 fun newCity(args: ArgForVoidEvent<City, Nothing?, Context, MyCollections>): City {
     return City(FirstName("Stockholm"))

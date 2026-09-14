@@ -59,7 +59,7 @@ public class KlerkWeb<C : KlerkContext, V>(
             ul {
                 klerk.specification.managedModels.filter { it.kClass in models }.sortedBy { it.kClass.simpleName }.forEach { model ->
                     li {
-                        a(href = pathProvider.pathForCollection(model.kClass)) { +translator(model) }
+                        a(href = pathProvider.pathForList(model.kClass)) { +translator(model) }
                     }
                 }
             }
@@ -71,10 +71,10 @@ public class KlerkWeb<C : KlerkContext, V>(
         route.adminUiRoutes(adminUI)
         klerk.specification.managedModels.filter { it.kClass in models }.forEach { model ->
             val humanName = camelCaseToPretty(model.kClass.simpleName ?: "")
-            log.info { "Registering route: ${pathProvider.pathForCollection(model.kClass)}" }
+            log.info { "Registering route: ${pathProvider.pathForList(model.kClass)}" }
             route.modelListRoutes(
                 ModelListPage<Any, C, V>(
-                    model.kClass, support, pathProvider.pathForCollection(model.kClass), humanName,
+                    model.kClass, support, pathProvider.pathForList(model.kClass), humanName,
                 )
             )
             pathProvider.pathForItem(model.kClass, "{id}")?.let {

@@ -2,7 +2,7 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.assets.ImageAsset
 import dev.klerkframework.web.config.*

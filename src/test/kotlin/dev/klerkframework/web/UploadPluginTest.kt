@@ -2,7 +2,7 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.collection.ModelViews
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.config.*
 import dev.klerkframework.web.upload.NoSuchUploadException
 import dev.klerkframework.web.upload.UploadPlugin

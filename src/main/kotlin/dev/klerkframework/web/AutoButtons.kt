@@ -33,7 +33,7 @@ internal fun <C : KlerkContext, V> buildCreateEvents(
     create: (EventReference, KClass<out Any>) -> LowCodeCreateEvent<C, V>,
 ): List<LowCodeCreateEvent<C, V>> = klerk.specification.managedModels.flatMap { managed ->
     managed.stateMachine.getAllEvents()
-        .filter { klerk.specification.getParameters(it) != null }
+        .filter { klerk.specification.parametersSchema(it) != null }
         .filter(eventFilter)
         .mapNotNull { event ->
             try {
@@ -80,7 +80,7 @@ public class AutoButtons<C: KlerkContext, V>(
     }
 
     internal fun canRender(event: EventReference): Boolean =
-        klerk.specification.getParameters(event) == null || event in renderableEvents
+        klerk.specification.parametersSchema(event) == null || event in renderableEvents
 
     internal fun urlFor(event: EventReference, modelId: ModelID<*>?, paths: CompletionPaths): String {
         var url =

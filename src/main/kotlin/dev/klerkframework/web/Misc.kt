@@ -43,7 +43,7 @@ internal fun FlowContent.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathP
         +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
     }
     if (isDetails) {
-        a(href = pathProvider.pathForCollection(clazz)) { +name }
+        a(href = pathProvider.pathForList(clazz)) { +name }
         unsafe {
             +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
         }

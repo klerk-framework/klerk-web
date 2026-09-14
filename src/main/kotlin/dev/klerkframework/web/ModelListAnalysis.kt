@@ -14,16 +14,16 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     kClass: KClass<out Any>
 ) {
     val context = support.contextProvider(call, klerk)
-    val modelView = klerk.specification.getView<T>(kClass)
+    val modelView = klerk.specification.getModelViews(kClass)
 
     call.respond(klerk.read(context) {
         html {
             apply(support.layout.page("Analysis") {
                 h1 { +"Details" }
                 +kClass.toString()
-                h2 { +"Collections" }
-                modelView.getCollections().forEach { collection ->
-                    h6 { +(collection.getFullId().toString()) }
+                h2 { +"Views" }
+                modelView.getViews().forEach { collection ->
+                    h6 { +(collection.id.toString()) }
                     val groupedByState = collection.withReader(this@read).groupBy { it.state }
                     val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
                     +"Total count: ${countPerState.values.sum()}"

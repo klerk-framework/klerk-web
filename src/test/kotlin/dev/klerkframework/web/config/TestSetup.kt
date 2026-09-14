@@ -6,7 +6,7 @@ import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
 import dev.klerkframework.klerk.PropertyCollectionValidity.Invalid
 import dev.klerkframework.klerk.PropertyCollectionValidity.Valid
-import dev.klerkframework.klerk.collection.*
+import dev.klerkframework.klerk.view.*
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
@@ -390,12 +390,10 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
         state(Improving) {
             onEnter {
                 unmanagedJob(::onEnterImprovingStateAction)
-                transitionWhen(
-                    linkedMapOf(
-                        ::isAnImpostor to Amateur,
-                        ::hasTalent to Established,
-                    )
-                )
+                transitionWhen {
+                    on(::isAnImpostor, Amateur)
+                    on(::hasTalent, Established)
+                }
                 jobs(::aJob)
             }
 
@@ -422,31 +420,31 @@ fun sayCongratulations(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCo
     println("Congratulations")
 }
 
-fun someUpdate(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Author {
+fun someUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author {
     return args.model.props.copy(lastName = LastName("efter"))
 }
 
-fun onExitUpdate(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Author {
+fun onExitUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author {
     return args.model.props.copy(FirstName("Changed name after exit"))
 }
 
-fun sayHello(args: ArgForInstanceNonEvent<Author, Context, MyCollections>) {
+fun sayHello(args: LifecycleArgs<Author, Context, MyCollections>) {
     println("Hello!")
 }
 
-fun later(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Instant {
+fun later(args: LifecycleArgs<Author, Context, MyCollections>): Instant {
     return args.time.plus(30.seconds)
 }
 
-fun hasTalent(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = true
-fun isAnImpostor(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): Boolean = false
+fun hasTalent(args: LifecycleArgs<Author, Context, MyCollections>): Boolean = true
+fun isAnImpostor(args: LifecycleArgs<Author, Context, MyCollections>): Boolean = false
 
-fun aJob(args: ArgForInstanceNonEvent<Author, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
+fun aJob(args: LifecycleArgs<Author, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
     return listOf(MyJob.declare(""))
 }
 
 
-fun onEnterImprovingStateAction(args: ArgForInstanceNonEvent<Author, Context, MyCollections>) {
+fun onEnterImprovingStateAction(args: LifecycleArgs<Author, Context, MyCollections>) {
     if (onEnterImprovingStateActionCallback != null) {
         onEnterImprovingStateActionCallback!!()
     }
@@ -457,7 +455,7 @@ fun showNotification(args: ArgForInstanceEvent<Author, Nothing?, Context, MyColl
     println("It was decided that we should show a notification")
 }
 
-fun onEnterAmateurStateAction(args: ArgForInstanceNonEvent<Author, Context, MyCollections>) {
+fun onEnterAmateurStateAction(args: LifecycleArgs<Author, Context, MyCollections>) {
     if (onEnterAmateurStateActionCallback != null) {
         onEnterAmateurStateActionCallback!!()
     }
@@ -811,20 +809,20 @@ object SQLiteInMemory {
 }
 
 object CreateAuthor :
-    VoidEventWithParameters<Author, CreateAuthorParams>(Author::class, External, CreateAuthorParams::class)
+    VoidEventWithParameters<Author, CreateAuthorParams>(External)
 
-object UpdateAuthor : InstanceEventWithParameters<Author, Author>(Author::class, External, Author::class) {
+object UpdateAuthor : InstanceEventWithParameters<Author, Author>(External) {
 
 }
 
-object DeleteAuthor : InstanceEventNoParameters<Author>(Author::class, External)
+object DeleteAuthor : InstanceEventNoParameters<Author>(External)
 
-object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(Author::class, External)
+object DeleteAuthorAndBooks : InstanceEventNoParameters<Author>(External)
 
-object ImproveAuthor : InstanceEventNoParameters<Author>(Author::class, External)
+object ImproveAuthor : InstanceEventNoParameters<Author>(External)
 
 object ChangeName :
-    InstanceEventWithParameters<Author, ChangeNameParams>(Author::class, External, ChangeNameParams::class)
+    InstanceEventWithParameters<Author, ChangeNameParams>(External)
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
@@ -879,7 +877,7 @@ data class Context(
 
 data class User(val name: FirstName)
 
-object AnEventWithoutParameters : VoidEventNoParameters<Author>(Author::class, External)
+object AnEventWithoutParameters : VoidEventNoParameters<Author>(External)
 
 // A plain String cursor is used (rather than a custom data class) because this module has no kotlinx.serialization
 // compiler plugin applied, and String has a serializer built into kotlinx-serialization-core without it.
@@ -953,11 +951,11 @@ open class EnglishKlerkTranslation(val default: KlerkTranslation) : KlerkTransla
 }
 
 
-object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(Book::class, External, CreateBookParams::class)
+object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(External)
 
-object PublishBook : InstanceEventNoParameters<Book>(Book::class, External)
+object PublishBook : InstanceEventNoParameters<Book>(External)
 
-object DeleteBook : InstanceEventNoParameters<Book>(Book::class, External)
+object DeleteBook : InstanceEventNoParameters<Book>(External)
 
 data class CreateBookParams(
     val title: BookTitle,
@@ -1150,11 +1148,9 @@ class DocumentTitle(value: String) : StringContainer(value) {
 
 data class CreateDocumentParams(val title: DocumentTitle, val content: DocumentContent?)
 
-object CreateDocument : VoidEventWithParameters<Document, CreateDocumentParams>(
-    Document::class, EventVisibility.External, CreateDocumentParams::class
-)
+object CreateDocument : VoidEventWithParameters<Document, CreateDocumentParams>(EventVisibility.External)
 
-object DeleteDocument : InstanceEventNoParameters<Document>(Document::class, EventVisibility.External)
+object DeleteDocument : InstanceEventNoParameters<Document>(EventVisibility.External)
 
 fun documentStateMachine(): StateMachine<Document, DocumentStates, Context, MyCollections> = stateMachine {
     event(CreateDocument) {}
@@ -1184,11 +1180,9 @@ class FlowerName(value: String) : StringContainer(value) {
 
 data class CreateFlowerParams(val name: FlowerName, val image: FlowerImage)
 
-object CreateFlower : VoidEventWithParameters<Flower, CreateFlowerParams>(
-    Flower::class, EventVisibility.External, CreateFlowerParams::class
-)
+object CreateFlower : VoidEventWithParameters<Flower, CreateFlowerParams>(EventVisibility.External)
 
-object DeleteFlower : InstanceEventNoParameters<Flower>(Flower::class, EventVisibility.External)
+object DeleteFlower : InstanceEventNoParameters<Flower>(EventVisibility.External)
 
 fun flowerStateMachine(): StateMachine<Flower, FlowerStates, Context, MyCollections> = stateMachine {
     event(CreateFlower) {}
@@ -1258,7 +1252,7 @@ class SmallNote(id: AttachedBlobID) : AttachedBlobContainer(id) {
 
 data class CreateNoteParams(val title: DocumentTitle, val content: SmallNote)
 
-object CreateNote : VoidEventWithParameters<Note, CreateNoteParams>(Note::class, EventVisibility.External, CreateNoteParams::class)
+object CreateNote : VoidEventWithParameters<Note, CreateNoteParams>(EventVisibility.External)
 
 fun noteStateMachine(): StateMachine<Note, NoteStates, Context, MyCollections> = stateMachine {
     event(CreateNote) {}
@@ -1307,11 +1301,9 @@ class SecretDraft(id: AttachedStringID) : AttachedStringContainer(id)
 
 data class CreatePublicationParams(val cover: PublicCover, val body: PublicBody, val draft: SecretDraft?)
 
-object CreatePublication : VoidEventWithParameters<Publication, CreatePublicationParams>(
-    Publication::class, EventVisibility.External, CreatePublicationParams::class
-)
+object CreatePublication : VoidEventWithParameters<Publication, CreatePublicationParams>(EventVisibility.External)
 
-object DeletePublication : InstanceEventNoParameters<Publication>(Publication::class, EventVisibility.External)
+object DeletePublication : InstanceEventNoParameters<Publication>(EventVisibility.External)
 
 fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Context, MyCollections> = stateMachine {
     event(CreatePublication) {}
@@ -1349,9 +1341,7 @@ suspend fun describeTestImage(args: BlobPreAttachStepArgs): BlobPreAttachStepRes
 
 data class CreatePhotoParams(val image: DescribedImage)
 
-object CreatePhoto : VoidEventWithParameters<Photo, CreatePhotoParams>(
-    Photo::class, EventVisibility.External, CreatePhotoParams::class
-)
+object CreatePhoto : VoidEventWithParameters<Photo, CreatePhotoParams>(EventVisibility.External)
 
 fun photoStateMachine(): StateMachine<Photo, PhotoStates, Context, MyCollections> = stateMachine {
     event(CreatePhoto) {}
