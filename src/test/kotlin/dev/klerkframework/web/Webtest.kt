@@ -413,7 +413,7 @@ private fun createFlower(
         is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
         is ParseResult.Parsed -> {
             val result = klerk.handle(
-                Command(event = CreateFlower, model = null, params = parsed.params),
+                Command(CreateFlower, parsed.params),
                 context,
                 ProcessingOptions(parsed.key),
             )

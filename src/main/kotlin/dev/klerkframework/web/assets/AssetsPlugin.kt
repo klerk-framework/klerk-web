@@ -100,14 +100,14 @@ public class AssetsPlugin<C : KlerkContext, V>(
 
                     _klerk.handle(
                         Command(
-                            event = CreateTextAsset,
-                            model = null,
-                            params = CreateTextAssetParams(
+                            CreateTextAsset,
+                            CreateTextAssetParams(
                                 AssetPath(asset.resourcePath),
                                 contentType,
                                 base64hash,
                                 brotliId?.let { CompressedAsset(it) },
                             )
+                        
                         ),
                         context,
                     )
@@ -146,9 +146,8 @@ public class AssetsPlugin<C : KlerkContext, V>(
             .forEach {
                 _klerk.handle(
                     Command(
-                        event = DeleteTextAsset,
-                        model = it.id,
-                        params = null
+                        DeleteTextAsset,
+                        it.id
                     ),
                     context = _klerk.specification.systemContextProvider(),
                     ProcessingOptions(

@@ -108,21 +108,21 @@ internal val dateTimeFormatter = LocalDateTime.Format {
  * Human-readable rendering of the temporal containers, whose stored value is a number (epoch day or
  * microseconds). Returns null for anything else, so the caller can fall back to its usual rendering.
  */
-internal fun renderTemporalContainer(value: Any?): String? = when (value) {
-    is DateContainer -> value.ifAuthorized { dateFormatter.format(date.toKotlinLocalDate().atTime(0, 0)) }
-    is InstantContainer -> value.ifAuthorized {
-        dateTimeFormatter.format(instant.toLocalDateTime(TimeZone.currentSystemDefault()))
+internal fun renderTemporalContainer(container: Any?): String? = when (container) {
+    is DateContainer -> container.ifAuthorized { dateFormatter.format(it.toKotlinLocalDate().atTime(0, 0)) }
+    is InstantContainer -> container.ifAuthorized {
+        dateTimeFormatter.format(it.toLocalDateTime(TimeZone.currentSystemDefault()))
     }
-    is DurationContainer -> value.ifAuthorized { duration.toString() }
+    is DurationContainer -> container.ifAuthorized { it.toString() }
     else -> null
 }
 
 /**
- * The container's `date`/`instant`/`duration` fields are readable even when the property is masked, so the
- * authorization of this particular container decides whether [render] may be used at all.
+ * A container's `value` is readable even when the property is masked, so the authorization of this particular
+ * container decides whether [render] may be used at all.
  */
-private fun <T : DataContainer<*>> T.ifAuthorized(render: T.() -> String): String =
-    if (valueOrNullIfNotAuthorized == null) toString() else render()
+private fun <V : Any, T : DataContainer<V>> T.ifAuthorized(render: (V) -> String): String =
+    if (valueOrNullIfNotAuthorized == null) toString() else render(value)
 
 
 /** Produces a complete HTML document inside a read. Use [Layout.page] to get the same head as the generated pages. */

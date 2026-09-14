@@ -18,8 +18,9 @@ Follow these steps:
 3. Add the AssetsPlugin when creating the Klerk specification, e.g:
    ```kotlin
    SpecificationBuilder<Ctx, Views>(views).build {
-   // lots of stuff here
-   }.withPlugin(AssetsPlugin(setOf(css, myScript)))
+       plugins(AssetsPlugin(setOf(css, myScript)))
+       // lots of stuff here
+   }
    ```
 4. Give the `CssAsset` to the [Layout](appearance.md), which renders the `<link>`. Asset URLs include a content hash
    for cache busting; `PathProvider.assetPath` builds them for anything else, such as a `JsAsset`:
@@ -45,8 +46,9 @@ val splash = ImageAsset("splash.jpg")
 val hero = images.template("hero", widths = setOf(640, 1280, 2560), sizes = "100vw")
 
 SpecificationBuilder<Ctx, Views>(views).build {
+    plugins(images, AssetsPlugin(setOf(css, splash), images = images))
     // ...
-}.withPlugin(images).withPlugin(AssetsPlugin(setOf(css, splash), images = images))
+}
 ```
 
 ```kotlin

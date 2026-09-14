@@ -111,13 +111,12 @@ public class UploadPlugin<C : KlerkContext, V>(
     ): ModelID<Upload> {
         val result = klerk.handle(
             Command(
-                event = CreateUpload,
-                model = null,
-                params = CreateUploadParams(
+                CreateUpload,
+                CreateUploadParams(
                     filename = UploadFilename(filename),
                     declaredContentType = UploadContentType(declaredContentType),
                     declaredSize = ByteCount(declaredSize),
-                ),
+                )
             ),
             context,
         )
@@ -144,13 +143,12 @@ public class UploadPlugin<C : KlerkContext, V>(
     ): Problem? {
         val result = klerk.handle(
             Command(
-                event = CreateUpload,
-                model = null,
-                params = CreateUploadParams(
+                CreateUpload,
+                CreateUploadParams(
                     filename = UploadFilename(filename),
                     declaredContentType = UploadContentType(declaredContentType),
                     declaredSize = ByteCount(declaredSize),
-                ),
+                )
             ),
             context,
             ProcessingOptions(CommandToken.simple(), dryRun = true),
@@ -233,9 +231,9 @@ public class UploadPlugin<C : KlerkContext, V>(
             verify?.invoke(written)
             klerk.handle(
                 Command(
-                    event = RecordUploadedBytes,
-                    model = id,
-                    params = RecordUploadedBytesParams(ByteCount(written)),
+                    RecordUploadedBytes,
+                    id,
+                    RecordUploadedBytesParams(ByteCount(written))
                 ),
                 systemContext(),
             ).getOrThrow()
@@ -286,7 +284,7 @@ public class UploadPlugin<C : KlerkContext, V>(
             file = staging.pathFor(id.value),
             declaration = declaration,
             context = context,
-            metadata = mapOf(
+            custom = mapOf(
                 // The client's word, kept for the application to check or to serve back — never trusted as fact.
                 "filename" to upload.props.filename.valueWithoutAuthorization,
                 "declaredContentType" to upload.props.declaredContentType.valueWithoutAuthorization,
@@ -299,7 +297,7 @@ public class UploadPlugin<C : KlerkContext, V>(
 
         // Whether the file was moved or copied, nothing needs it any more.
         klerk.handle(
-            Command(event = DeleteUpload, model = id, params = null),
+            Command(DeleteUpload, id),
             systemContext(),
         ).getOrThrow()
         staging.delete(id.value)
@@ -317,7 +315,7 @@ public class UploadPlugin<C : KlerkContext, V>(
     public suspend fun delete(context: C, id: ModelID<Upload>) {
         get(context, id)
         klerk.handle(
-            Command(event = DeleteUpload, model = id, params = null),
+            Command(DeleteUpload, id),
             systemContext(),
         ).getOrThrow()
         staging.delete(id.value)

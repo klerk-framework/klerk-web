@@ -418,7 +418,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         if (!Csrf.isValid(call, callParams[CSRF_TOKEN])) {
             return ParseResult.Forbidden()
         }
-        val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) }
+        val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.parse(it) }
             ?: throw IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         callParams.forEach { name, _ ->
@@ -679,7 +679,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             tag.input(type) {
                 id = property.name
                 name = property.name
-                value = datatypeValue.string
+                value = datatypeValue.value
                 required = !property.returnType.isMarkedNullable
                 datatypeValue.minLength?.apply { minLength = this.toString() }
                 datatypeValue.maxLength?.apply { maxLength = this.toString() }
@@ -706,7 +706,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             tag.input(type) {
                 id = property.name
                 name = property.name
-                value = datatypeValue.int.toString()
+                value = datatypeValue.value.toString()
                 required = !property.returnType.isMarkedNullable
                 datatypeValue.min?.apply { min = this.toString() }
                 datatypeValue.max?.apply { max = this.toString() }
@@ -730,7 +730,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             tag.input(type) {
                 id = property.name
                 name = property.name
-                value = datatypeValue.long.toString()
+                value = datatypeValue.value.toString()
                 required = !property.returnType.isMarkedNullable
                 datatypeValue.min?.apply { min = this.toString() }
                 datatypeValue.max?.apply { max = this.toString() }
@@ -755,7 +755,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 id = property.name
                 name = property.name
                 value = "true"
-                checked = datatypeValue.boolean
+                checked = datatypeValue.value
             }
             tag.input(InputType.hidden) {
                 name = property.name
@@ -1300,7 +1300,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             id = elementId(propertyName)
             name = propertyName
             value = theValue.valueOrNullIfNotAuthorized
-                ?.let { theValue.instant.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat) }
+                ?.let { theValue.value.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat) }
                 ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
@@ -1317,7 +1317,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(InputType.date) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.date.toString() } ?: ""
+            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.value.toString() } ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
         }
@@ -1333,7 +1333,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         input(number) {
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.duration.inWholeSeconds.toString() } ?: ""
+            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.value.inWholeSeconds.toString() } ?: ""
             step = "1"
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
@@ -1592,11 +1592,7 @@ public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
     klerk: Klerk<C, D>,
     context: C,
 ) {
-    val command = Command(
-        event = event,
-        params = params,
-        model = null,
-    )
+    val command = Command(event, params)
     when (val result = klerk.handle(command, context, ProcessingOptions(key, dryRun = true))) {
         is CommandResult.Failure -> {
             val fieldProblems = result.problems

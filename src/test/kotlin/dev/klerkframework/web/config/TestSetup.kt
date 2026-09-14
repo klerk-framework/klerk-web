@@ -366,7 +366,7 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             }
 
             onEvent(DeleteAuthorAndBooks) {
-                createCommands(::eventsToDeleteAuthorAndBooks)
+                commands(::eventsToDeleteAuthorAndBooks)
             }
 
             onEvent(ImproveAuthor) {
@@ -478,15 +478,15 @@ fun changeNameOfAuthor(args: ArgForInstanceEvent<Author, ChangeNameParams, Conte
 fun eventsToDeleteAuthorAndBooks(args: ArgForInstanceEvent<Author, Nothing?, Context, MyCollections>): List<Command<Any, Any>> {
     args.reader.apply {
         val result: MutableList<Command<Any, Any>> = mutableListOf()
-        val books = getRelated(Book::class, requireNotNull(args.model.id))
+        val books = referencing(Book::class, requireNotNull(args.model.id))
 
         @Suppress("UNCHECKED_CAST")
-        books.map { Command(event = DeleteBook, model = it.id, null) }
+        books.map { Command(DeleteBook, it.id) }
             .forEach { result.add(it as Command<Any, Any>) }
 
         @Suppress("UNCHECKED_CAST")
         result.add(
-            Command(event = DeleteAuthor, model = requireNotNull(args.model.id), null)
+            Command(DeleteAuthor, requireNotNull(args.model.id))
                     as Command<Any, Any>
         )
 
@@ -580,9 +580,8 @@ data class MyCollections(
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
     val result = klerk.handle(
         Command(
-            event = CreateAuthor,
-            model = null,
-            params = CreateAuthorParams(
+            CreateAuthor,
+            CreateAuthorParams(
                 firstName = FirstName("J.K"),
                 lastName = LastName("Rowling"),
                 phone = PhoneNumber("+46123456"),
@@ -591,7 +590,7 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
                 favouritePrimeNumber = PrimeNumber(31),
                 isLikedByMyDaughter = IsLikedByMyDaughter(false),
                 nullableFirstName = null,
-            ),
+            )
         ),
         Context.system(),
     )
@@ -601,9 +600,8 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
 suspend fun createAuthorAstrid(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
     val result = klerk.handle(
         Command(
-            event = CreateAuthor,
-            model = null,
-            params = createAstridParameters,
+            CreateAuthor,
+            createAstridParameters
         ),
         Context.system(),
     )
@@ -624,16 +622,15 @@ val createAstridParameters = CreateAuthorParams(
 suspend fun createBookHarryPotter1(klerk: Klerk<Context, MyCollections>, author: ModelID<Author>): ModelID<Book> {
     val result = klerk.handle(
         Command(
-            event = CreateBook,
-            model = null,
-            params = CreateBookParams(
+            CreateBook,
+            CreateBookParams(
                 title = BookTitle("Harry Potter and the Philosopher's Stone"),
                 author = author,
                 coAuthors = emptySet(),
                 previousBooksInSameSeries = emptyList(),
                 tags = setOf(BookTag("Fiction"), BookTag("Children")),
                 averageScore = AverageScore(0f)
-            ),
+            )
         ),
         Context.system(),
     )
@@ -648,16 +645,15 @@ suspend fun createBookHarryPotter2(
 ): ModelID<Book> {
     val result = klerk.handle(
         Command(
-            event = CreateBook,
-            model = null,
-            params = CreateBookParams(
+            CreateBook,
+            CreateBookParams(
                 title = BookTitle("Harry Potter and the Chamber of Secrets"),
                 author = author,
                 coAuthors = coAuthors,
                 previousBooksInSameSeries = previousBooksInSameSeries,
                 tags = setOf(BookTag("Fiction"), BookTag("Children")),
                 averageScore = AverageScore(0f)
-            ),
+            )
         ),
         Context.system(),
     )
@@ -1006,9 +1002,8 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
     for (i in 1..numberOfAuthors) {
         val result = klerk.handle(
             Command(
-                event = CreateAuthor,
-                model = null,
-                params = CreateAuthorParams(
+                CreateAuthor,
+                CreateAuthorParams(
                     firstName = FirstName(firstNames.random()),
                     lastName = LastName(i.toString()),
                     phone = PhoneNumber("+46123456"),
@@ -1017,7 +1012,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(true),
                     nullableFirstName = null,
-                ),
+                )
             ),
             Context.system(),
         )
@@ -1025,9 +1020,8 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
         if (i % 10 == 0) {
             klerk.handle(
                 Command(
-                    event = ImproveAuthor,
-                    model = result.getOrThrow().primaryModel,
-                    params = null
+                    ImproveAuthor,
+                    requireNotNull(result.getOrThrow().primaryModel)
                 ),
                 context = Context.system(),
                 ProcessingOptions(
@@ -1044,16 +1038,15 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
         for (j in 1..booksPerAuthor) {
             klerk.handle(
                 Command(
-                    event = CreateBook,
-                    model = null,
-                    params = CreateBookParams(
+                    CreateBook,
+                    CreateBookParams(
                         title = BookTitle("Book $j"),
                         author = authorRef,
                         coAuthors = emptySet(),
                         previousBooksInSameSeries = emptyList(),
                         tags = setOf(BookTag("Fiction"), BookTag("Children")),
                         averageScore = AverageScore(0f)
-                    ),
+                    )
                 ),
                 Context.system(),
             )

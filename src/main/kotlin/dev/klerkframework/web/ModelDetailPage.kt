@@ -241,7 +241,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
 
 internal fun EventReference.urlEncode(): String = id().encodeURLPathPart()
 
-internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = from(encoded.decodeURLPart())
+internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = parse(encoded.decodeURLPart())
 
 /** The detail route for one model. Registers nothing when [PathProvider.pathForItem] returns null for it. */
 public fun <T : Any, C : KlerkContext, V> Route.modelDetailRoutes(page: ModelDetailPage<T, C, V>): Unit =

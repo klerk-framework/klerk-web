@@ -134,9 +134,8 @@ class ImageProcessorContractTest {
         val body = klerk.attachedData.prepare("a body", PublicBody::class, author)
         val result = klerk.handle(
             Command(
-                event = CreatePublication,
-                model = null,
-                params = CreatePublicationParams(PublicCover(cover), PublicBody(body), null),
+                CreatePublication,
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), null)
             ),
             author,
         )

@@ -85,7 +85,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         ModelViews: ModelViews<T, C>
     ): ModelView<T, C> {
         val collectionId = queryParameters["collection"] ?: return ModelViews.all
-        val decoded = CollectionId.from(URLDecoder.decode(collectionId, Charset.forName("utf-8")))
+        val decoded = CollectionId.parse(URLDecoder.decode(collectionId, Charset.forName("utf-8")))
         return klerk.specification.getView<T>(kClass).getCollections().single { it.getFullId() == decoded }
     }
 
@@ -325,7 +325,7 @@ internal fun addMermaidScript(): FlowContent.() -> Unit = {
 private fun createQueryOptions(queryParameters: Parameters, pageSize: Int): QueryOptions {
     val cursor = queryParameters["cursor"]?.let {
         try {
-            QueryListCursor.fromString(it)
+            QueryListCursor.parse(it)
         } catch (e: IllegalArgumentException) {
             null
         }

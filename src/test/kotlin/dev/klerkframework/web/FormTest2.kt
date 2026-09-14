@@ -103,9 +103,9 @@ fun main() {
     klerk: Klerk<Context, MyCollections>
 ) {
     val re = Command(
-        event = event,
+        event,
         params = params,
-        model = id,
+        model = id
     )
     when (val result =
         klerk.handle(re, Context.swedishUnauthenticated(), ProcessingOptions(key, dryRun = true))) {

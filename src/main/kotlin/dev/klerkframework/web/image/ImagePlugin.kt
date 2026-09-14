@@ -71,7 +71,7 @@ private val sourceContentTypes = setOf("image/jpeg", "image/png", "image/gif", "
  * )
  * val hero = images.template("hero", widths = setOf(640, 1280, 2560), sizes = "100vw")
  *
- * val spec = SpecificationBuilder<Ctx, Views>(views).build { }.withPlugin(images)
+ * val spec = SpecificationBuilder<Ctx, Views>(views).build { plugins(images) }
  *
  * routing { attachedDataRoutes(support, images = images) }
  * ```

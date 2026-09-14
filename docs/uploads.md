@@ -9,8 +9,9 @@ owned by one of your models.
 val uploads = UploadPlugin<Context, MyViews>(stagingDirectory = Path("/var/lib/myapp/uploads"))
 
 val specification = SpecificationBuilder<Context, MyViews>(views).build {
+    plugins(uploads)
     // ...
-}.withPlugin(uploads)
+}
 
 val settings = KlerkSettings(
     persistence = SqlPersistence(dataSource),

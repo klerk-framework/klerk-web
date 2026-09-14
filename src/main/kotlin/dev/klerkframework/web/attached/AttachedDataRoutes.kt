@@ -120,7 +120,7 @@ private suspend fun <C : KlerkContext, V> RoutingContext.serve(
     support: WebSupport<C, V>,
     settings: ServingSettings<C, V>,
 ) {
-    val id = AttachedDataID.parse(call.parameters["id"])
+    val id = AttachedDataID.parseOrNull(call.parameters["id"])
     if (id == null) {
         call.respond(HttpStatusCode.BadRequest)
         return

@@ -122,7 +122,7 @@ class ImageFlowTest {
                         is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
                         is ParseResult.Parsed -> {
                             klerk.handle(
-                                Command(CreateFlower, null, parsed.params),
+                                Command(CreateFlower, parsed.params),
                                 actor,
                                 ProcessingOptions(parsed.key),
                             ).getOrThrow()

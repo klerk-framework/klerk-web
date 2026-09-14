@@ -96,9 +96,8 @@ class ImageVariantsTest {
         val body = klerk.attachedData.prepare("a body", PublicBody::class, author)
         val result = klerk.handle(
             Command(
-                event = CreatePublication,
-                model = null,
-                params = CreatePublicationParams(PublicCover(cover), PublicBody(body), null),
+                CreatePublication,
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), null)
             ),
             author,
         )
@@ -361,7 +360,7 @@ class ImageVariantsTest {
         assertTrue(listing().any { it == "320.png" })
 
         klerk.handle(
-            Command(event = DeletePublication, model = id, params = null),
+            Command(DeletePublication, id),
             author,
         ).getOrThrow()
         images.sweep()

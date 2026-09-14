@@ -100,7 +100,7 @@ class UploadFormTest {
                         is ParseResult.DryRun -> call.respond(HttpStatusCode.OK)
                         is ParseResult.Parsed -> {
                             val result = klerk.handle(
-                                Command(CreateDocument, null, parsed.params),
+                                Command(CreateDocument, parsed.params),
                                 ctx,
                                 ProcessingOptions(parsed.key),
                             )

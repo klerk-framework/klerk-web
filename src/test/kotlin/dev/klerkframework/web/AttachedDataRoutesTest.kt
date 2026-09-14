@@ -69,9 +69,8 @@ class AttachedDataRoutesTest {
         val draft = klerk.attachedData.prepare("not finished yet", SecretDraft::class, author)
         val result = klerk.handle(
             Command(
-                event = CreatePublication,
-                model = null,
-                params = CreatePublicationParams(PublicCover(cover), PublicBody(body), SecretDraft(draft)),
+                CreatePublication,
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), SecretDraft(draft))
             ),
             author,
         )
@@ -214,7 +213,7 @@ class AttachedDataRoutesTest {
         assertEquals(HttpStatusCode.OK, client.get(path).status)
 
         klerk.handle(
-            Command(event = DeletePublication, model = id, params = null),
+            Command(DeletePublication, id),
             author,
         ).getOrThrow()
 

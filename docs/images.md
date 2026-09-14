@@ -12,8 +12,9 @@ val images = ImagePlugin<Context, MyViews>(
 )
 
 val specification = SpecificationBuilder<Context, MyViews>(views).build {
+    plugins(images)
     // ...
-}.withPlugin(images)
+}
 
 routing {
     attachedDataRoutes(support, images = images)

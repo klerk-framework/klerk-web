@@ -21,7 +21,7 @@ class ValueWithCorrectTypeTest {
     @Test
     fun `An enum declared inside a class is parsed`() {
         val value = valueWithCorrectType("Large", schema.field("size")!!) as SizeContainer
-        assertEquals(Holder.Size.Large, value.enum)
+        assertEquals(Holder.Size.Large, value.value)
     }
 
     @Test

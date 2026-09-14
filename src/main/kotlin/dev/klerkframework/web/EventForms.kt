@@ -180,7 +180,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val context = support.contextProvider(call, klerk)
             val queryParameters = call.request.queryParameters
             //  val buttonTargets = parseButtonTargets(call, null)
-            val eventReference = EventReference.from(requireNotNull(queryParameters["eventId"]))
+            val eventReference = EventReference.parse(requireNotNull(queryParameters["eventId"]))
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.getParameters(eventReference)))
             val parameters = klerk.specification.getParameters(eventReference)
@@ -197,7 +197,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             if (template == null) {
                 // An event without parameters: no form was parsed, so the CSRF token is verified here.
                 val params = Csrf.receiveVerifiedParameters(call) ?: return
-                val key = params[IDEMPOTENCE_KEY]?.let { CommandToken.from(it) } ?: CommandToken.simple()
+                val key = params[IDEMPOTENCE_KEY]?.let { CommandToken.parse(it) } ?: CommandToken.simple()
                 executeEvent(
                     event,
                     id,
@@ -240,12 +240,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             params: Any?
         ) {
             val options = ProcessingOptions(token = key)
-            val command = when (event) {
-                is InstanceEventNoParameters -> Command(event, id, null)
-                is InstanceEventWithParameters -> Command(event, id, params!!)
-                is VoidEventNoParameters -> Command(event, null, null)
-                is VoidEventWithParameters -> Command(event, null, params!!)
-            }
+            val command = Command.dynamic(event, id, params)
 
             when (val eventResult = klerk.handle(command, context, options)) {
                 is CommandResult.Failure -> {

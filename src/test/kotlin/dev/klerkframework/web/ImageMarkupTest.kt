@@ -474,7 +474,7 @@ class ImageMarkupTest {
             val blob = setup.klerk.attachedData.prepare(png(800, 400).inputStream(), DescribedImage::class, actor)
             setup.klerk.attachedData.awaitProcessing(blob)
             val photoID = setup.klerk.handle(
-                Command(event = CreatePhoto, model = null, params = CreatePhotoParams(DescribedImage(blob))),
+                Command(CreatePhoto, CreatePhotoParams(DescribedImage(blob))),
                 actor,
             ).getOrThrow().primaryModel as ModelID<Photo>
 

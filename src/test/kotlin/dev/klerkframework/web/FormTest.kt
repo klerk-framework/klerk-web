@@ -42,7 +42,7 @@ fun main() {
             val harryPotter2 = createBookHarryPotter2(klerk, rowling, listOf(), setOf())
 
             val improveResult = klerk.handle(
-                Command(ImproveAuthor, rowling, null), Context.system(), ProcessingOptions(
+                Command(ImproveAuthor, rowling), Context.system(), ProcessingOptions(
                     CommandToken.simple()
                 )
             )
