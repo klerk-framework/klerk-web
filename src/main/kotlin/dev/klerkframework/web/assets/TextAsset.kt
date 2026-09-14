@@ -46,10 +46,10 @@ internal fun <C : KlerkContext, V> createTextResourceStatemachine(): StateMachin
     }
 
 /** Issued by [AssetsPlugin] at startup for each asset. Not meant to be rendered by klerk-web. */
-public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(EventVisibility.Code)
+public object CreateTextAsset : VoidEventWithParameters<TextAsset, CreateTextAssetParams>(EventVisibility.Application)
 
 /** Issued by [AssetsPlugin] when an asset is no longer part of the application. */
-public object DeleteTextAsset : InstanceEventNoParameters<TextAsset>(EventVisibility.Code)
+public object DeleteTextAsset : InstanceEventNoParameters<TextAsset>(EventVisibility.Application)
 
 /** Parameters of [CreateTextAsset]. */
 public data class CreateTextAssetParams(

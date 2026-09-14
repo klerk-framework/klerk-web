@@ -86,56 +86,30 @@ fun createConfig(
         }
         authorization {
             readModels {
-                positive {
-                    rule(::`Everybody can read`)
-                }
-                negative {
-                    rule(::pelleCannotReadOnMornings)
-                    rule(::unauthenticatedCannotReadAstrid)
-                }
+                positive(::`Everybody can read`)
+                negative(::pelleCannotReadOnMornings, ::unauthenticatedCannotReadAstrid)
             }
 
             readProperties {
-                positive {
-                    rule(::canReadAllProperties)
-                }
-                negative {
-                    rule(::cannotReadAstrid)
-                }
+                positive(::canReadAllProperties)
+                negative(::cannotReadAstrid)
             }
             commands {
-                positive {
-                    rule(::`Everybody can do everything`)
-                }
-                negative {
-                    rule(::noUploadLargerThanTenMegabytes)
-                }
+                positive(::`Everybody can do everything`)
+                negative(::noUploadLargerThanTenMegabytes)
             }
             eventLog {
-                positive {
-                    rule(::`Everybody can read event log`)
-                }
-                negative {}
+                positive(::`Everybody can read event log`)
             }
             jobs {
-                positive {
-                    rule(::`Everybody can read jobs`)
-                }
-                negative {}
+                positive(::`Everybody can read jobs`)
             }
             readAttachedData {
-                positive {
-                    rule(::`Everybody can read attached data`)
-                }
-                negative {
-                    rule(::`Only the author can read a publication`)
-                }
+                positive(::`Everybody can read attached data`)
+                negative(::`Only the author can read a publication`)
             }
             writeAttachedData {
-                positive {
-                    rule(::`Everybody can prepare attached data`)
-                }
-                negative {}
+                positive(::`Everybody can prepare attached data`)
             }
         }
         systemContextProvider(::myContextProvider)
@@ -767,25 +741,14 @@ fun addStandardTestConfiguration(auth: Boolean = true): SpecificationBuilder<Con
     if (auth) {
         authorization {
             readModels {
-                positive {
-                    rule(::`Everybody can read`)
-                }
-                negative {
-                    rule(::pelleCannotReadOnMornings)
-                }
+                positive(::`Everybody can read`)
+                negative(::pelleCannotReadOnMornings)
             }
             commands {
-                positive {
-                    rule(::`Everybody can do everything`)
-                }
-                negative {
-                }
+                positive(::`Everybody can do everything`)
             }
             eventLog {
-                positive {
-                    rule(::`Everybody can read event log`)
-                }
-                negative {}
+                positive(::`Everybody can read event log`)
             }
         }
     }
