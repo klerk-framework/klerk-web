@@ -8,8 +8,8 @@ import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
-import dev.klerkframework.klerk.validation.PropertyValidation
-import dev.klerkframework.klerk.validation.PropertyValidation.Valid
+import dev.klerkframework.klerk.validation.PropertyValidity
+import dev.klerkframework.klerk.validation.PropertyValidity.Valid
 import dev.klerkframework.web.ParseResult.DryRun
 import dev.klerkframework.web.ParseResult.Invalid
 import dev.klerkframework.web.ParseResult.Parsed
@@ -190,8 +190,8 @@ data class TestParams(
     val aRemainingString: FirstName,
 ) {
 
-    fun phoneMustEndWith7(): PropertyValidation {
-        return if (aPhone.value.endsWith("7")) Valid else PropertyValidation.Invalid()
+    fun phoneMustEndWith7(): PropertyValidity {
+        return if (aPhone.value.endsWith("7")) Valid else PropertyValidity.Invalid()
     }
 
 

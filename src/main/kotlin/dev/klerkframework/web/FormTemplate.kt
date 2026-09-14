@@ -15,7 +15,7 @@ import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.read.Reader
-import dev.klerkframework.klerk.validation.PropertyValidation
+import dev.klerkframework.klerk.validation.PropertyValidity
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.assets.formJs
 import dev.klerkframework.web.assets.uploadJs
@@ -452,28 +452,15 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 return ParseResult.Invalid(propertyValidationProblems.toSet())
             }
 
-            // Level 2: the properties together.
-            val validationProblems: MutableSet<PropertyCollectionValidity.Invalid> = if (paramsClass is Validatable) {
-                paramsClass.validators()
-                    .mapNotNull {
-                         val result = it.invoke()
-                         return@mapNotNull if (result is PropertyCollectionValidity.Invalid) {
-                             if (result.endUserTranslatedMessage != null) result else PropertyCollectionValidity.Invalid(context.translation.klerk.function(it))
-                         } else {
-                             null
-                         }
-                    }.toMutableSet()
-            } else mutableSetOf()
+            // Level 2: the properties together. Klerk builds the message, so the form shows what the command would.
+            val validationProblems = if (paramsClass is Validatable) {
+                paramsClass.validators().mapNotNull { rule ->
+                    (rule.invoke() as? PropertyCollectionValidity.Invalid)?.toProblem(rule, context.translation)
+                }
+            } else emptyList()
 
             if (validationProblems.isNotEmpty()) {
-                return ParseResult.Invalid(validationProblems.map {
-                    InvalidPropertyCollectionProblem(
-                        endUserTranslatedMessage = it.endUserTranslatedMessage
-                            ?: context.translation.klerk.invalid,
-                        fieldsMustBeNull = setOfNotNull(it.fieldMustBeNull),
-                        fieldsMustNotBeNull = setOfNotNull(it.fieldMustNotBeNull),
-                    )
-                }.toSet())
+                return ParseResult.Invalid(validationProblems.toSet())
             }
 
 

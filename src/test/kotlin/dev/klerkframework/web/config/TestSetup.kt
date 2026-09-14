@@ -30,7 +30,7 @@ import dev.klerkframework.klerk.storage.AttachedBlobStore
 import dev.klerkframework.klerk.storage.Persistence
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
-import dev.klerkframework.klerk.validation.PropertyValidation
+import dev.klerkframework.klerk.validation.PropertyValidity
 import dev.klerkframework.web.assets.AssetsPlugin
 import dev.klerkframework.web.upload.CreateUploadParams
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
@@ -670,11 +670,11 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
 
     override val validators = setOf(::mustBeEven)
 
-    fun mustBeEven(value: Int, translation: Translation): PropertyValidation {
+    fun mustBeEven(value: Int, translation: Translation): PropertyValidity {
         if (value % 2 == 0) {
-            return PropertyValidation.Valid
+            return PropertyValidity.Valid
         }
-        return PropertyValidation.Invalid("Must be even")
+        return PropertyValidity.Invalid("Must be even")
     }
 
 }
@@ -685,13 +685,13 @@ class FirstName(value: String) : StringContainer(value) {
     override val maxLines = 1
     override val recommendedDefault = "John"
 
-    override val validators: Set<(String, Translation) -> PropertyValidation> =
+    override val validators: Set<(String, Translation) -> PropertyValidity> =
         setOf(::mustNotHavePelleInName)
 
-    fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidation {
+    fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidity {
         return if (name.contains("Pelle", ignoreCase = true))
-            PropertyValidation.Invalid("Must not contain 'Pelle'") else
-            PropertyValidation.Valid
+            PropertyValidity.Invalid("Must not contain 'Pelle'") else
+            PropertyValidity.Valid
     }
 }
 
@@ -708,16 +708,16 @@ class BookTitle(value: String) : StringContainer(value) {
     override val regexPattern = ".*"
     override val validators = setOf(::`title must not contain 'alpha'`, ::`title must not start with 'beta'`)
 
-    private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidation {
+    private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidity {
         return if (title.contains("alpha")) {
-            PropertyValidation.Invalid()
-        } else PropertyValidation.Valid
+            PropertyValidity.Invalid()
+        } else PropertyValidity.Valid
     }
 
-    private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidation {
+    private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidity {
         return if (title.lowercase().startsWith("beta")) {
-            PropertyValidation.Invalid("'beta' must not be the first word")
-        } else PropertyValidation.Valid
+            PropertyValidity.Invalid("'beta' must not be the first word")
+        } else PropertyValidity.Valid
     }
 }
 
@@ -1117,12 +1117,12 @@ class PrimeNumber(value: Int) : IntContainer(value) {
     override val min: Int = 1
     override val max: Int = Int.MAX_VALUE
 
-    override val validators: Set<(Int, Translation) -> PropertyValidation> = setOf(::mustBePrime)
+    override val validators: Set<(Int, Translation) -> PropertyValidity> = setOf(::mustBePrime)
 
     private val primeNumbers = setOf(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
 
-    fun mustBePrime(value: Int, translation: Translation): PropertyValidation {
-        return if (primeNumbers.contains(value)) PropertyValidation.Valid else PropertyValidation.Invalid()
+    fun mustBePrime(value: Int, translation: Translation): PropertyValidity {
+        return if (primeNumbers.contains(value)) PropertyValidity.Valid else PropertyValidity.Invalid()
     }
 
 }
