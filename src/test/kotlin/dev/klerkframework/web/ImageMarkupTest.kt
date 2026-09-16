@@ -14,7 +14,7 @@ import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.config.*
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.FetchPriority
-import dev.klerkframework.klerk.BlobRejected
+import dev.klerkframework.klerk.BlobRejectedException
 import dev.klerkframework.web.image.ImageIoProcessor
 import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImageProcessor
@@ -217,7 +217,7 @@ class ImageMarkupTest {
             setup.klerk.meta.start(installShutdownHook = false)
             val blob = setup.klerk.attachedData.prepare(png(800, 400).inputStream(), DescribedImage::class, actor)
 
-            val thrown = assertFailsWith<BlobRejected> { setup.klerk.attachedData.awaitProcessing(blob) }
+            val thrown = assertFailsWith<BlobRejectedException> { setup.klerk.attachedData.awaitProcessing(blob) }
 
             assertTrue(thrown.message!!.contains("320000"), thrown.message)
             assertTrue(thrown.message!!.contains("1000"), thrown.message)

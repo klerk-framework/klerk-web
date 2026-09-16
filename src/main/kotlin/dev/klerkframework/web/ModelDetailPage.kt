@@ -63,7 +63,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             support.respondPage(call, "Forbidden", HttpStatusCode.Forbidden) { +"Forbidden" }
             return
         }
-        val events = klerk.read(context) { getPossibleEvents(id) }
+        val events = klerk.read(context) { possibleEvents(id) }
 
         support.respondPage(call, "$humanName ${model.id}") {
             breadcrumbs(model.props::class, pathProvider, true)

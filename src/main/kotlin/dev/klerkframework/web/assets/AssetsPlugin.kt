@@ -4,8 +4,6 @@ import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.web.AdminUIPluginIntegration
 import dev.klerkframework.web.WebSupport
 
@@ -150,9 +148,6 @@ public class AssetsPlugin<C : KlerkContext, V>(
                         it.id
                     ),
                     context = _klerk.specification.systemContextProvider(),
-                    ProcessingOptions(
-                        CommandToken.simple()
-                    )
                 )
             }
     }

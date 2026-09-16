@@ -32,7 +32,7 @@ internal fun <C : KlerkContext, V> buildCreateEvents(
     eventFilter: (EventReference) -> Boolean,
     create: (EventReference, KClass<out Any>) -> LowCodeCreateEvent<C, V>,
 ): List<LowCodeCreateEvent<C, V>> = klerk.specification.managedModels.flatMap { managed ->
-    managed.stateMachine.getAllEvents()
+    managed.stateMachine.eventReferences
         .filter { klerk.specification.parametersSchema(it) != null }
         .filter(eventFilter)
         .mapNotNull { event ->
@@ -112,7 +112,7 @@ public fun <C : KlerkContext, V> FlowContent.eventButton(
     onErrorPath: String? = null,
 ): Unit = eventButton(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
 
-/** As [eventButton], but takes the event by reference - e.g. what `getPossibleEvents` returns. */
+/** As [eventButton], but takes the event by reference. */
 context(support: WebSupport<C, V>)
 public fun <C : KlerkContext, V> FlowContent.eventButton(
     event: EventReference,

@@ -1,6 +1,8 @@
 package dev.klerkframework.web
 
 import kotlinx.serialization.Serializable
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity
+import dev.klerkframework.klerk.validation.Valid
 import kotlinx.serialization.json.Json
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.view.ModelView
@@ -38,9 +40,7 @@ import kotlinx.datetime.format
 import kotlinx.html.*
 import kotlinx.html.InputType.*
 import mu.KotlinLogging
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
+import kotlinx.datetime.LocalDate
 import java.io.InputStream
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
@@ -324,7 +324,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 } else {
                     // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
                     val referencedModel = eventParameter.referencedModel
-                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else with(reader) { getPossibleVoidEvents(referencedModel) }
+                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else with(reader) { possibleVoidEvents(referencedModel) }
                     result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
                 }
             }
@@ -611,10 +611,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                                 fromFileParts.add(name)
                             } catch (e: UploadRefused) {
                                 refused = e.message
-                            } catch (e: BlobRejected) {
+                            } catch (e: BlobRejectedException) {
                                 // A step said no. Same treatment as a size refusal: the body is still drained, and
                                 // the user is told why.
-                                refused = e.message
+                                refused = e.reason
                             }
                         }
                     }
@@ -722,7 +722,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 name = property.name
                 required = !property.returnType.isMarkedNullable
                 if (minFunction != null) {
-                    min = minFunction.invoke().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT))
+                    min = minFunction.invoke().toString()
                 }
                 // maxFunction
             }
@@ -1187,8 +1187,8 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
             // required = !property.returnType.isMarkedNullable
-            min = theValue.minAsText
-            max = theValue.maxAsText
+            min = theValue.min.toString()
+            max = theValue.max.toString()
             if (theValue.hasDecimals) {
                 step = "any"
             }
@@ -1432,7 +1432,7 @@ public data class ReferencePropertyWithOptions(
     val propertyName: String,
     val propertyNullable: Boolean,
     val options: List<Model<out Any>>,
-    val suggestedEvents: Collection<EventReference>
+    val suggestedEvents: Collection<VoidEvent<*, *>>
 )
 
 /** An enum parameter and the values that may be selected for it. */

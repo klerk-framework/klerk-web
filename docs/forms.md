@@ -139,6 +139,12 @@ routing {
 
 `parse` needs the caller's context so that the messages the user reads are translated for them.
 
+If the command you then handle fails, `Problem.httpStatus` gives the status to respond with:
+
+```kotlin
+is CommandResult.Failure -> call.respond(result.problems.first().httpStatus)
+```
+
 ## Validation
 
 Klerk will make sure to evaluate all relevant rules when you pass the parameters in a Klerk command, so there is no
@@ -158,8 +164,8 @@ reported at once, so every offending field is marked:
 2. The properties together (`Validatable.validators()`).
 3. The command pipeline: authorization and business rules.
 
-Whether the actor may execute the event at all is decided before the form is rendered - use `getPossibleEvents` and
-`getPossibleVoidEvents` so nobody fills in a form for an event they can never execute.
+Whether the actor may execute the event at all is decided before the form is rendered - use `possibleEvents` and
+`possibleVoidEvents` so nobody fills in a form for an event they can never execute.
 
 Without JavaScript the form still posts and the server validates.
 

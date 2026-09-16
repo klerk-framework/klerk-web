@@ -9,7 +9,7 @@ import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.validation.PropertyValidity
-import dev.klerkframework.klerk.validation.PropertyValidity.Valid
+import dev.klerkframework.klerk.validation.Valid
 import dev.klerkframework.web.ParseResult.DryRun
 import dev.klerkframework.web.ParseResult.Invalid
 import dev.klerkframework.web.ParseResult.Parsed

@@ -1,7 +1,6 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.misc.AlgorithmDocumenter
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -54,7 +53,7 @@ public class AdminUI<C : KlerkContext, V>(
                 LowCodeCreateEvent(support, createCommandPath, event, kClass, autoButtons)
             }
 
-        val pairs = klerk.specification.getManagedClasses().map { managedClass ->
+        val pairs = klerk.specification.managedClasses.map { managedClass ->
             val humanName =
                 managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             val modelPathPart = managedClass.simpleName!!.lowercase()
@@ -69,7 +68,6 @@ public class AdminUI<C : KlerkContext, V>(
         listViews = pairs.map { it.first }
         detailViews = pairs.map { it.second }
 
-        AlgorithmDocumenter.setKnownAlgorithms(knownAlgorithms)
     }
 
     internal fun registerInto(route: Route): Unit = with(route) {
@@ -144,7 +142,7 @@ public class AdminUI<C : KlerkContext, V>(
 
         get(documentationPath) {
             requireAdmin(call) {
-                renderDocumentation(call, support, klerk, documentationPath)
+                renderDocumentation(call, support, klerk, documentationPath, knownAlgorithms)
             }
         }
 
@@ -156,7 +154,7 @@ public class AdminUI<C : KlerkContext, V>(
 
         get("$documentationPath/algorithms/{name}") {
             requireAdmin(call) {
-                renderAlgorithm(call, support, klerk)
+                renderAlgorithm(call, support, knownAlgorithms)
             }
         }
 
@@ -193,7 +191,7 @@ public class AdminUI<C : KlerkContext, V>(
                     nav {
                         span {
                             style = "margin: 10px;"
-                            a(href = logPath) { button { +"Log" } }
+                            a(href = logPath) { button { +"Activity log" } }
                         }
 
                         span {

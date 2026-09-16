@@ -21,7 +21,7 @@ in scope, which `respondPage` provides. For void events:
 
 ```kotlin
 val context = call.ctx(klerk)
-val events = klerk.read(context) { getPossibleVoidEvents(Author::class) }
+val events = klerk.read(context) { possibleVoidEvents(Author::class) }
 support.respondPage(call, "New author") {
     events.forEach { eventButton(it, null, context) }
 }
@@ -31,7 +31,7 @@ And for instance events:
 
 ```kotlin
 val context = call.ctx(klerk)
-val events = klerk.read(context) { getPossibleEvents(id) }
+val events = klerk.read(context) { possibleEvents(id) }
 support.respondPage(call, "Author") {
     events.forEach { event -> eventButton(event, id, context) }
 }
@@ -44,7 +44,7 @@ call.respond(klerk.read(context) {
     html {
         body {
             with(support) {
-                getPossibleEvents(id).forEach { event -> eventButton(event, id, context) }
+                possibleEvents(id).forEach { event -> eventButton(event, id, context) }
             }
         }
     }

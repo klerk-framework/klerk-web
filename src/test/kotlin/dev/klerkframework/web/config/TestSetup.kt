@@ -1,11 +1,12 @@
 package dev.klerkframework.web.config
 
 import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity
 import dev.klerkframework.klerk.EventVisibility.External
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
-import dev.klerkframework.klerk.PropertyCollectionValidity.Invalid
-import dev.klerkframework.klerk.PropertyCollectionValidity.Valid
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity.Invalid
+import dev.klerkframework.klerk.validation.Valid
 import dev.klerkframework.klerk.view.*
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
@@ -407,7 +408,7 @@ fun sayHello(args: LifecycleArgs<Author, Context, MyCollections>) {
 }
 
 fun later(args: LifecycleArgs<Author, Context, MyCollections>): Instant {
-    return args.time.plus(30.seconds)
+    return args.context.time.plus(30.seconds)
 }
 
 fun hasTalent(args: LifecycleArgs<Author, Context, MyCollections>): Boolean = true
@@ -646,7 +647,7 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
 
     fun mustBeEven(value: Int, translation: Translation): PropertyValidity {
         if (value % 2 == 0) {
-            return PropertyValidity.Valid
+            return Valid
         }
         return PropertyValidity.Invalid("Must be even")
     }
@@ -665,7 +666,7 @@ class FirstName(value: String) : StringContainer(value) {
     fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidity {
         return if (name.contains("Pelle", ignoreCase = true))
             PropertyValidity.Invalid("Must not contain 'Pelle'") else
-            PropertyValidity.Valid
+            Valid
     }
 }
 
@@ -685,13 +686,13 @@ class BookTitle(value: String) : StringContainer(value) {
     private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidity {
         return if (title.contains("alpha")) {
             PropertyValidity.Invalid()
-        } else PropertyValidity.Valid
+        } else Valid
     }
 
     private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidity {
         return if (title.lowercase().startsWith("beta")) {
             PropertyValidity.Invalid("'beta' must not be the first word")
-        } else PropertyValidity.Valid
+        } else Valid
     }
 }
 
@@ -1085,7 +1086,7 @@ class PrimeNumber(value: Int) : IntContainer(value) {
     private val primeNumbers = setOf(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
 
     fun mustBePrime(value: Int, translation: Translation): PropertyValidity {
-        return if (primeNumbers.contains(value)) PropertyValidity.Valid else PropertyValidity.Invalid()
+        return if (primeNumbers.contains(value)) Valid else PropertyValidity.Invalid()
     }
 
 }

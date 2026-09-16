@@ -45,7 +45,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     // so T is Any here and the cast holds. Kept on this side rather than in Specification, which cannot know it.
     @Suppress("UNCHECKED_CAST")
     private val modelViews: ModelViews<T, C>
-        get() = klerk.specification.getModelViews(kClass) as ModelViews<T, C>
+        get() = klerk.specification.modelViews(kClass) as ModelViews<T, C>
 
     internal fun registerInto(route: Route): Unit = with(route) {
         get(pathProvider.pathForList(kClass)) {
@@ -70,7 +70,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         val (table, voidEvents) = klerk.read(context) {
             Pair(
                 tableTemplate.build(view, this, call),
-                getPossibleVoidEvents(kClass)
+                possibleVoidEvents(kClass)
             )
         }
 
@@ -90,7 +90,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     ): ModelView<T, C> {
         val viewId = queryParameters["view"] ?: return modelViews.all
         val decoded = ViewId.parse(URLDecoder.decode(viewId, Charset.forName("utf-8")))
-        return modelViews.getViews().single { it.id == decoded }
+        return modelViews.views.single { it.id == decoded }
     }
 
     /*
@@ -127,7 +127,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
 
     private fun renderModelList2(
         table: Table<T, C, V>,
-        voidEventReferences: Set<EventReference>,
+        voidEvents: Set<VoidEvent<*, *>>,
         call: ApplicationCall,
         ModelViews: ModelViews<T, C>,
         context: C
@@ -136,7 +136,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         modelTable(table)
 
         h3 { +"Events" }
-        voidEventReferences.forEach { event ->
+        voidEvents.forEach { event ->
             p {
                 with(support) {
                     eventButton(
@@ -182,7 +182,7 @@ private fun <C : KlerkContext, V> renderFilter(
                         select {
                             id = "viewselect"
                             name = "view"
-                            klerk.specification.getViews().filter { it.modelClass == kClass }.map { it.view }.forEach {
+                            klerk.specification.registeredViews.filter { it.modelClass == kClass }.map { it.view }.forEach {
                                 option {
                                     value = it.id.toString()
                                     if (call.request.queryParameters["view"]?.equals(
@@ -488,7 +488,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
         val queryOptions = createQueryOptions(call.request.queryParameters, pageSize)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
         // query() skips a row the actor may not read instead of turning the page into a 500.
-        val queryResponse = with(reader) { source.filter(filter = metaFilter).query(queryOptions) }
+        val queryResponse = with(reader) { (metaFilter?.let { source.filter(it) } ?: source).query(queryOptions) }
         return Table(queryResponse, support, call, klerk, kClass, columns)
     }
 

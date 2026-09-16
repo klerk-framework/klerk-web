@@ -234,7 +234,10 @@ public class ImagePlugin<C : KlerkContext, V>(
     }
 
     /** Keys currently being generated, so that N simultaneous misses schedule one job rather than N. */
-    private val inFlight = ConcurrentHashMap<String, Instant>()
+    private val inFlight = ConcurrentHashMap<String, Claim>()
+
+    // Compared by identity: two misses in the same clock tick must not both think they own the key.
+    private class Claim(val at: Instant)
 
     /**
      * Variants the processor has refused, so that a request for one is answered at once instead of waiting
@@ -515,17 +518,17 @@ public class ImagePlugin<C : KlerkContext, V>(
      */
     internal suspend fun requestVariant(id: String, hash: String, variant: RequestedVariant) {
         val key = variant.key(id, hash)
-        val now = Clock.System.now()
+        val claim = Claim(Clock.System.now())
         val claimed = inFlight.compute(key) { _, existing ->
-            if (existing != null && now < existing.plus(retryAfter)) existing else now
+            if (existing != null && claim.at < existing.at.plus(retryAfter)) existing else claim
         }
-        if (claimed != now) {
+        if (claimed !== claim) {
             return
         }
         // Look again now that this call owns the key. A request that read "missing" just before the job published the
         // file, and got here just after the job released the key, would otherwise schedule the same work twice.
         if (existing(id, hash, variant) != null) {
-            inFlight.remove(key, now)
+            inFlight.remove(key, claim)
             return
         }
         try {
@@ -537,7 +540,7 @@ public class ImagePlugin<C : KlerkContext, V>(
             // The job queue can refuse work when it is not draining. Nothing is broken: the fallback is being served,
             // and the next request after the cooldown will try again.
             log.debug(e) { "Could not schedule the generation of $key" }
-            inFlight.remove(key, now)
+            inFlight.remove(key, claim)
         }
     }
 

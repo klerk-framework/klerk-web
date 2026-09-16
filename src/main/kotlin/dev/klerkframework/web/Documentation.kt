@@ -1,7 +1,7 @@
 package dev.klerkframework.web
 
 import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.misc.AlgorithmDocumenter
+import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.generateFlowChart
@@ -20,7 +20,8 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     klerk: Klerk<C, V>,
-    documentationPath: String
+    documentationPath: String,
+    algorithms: Set<FlowChartAlgorithm<*, *>>,
 ) {
     val context = support.contextProvider(call, klerk)
     val showUpdateNotes = (call.request.queryParameters["showUpdateNotes"] ?: "false") == "true"
@@ -64,7 +65,7 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
                 // apply(renderStates(model.stateMachine, klerk, documentationPath))
 
             }
-            apply(renderAlgorithms(documentationPath))
+            apply(renderAlgorithms(documentationPath, algorithms))
     }
 }
 
@@ -160,9 +161,9 @@ private fun <V> renderViews(views: V): FlowContent.() -> Unit = {
 
 }
 
-internal fun renderAlgorithms(documentationPath: String): FlowContent.() -> Unit = {
+internal fun renderAlgorithms(documentationPath: String, algorithms: Set<FlowChartAlgorithm<*, *>>): FlowContent.() -> Unit = {
     h2 { +"Algorithms" }
-    AlgorithmDocumenter.algorithms.forEach {
+    algorithms.forEach {
         val url = URLEncoder.encode(it::class.qualifiedName, Charset.defaultCharset())
         a(href = "$documentationPath/algorithms/${url}") { +it::class.qualifiedName.toString() }
     }
@@ -177,7 +178,7 @@ private fun <C : KlerkContext, V> renderEvents(
 ): FlowContent.() -> Unit =
     {
         h5 { +"Events" }
-        stateMachine.getAllEvents().forEach { externalEvent ->
+        stateMachine.eventReferences.forEach { externalEvent ->
             val parameters = klerk.specification.parametersSchema(externalEvent)
             h6 { +externalEvent.toString() }
             ul {
@@ -318,11 +319,11 @@ internal fun <V> renderAuthorizationRules(
 internal suspend fun <C : KlerkContext, V> renderAlgorithm(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    klerk: Klerk<*, V>
+    algorithms: Set<FlowChartAlgorithm<*, *>>,
 ) {
     val algorithmName =
         URLDecoder.decode(call.parameters["name"], Charset.defaultCharset()) ?: throw IllegalArgumentException()
-    val algorithm = AlgorithmDocumenter.getAlgorithm(algorithmName)
+    val algorithm = algorithms.single { it::class.qualifiedName == algorithmName }
 
     support.respondPage(call, algorithm.name) {
         apply(addMermaidScript())

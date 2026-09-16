@@ -18,7 +18,6 @@ import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
 import mu.KotlinLogging
 import java.io.InputStream
@@ -151,7 +150,7 @@ public class UploadPlugin<C : KlerkContext, V>(
                 )
             ),
             context,
-            ProcessingOptions(CommandToken.simple(), dryRun = true),
+            ProcessingOptions(dryRun = true),
         )
         return when (result) {
             is CommandResult.Success -> null
@@ -270,7 +269,7 @@ public class UploadPlugin<C : KlerkContext, V>(
      * @param declaration the property the file is being uploaded for. It decides what is acceptable and what must
      * happen to the file first.
      * @throws IllegalStateException if the upload is not complete.
-     * @throws dev.klerkframework.klerk.BlobRejected if a step refused the file.
+     * @throws dev.klerkframework.klerk.BlobRejectedException if a step refused the file.
      */
     public suspend fun toAttachedData(
         context: C,

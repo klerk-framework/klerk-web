@@ -41,7 +41,7 @@ The `PathProvider` decides where the pages are mounted; with the prefix above th
 
 It is not a second permission system. Klerk's own rules still apply to everything behind it:
 
-* which events a user may execute (`getPossibleEvents`),
+* which events a user may execute (`possibleEvents`),
 * which models a user may read,
 * the event log (`eventLogPositiveRules`),
 * which jobs a user may see or control.

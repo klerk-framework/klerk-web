@@ -131,8 +131,8 @@ who may see it.
 
 One feature of Klerk is that it is easy to ask for the specification of the application. This can be used to
 keep the UI in sync with the specification. These methods are available when you read:
-* getPossibleVoidEvents: Given a model class, it will tell you which event(s) can be used to create a new instance.
-* getPossibleEvents: Give it a ModelID and Klerk will figure out all events that can be applied to it considering the current state.
+* possibleVoidEvents: Given a model class, it will tell you which event(s) can be used to create a new instance.
+* possibleEvents: Give it a ModelID and Klerk will figure out all events that can be applied to it considering the current state.
   You can use these methods e.g. to figure out if a certain button should be visible or not.
 
 An even more powerful approach is to combine these methods with other building blocks to create a UI that automatically
@@ -140,7 +140,7 @@ follows the specification. So if the specification changes, your UI will automat
 
 ```kotlin
 val context = call.ctx(klerk)
-val (model, events) = klerk.read(context) { Pair(get(id), getPossibleEvents(id)) }
+val (model, events) = klerk.read(context) { Pair(get(id), possibleEvents(id)) }
 support.respondPage(call, "Actions") {
     h1 { +"Actions for ${model.props.name}" }
     events.forEach { event -> eventButton(event, id, context) }

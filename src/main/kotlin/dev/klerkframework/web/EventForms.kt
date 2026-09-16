@@ -13,7 +13,7 @@ import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.html.*
-import java.time.LocalDate
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -184,7 +184,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
             //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.parametersSchema(eventReference)))
             val parameters = klerk.specification.parametersSchema(eventReference)
-            val event = klerk.specification.getEvent(eventReference)
+            val event = klerk.specification.event(eventReference)
 
             val template = createCommandsWithParams.singleOrNull { it.eventReference == eventReference }?.template
 

@@ -12,13 +12,13 @@ internal suspend fun <C : KlerkContext, V> renderLog(
     call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>
 ) {
     val context = support.contextProvider.invoke(call, klerk)
-    support.respondPage(call, "Log") {
+    support.respondPage(call, "Activity log") {
             header {
                 nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
             }
             main {
-                h1 { +"Log" }
-                klerk.log.entries(context).forEach { entry ->
+                h1 { +"Activity log" }
+                klerk.activityLog.entries(context).forEach { entry ->
                     // the LogEntry is currently always a fat object (i.e. it contains lots of interesting stuff). But
                     // soon we will persist the log, which means that after a restart, the entries will not be fat
                     // anymore. So we can only use the template and facts here. (but for now we have to use toLogMessage())

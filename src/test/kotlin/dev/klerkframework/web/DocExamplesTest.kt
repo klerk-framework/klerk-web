@@ -129,7 +129,7 @@ class DocExamplesTest {
                 // docs/introduction.md - Ask Klerk, rendered as a whole page
                 get("/actions") {
                     val context = call.docCtx(klerk)
-                    val (model, events) = klerk.read(context) { Pair(get(author), getPossibleEvents(author)) }
+                    val (model, events) = klerk.read(context) { Pair(get(author), possibleEvents(author)) }
                     support.respondPage(call, "Actions") {
                         h1 { +"Actions for ${model.props.firstName.value}" }
                         events.forEach { event -> eventButton(event, author, context) }
@@ -139,7 +139,7 @@ class DocExamplesTest {
                 // docs/introduction.md and docs/auto-buttons.md - the same block in a fragment
                 get("/fragment") {
                     val context = call.docCtx(klerk)
-                    val events = klerk.read(context) { getPossibleEvents(author) }
+                    val events = klerk.read(context) { possibleEvents(author) }
                     call.respond(klerk.read(context) {
                         html {
                             body {

@@ -20,7 +20,6 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.format.char
-import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 import kotlinx.html.stream.appendHTML
@@ -109,7 +108,7 @@ internal val dateTimeFormatter = LocalDateTime.Format {
  * microseconds). Returns null for anything else, so the caller can fall back to its usual rendering.
  */
 internal fun renderTemporalContainer(container: Any?): String? = when (container) {
-    is DateContainer -> container.ifAuthorized { dateFormatter.format(it.toKotlinLocalDate().atTime(0, 0)) }
+    is DateContainer -> container.ifAuthorized { dateFormatter.format(it.atTime(0, 0)) }
     is InstantContainer -> container.ifAuthorized {
         dateTimeFormatter.format(it.toLocalDateTime(TimeZone.currentSystemDefault()))
     }

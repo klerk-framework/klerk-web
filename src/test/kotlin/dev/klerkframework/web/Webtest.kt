@@ -210,7 +210,7 @@ fun main() {
         Runtime.getRuntime().addShutdownHook(Thread {
             println("Shutting down")
             embeddedServer.stop()
-            klerk.meta.stop()
+            runBlocking { klerk.meta.stop() }
             println("Shutdown complete")
         })
 
@@ -422,7 +422,7 @@ private fun createFlower(
                 // problem carries a message for the user and the status code to answer with.
                 is CommandResult.Failure -> {
                     val problem = result.problems.first()
-                    call.respondHtml(HttpStatusCode.fromValue(problem.recommendedHttpCode), layout.page("Not planted") {
+                    call.respondHtml(problem.httpStatus, layout.page("Not planted") {
                         h1 { +"That did not work" }
                         p { +problem.endUserTranslatedMessage }
                         p { a(href = "${pathProvider.base}flowers/new") { +"Try again" } }
