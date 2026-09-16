@@ -10,7 +10,7 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     jobsPath: String,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val actor = support.contextProvider(call, klerk)
     support.respondPage(call, "Metrics") {
@@ -57,8 +57,9 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                                                 td { +it.id.name }
                                                 td {
                                                     unsafe {
-                                                        it.measure().forEach {
-                                                            +"${it.statistic.name}:$NON_BREAKING_SPACE${it.value}"
+                                                        for (measurement in it.measure()) {
+                                                            +"${measurement.statistic.name}:"
+                                                            +"$NON_BREAKING_SPACE${measurement.value}"
                                                             +"<br>"
                                                         }
                                                     }

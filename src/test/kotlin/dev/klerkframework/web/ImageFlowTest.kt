@@ -132,7 +132,8 @@ class ImageFlowTest {
 
                 get("/flowers") {
                     val flowers = klerk.read(actor) {
-                        views.flowers.all.asSequence().toList().map { it to attachedData.getMetadata(it.props.image.id) }
+                        views.flowers.all.asSequence().toList()
+                            .map { it to attachedData.getMetadata(it.props.image.id) }
                     }
                     call.respondHtml(block = layout.page("Flowers") {
                         h1 { +"Flowers" }
@@ -164,7 +165,7 @@ class ImageFlowTest {
                     IDEMPOTENCE_KEY to CommandToken.simple().toString(),
                     "name" to "Sunflower",
                     "image" to upload.value.toString(),
-                ).formUrlEncode()
+                ).formUrlEncode(),
             )
         }
     }

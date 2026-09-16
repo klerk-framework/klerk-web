@@ -33,7 +33,7 @@ private val log = KotlinLogging.logger {}
  *
  * Implement [ImageProcessor] against a transformer running beside the application to be rid of all three.
  *
- * @param quality the JPEG quality, 0..1.
+ * [quality] is the JPEG quality, 0..1.
  */
 public class ImageIoProcessor(
     override val limits: ImageLimits = ImageLimits(),
@@ -114,7 +114,7 @@ public class ImageIoProcessor(
             if (pixels > limits.maxPixels) {
                 throw ImageRefused(
                     "the image is ${sourceWidth}x$sourceHeight ($pixels pixels), and at most ${limits.maxPixels} " +
-                            "are allowed"
+                            "are allowed",
                 )
             }
             val displayedSize = if (swapsDimensions(orientation)) {

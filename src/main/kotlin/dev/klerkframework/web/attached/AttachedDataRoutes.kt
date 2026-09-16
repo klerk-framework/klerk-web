@@ -87,10 +87,10 @@ public val defaultInlineContentTypes: Set<String> = setOf(
  *
  * Install Ktor's `PartialContent` plugin to have range requests served.
  *
- * @param path where the route is mounted.
- * @param inlineContentTypes what may be rendered inline rather than downloaded. Adding a type here means you have
- * decided the browser may do whatever it likes with it, in your application's origin.
- * @param serveOriginalImages whether the file as it was uploaded may be fetched, for the types [images] handles.
+ * The route is mounted at [path]. [inlineContentTypes] is what may be rendered inline rather than downloaded. Adding a
+ * type there means you have decided the browser may do whatever it likes with it, in your application's origin.
+ *
+ * [serveOriginalImages] decides whether the file as it was uploaded may be fetched, for the types [images] handles.
  * Off by default: an uploaded photograph knows where it was taken, when, on what, and often carries a thumbnail of
  * an earlier crop of itself, none of which a variant keeps. With this off, an image is reachable only through a
  * template, and only the sizes that template declared. Turn it on when the original is the point — a photographer

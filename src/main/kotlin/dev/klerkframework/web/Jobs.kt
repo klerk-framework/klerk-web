@@ -2,7 +2,7 @@ package dev.klerkframework.web
 
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.job.JobId
+import dev.klerkframework.klerk.job.JobID
 import dev.klerkframework.klerk.job.JobInfo
 import dev.klerkframework.klerk.job.JobLogEntry
 import dev.klerkframework.klerk.job.JobStatus
@@ -18,7 +18,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     jobsPath: String,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
     val statusFilter = call.request.queryParameters["status"]?.let { name ->
@@ -60,7 +60,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                 p {
                     +"Filter: "
                     a(href = jobsUrl(null, autoRefresh)) { +"All" }
-                    JobStatus.entries.forEach { status ->
+                    for (status in JobStatus.entries) {
                         +" | "
                         a(href = jobsUrl(status, autoRefresh)) { +status.name }
                     }
@@ -78,7 +78,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                         }
                     }
                     tbody {
-                        jobs.forEach { job ->
+                        for (job in jobs) {
                             tr {
                                 onClick = """window.location = '$jobsPath/${job.id}';"""
                                 td { +job.id.toString() }
@@ -91,7 +91,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                                     }
                                 }
                                 td { apply(jobProgressBar(job)) }
-                                td { +dateTimeFormatter.format(job.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) }
+                                td { +formatTime(job.createdAt) }
                             }
                         }
                     }
@@ -106,10 +106,10 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     jobsPath: String,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
+    val id = JobID(requireNotNull(call.parameters["id"]).toLong())
     val job = klerk.jobs.get(id, context)
     val csrfToken = Csrf.issue(call)
 
@@ -133,7 +133,10 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                     tr { td { +"Status" }; td { apply(jobStatusBadge(job.status)) } }
                     tr { td { +"Priority" }; td { +job.priority.name } }
                     tr { td { +"Step / attempt" }; td { +"${job.step} / ${job.attempt}" } }
-                    tr { td { +"Created" }; td { +dateTimeFormatter.format(job.createdAt.toLocalDateTime(TimeZone.currentSystemDefault())) } }
+                    tr {
+                        td { +"Created" }
+                        td { +formatTime(job.createdAt) }
+                    }
                     job.parent?.let { parentId ->
                         tr { td { +"Parent" }; td { a(href = "$jobsPath/$parentId") { +parentId.toString() } } }
                     }
@@ -201,7 +204,9 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                         }
                     }
                     tbody {
-                        job.log.forEach { entry -> apply(jobLogRow(entry)) }
+                        for (entry in job.log) {
+                            apply(jobLogRow(entry))
+                        }
                     }
                 }
             }
@@ -212,7 +217,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     jobsPath: String,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val jobsConfig = klerk.specification.jobs
 
@@ -260,26 +265,41 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     }
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobCancel(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+internal suspend fun <C : KlerkContext, V> handleJobCancel(
+    call: ApplicationCall,
+    support: WebSupport<C, V>,
+    jobsPath: String,
+    klerk: Klerk<C, V>,
+) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
+    val id = JobID(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.cancel(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobResume(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+internal suspend fun <C : KlerkContext, V> handleJobResume(
+    call: ApplicationCall,
+    support: WebSupport<C, V>,
+    jobsPath: String,
+    klerk: Klerk<C, V>,
+) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
+    val id = JobID(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.resume(id, context)
     call.respondRedirect("$jobsPath/$id")
 }
 
-internal suspend fun <C : KlerkContext, V> handleJobDelete(call: ApplicationCall, support: WebSupport<C, V>, jobsPath: String, klerk: Klerk<C, V>) {
+internal suspend fun <C : KlerkContext, V> handleJobDelete(
+    call: ApplicationCall,
+    support: WebSupport<C, V>,
+    jobsPath: String,
+    klerk: Klerk<C, V>,
+) {
     Csrf.receiveVerifiedParameters(call) ?: return
     val context = support.contextProvider(call, klerk)
-    val id = JobId(requireNotNull(call.parameters["id"]).toLong())
+    val id = JobID(requireNotNull(call.parameters["id"]).toLong())
     klerk.jobs.delete(id, context)
     call.respondRedirect(jobsPath)
 }
@@ -300,7 +320,7 @@ private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsSpecificati
                 }
             }
             tbody {
-                jobsConfig.crons.forEach { cron ->
+                for (cron in jobsConfig.crons) {
                     tr {
                         td { +cron.type.name.value }
                         td { +cron.expression }

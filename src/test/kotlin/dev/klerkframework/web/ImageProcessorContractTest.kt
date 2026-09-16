@@ -135,7 +135,7 @@ class ImageProcessorContractTest {
         val result = klerk.handle(
             Command(
                 CreatePublication,
-                CreatePublicationParams(PublicCover(cover), PublicBody(body), null)
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), null),
             ),
             author,
         )

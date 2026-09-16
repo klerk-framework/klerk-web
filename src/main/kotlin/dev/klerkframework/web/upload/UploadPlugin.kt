@@ -53,12 +53,13 @@ public class ChecksumMismatch(message: String) : RuntimeException(message)
  * The plugin only manages uploads. What may be uploaded, by whom and how large is decided by ordinary authorization
  * rules on [CreateUpload], which see the declared size before any byte is accepted.
  *
- * @param stagingDirectory where partial uploads are kept. Required, and independent of where blobs end up — an
+ * [stagingDirectory] is where partial uploads are kept. It is required, and independent of where blobs end up — an
  * application storing blobs in the database can still upload large files. Put it on the same filesystem as a
  * [dev.klerkframework.klerk.storage.FileBlobStore] to make the final step a rename rather than a copy.
- * @param lifetime how long an upload may sit unfinished, or finished but unused, before it is discarded.
- * @param sweepExpression how often the staging directory is reconciled against the models, as a cron expression.
- * Hourly by default.
+ *
+ * [lifetime] is how long an upload may sit unfinished, or finished but unused, before it is discarded.
+ * [sweepExpression] is how often the staging directory is reconciled against the models, as a cron expression; hourly
+ * by default.
  */
 public class UploadPlugin<C : KlerkContext, V>(
     stagingDirectory: Path,
@@ -115,7 +116,7 @@ public class UploadPlugin<C : KlerkContext, V>(
                     filename = UploadFilename(filename),
                     declaredContentType = UploadContentType(declaredContentType),
                     declaredSize = ByteCount(declaredSize),
-                )
+                ),
             ),
             context,
         )
@@ -130,9 +131,10 @@ public class UploadPlugin<C : KlerkContext, V>(
      * most 10 MB" would silently apply to one path and not the other. Running the command as a dry run asks exactly
      * that question and persists nothing.
      *
-     * @param declaredSize the best estimate available before the bytes are read. For a form submission that is the
+     * [declaredSize] is the best estimate available before the bytes are read. For a form submission that is the
      * request's `Content-Length`, which covers the whole request and so slightly over-estimates the file.
-     * @return null if the upload would be allowed, otherwise the problem to report.
+     *
+     * Returns null if the upload would be allowed, otherwise the problem to report.
      */
     public suspend fun reasonUploadWouldBeRefused(
         context: C,
@@ -147,7 +149,7 @@ public class UploadPlugin<C : KlerkContext, V>(
                     filename = UploadFilename(filename),
                     declaredContentType = UploadContentType(declaredContentType),
                     declaredSize = ByteCount(declaredSize),
-                )
+                ),
             ),
             context,
             ProcessingOptions(dryRun = true),
@@ -168,9 +170,9 @@ public class UploadPlugin<C : KlerkContext, V>(
      * The bytes are written and flushed first, and only then does the model record them, so a crash costs the client
      * a re-send rather than leaving the model claiming bytes that were never stored.
      *
-     * @param offset where the client believes the upload ends. A mismatch throws [OffsetMismatch] and nothing is
-     * written — the client should ask for the offset and resume from there.
-     * @return the new offset.
+     * [offset] is where the client believes the upload ends. A mismatch throws [OffsetMismatch] and nothing is written
+     * — the client should ask for the offset and resume from there. Returns the new offset.
+     *
      * @throws TooManyBytes if the chunk would take the upload past its declared size.
      */
     public suspend fun append(context: C, id: ModelID<Upload>, offset: Long, data: InputStream): Long =
@@ -182,7 +184,8 @@ public class UploadPlugin<C : KlerkContext, V>(
      * The chunk is verified where it landed rather than in memory, so a client cannot make the server buffer an
      * arbitrarily large chunk just by promising a checksum. A chunk that does not match is rolled back entirely.
      *
-     * @param checksum the value of the `Upload-Checksum` header: an algorithm name and a Base64 digest.
+     * [checksum] is the value of the `Upload-Checksum` header: an algorithm name and a Base64 digest.
+     *
      * @throws ChecksumMismatch if the digest does not match, or names an algorithm other than sha256.
      */
     public suspend fun appendVerified(
@@ -232,7 +235,7 @@ public class UploadPlugin<C : KlerkContext, V>(
                 Command(
                     RecordUploadedBytes,
                     id,
-                    RecordUploadedBytesParams(ByteCount(written))
+                    RecordUploadedBytesParams(ByteCount(written)),
                 ),
                 systemContext(),
             ).getOrThrow()
@@ -264,10 +267,9 @@ public class UploadPlugin<C : KlerkContext, V>(
      * The blob is unclaimed until a command stores it, so it comes with a [lease] rather than the usual minute.
      *
      * Waits for the steps [declaration] declares — a virus scan, a disarm pass, a check of the contents — since the
-     * command that attaches the blob follows immediately and would be rejected otherwise.
+     * command that attaches the blob follows immediately and would be rejected otherwise. The [declaration] is the
+     * property the file is being uploaded for; it decides what is acceptable and what must happen to the file first.
      *
-     * @param declaration the property the file is being uploaded for. It decides what is acceptable and what must
-     * happen to the file first.
      * @throws IllegalStateException if the upload is not complete.
      * @throws dev.klerkframework.klerk.BlobRejectedException if a step refused the file.
      */

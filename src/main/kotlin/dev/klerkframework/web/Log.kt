@@ -4,12 +4,10 @@ import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import io.ktor.server.application.*
 import io.ktor.server.html.*
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 
 internal suspend fun <C : KlerkContext, V> renderLog(
-    call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>
+    call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider.invoke(call, klerk)
     support.respondPage(call, "Activity log") {
@@ -18,13 +16,16 @@ internal suspend fun <C : KlerkContext, V> renderLog(
             }
             main {
                 h1 { +"Activity log" }
-                klerk.activityLog.entries(context).forEach { entry ->
+                for (entry in klerk.activityLog.entries(context)) {
                     // the LogEntry is currently always a fat object (i.e. it contains lots of interesting stuff). But
                     // soon we will persist the log, which means that after a restart, the entries will not be fat
-                    // anymore. So we can only use the template and facts here. (but for now we have to use toLogMessage())
+                    // anymore. So we can only use the template and facts here. (but for now we have to use
+                    // toLogMessage())
 
                     details {
-                        summary { +"${dateTimeFormatter.format(entry.time.toLocalDateTime(TimeZone.currentSystemDefault()))} ${entry.heading}" }
+                        summary {
+                            +"${formatTime(entry.time)} ${entry.heading}"
+                        }
                         table {
                             entry.content?.let {
                                 tr {
@@ -40,10 +41,10 @@ internal suspend fun <C : KlerkContext, V> renderLog(
                                 td { +"Source" }
                                 td { +entry.source.toString() }
                             }
-                            entry.facts.forEach {
+                            for (fact in entry.facts) {
                                 tr {
-                                    td { +it.type.name }
-                                    td { +"${it.name}=${it.value}" }
+                                    td { +fact.type.name }
+                                    td { +"${fact.name}=${fact.value}" }
                                 }
                             }
                         }

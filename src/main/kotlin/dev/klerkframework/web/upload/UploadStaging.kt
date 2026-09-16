@@ -45,12 +45,11 @@ internal class UploadStaging(private val root: Path) {
     }
 
     /**
-     * Appends [source] to the staging file of [id].
+     * Appends [source] to the staging file of [id] and returns the size of the file afterwards.
      *
-     * @param offset where the client believes the file ends. Must match what is actually there.
-     * @param limit the largest the file may become, i.e. the declared size of the upload. Enforced while copying, so
-     * a client that lies about the length of its body is cut off rather than allowed to fill the disk.
-     * @return the size of the staging file afterwards.
+     * [offset] is where the client believes the file ends, and must match what is actually there. [limit] is the
+     * largest the file may become, i.e. the declared size of the upload. It is enforced while copying, so a client that
+     * lies about the length of its body is cut off rather than allowed to fill the disk.
      */
     fun append(id: Int, offset: Long, source: InputStream, limit: Long): Long {
         val path = pathFor(id)
@@ -126,13 +125,13 @@ internal class UploadStaging(private val root: Path) {
      */
     fun sweep(live: Set<Int>, olderThan: Instant) {
         Files.newDirectoryStream(root).use { files ->
-            files.forEach { file ->
+            for (file in files) {
                 val id = file.name.toIntOrNull()
                 if (id != null && live.contains(id)) {
-                    return@forEach
+                    continue
                 }
                 if (Files.getLastModifiedTime(file).toInstant().toEpochMilli() >= olderThan.toEpochMilliseconds()) {
-                    return@forEach
+                    continue
                 }
                 logger.info { "Deleting abandoned upload staging file $file" }
                 runCatching { Files.deleteIfExists(file) }

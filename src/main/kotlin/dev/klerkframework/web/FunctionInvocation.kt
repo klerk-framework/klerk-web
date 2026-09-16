@@ -19,7 +19,7 @@ internal const val DATA_CONTAINER_CLASS = "data-container-class"
 internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
     val requestParams = Csrf.receiveVerifiedParameters(call) ?: return

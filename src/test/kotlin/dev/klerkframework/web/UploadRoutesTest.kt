@@ -29,7 +29,9 @@ class UploadRoutesTest {
     private val csrfHeader = Csrf.TOKEN_NAME
     private val token = "test-csrf-token"
 
-    private fun ApplicationTestBuilder.setup(): Pair<Klerk<Context, MyCollections>, UploadPlugin<Context, MyCollections>> {
+    private fun ApplicationTestBuilder.setup():
+
+        Pair<Klerk<Context, MyCollections>, UploadPlugin<Context, MyCollections>> {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val dir = Files.createTempDirectory("klerk-upload-routes")
         val bc = BookCollections()
@@ -108,7 +110,10 @@ class UploadRoutesTest {
         val id = location.substringAfterLast("/").toInt()
         assertEquals(
             String(content),
-            String(plugin.read(Context(CustomIdentity(id = null, externalId = 1)), dev.klerkframework.klerk.ModelID(id)).readAllBytes())
+            String(
+                plugin.read(Context(CustomIdentity(id = null, externalId = 1)), dev.klerkframework.klerk.ModelID(id))
+                    .readAllBytes(),
+            ),
         )
         klerk.meta.stop()
     }
@@ -244,7 +249,10 @@ class UploadRoutesTest {
         val id = assertNotNull(created.headers[HttpHeaders.Location]).substringAfterLast("/").toInt()
         assertEquals(
             "hello",
-            String(plugin.read(Context(CustomIdentity(id = null, externalId = 1)), dev.klerkframework.klerk.ModelID(id)).readAllBytes())
+            String(
+                plugin.read(Context(CustomIdentity(id = null, externalId = 1)), dev.klerkframework.klerk.ModelID(id))
+                    .readAllBytes(),
+            ),
         )
         klerk.meta.stop()
     }

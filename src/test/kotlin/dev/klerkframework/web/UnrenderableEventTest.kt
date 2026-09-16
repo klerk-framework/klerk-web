@@ -46,7 +46,7 @@ class UnrenderableEventTest {
         // The unrenderable one is not.
         assertFalse(
             authorPage.contains(UpdateAuthor.id.urlEncode()),
-            "UpdateAuthor cannot be rendered, so it must not get a button"
+            "UpdateAuthor cannot be rendered, so it must not get a button",
         )
     }
 

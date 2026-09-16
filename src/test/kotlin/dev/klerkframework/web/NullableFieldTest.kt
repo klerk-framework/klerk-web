@@ -17,7 +17,10 @@ class NullableFieldTest {
         }
 
         @Suppress("UNCHECKED_CAST")
-        val result = createParamClassFromCallParameters(dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullable::class), callParams) as ParamsWithNullable
+        val result = createParamClassFromCallParameters(
+            dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullable::class),
+            callParams,
+        ) as ParamsWithNullable
         assertNull(result.nullableFirstName, "nullableFirstName should be null when null-toggle is absent")
     }
 
@@ -29,7 +32,10 @@ class NullableFieldTest {
         }
 
         @Suppress("UNCHECKED_CAST")
-        val result = createParamClassFromCallParameters(dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullable::class), callParams) as ParamsWithNullable
+        val result = createParamClassFromCallParameters(
+            dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullable::class),
+            callParams,
+        ) as ParamsWithNullable
         assertNotNull(result.nullableFirstName, "nullableFirstName should not be null when null-toggle is 'on'")
         assertEquals("Jane", result.nullableFirstName.value)
     }
@@ -44,7 +50,10 @@ class NullableFieldTest {
         }
 
         @Suppress("UNCHECKED_CAST")
-        val result = createParamClassFromCallParameters(dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullableReference::class), callParams) as ParamsWithNullableReference
+        val result = createParamClassFromCallParameters(
+            dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullableReference::class),
+            callParams,
+        ) as ParamsWithNullableReference
         assertEquals(ModelID<Author>(7), result.favourite, "the selected reference should survive parsing")
     }
 
@@ -55,7 +64,10 @@ class NullableFieldTest {
         }
 
         @Suppress("UNCHECKED_CAST")
-        val result = createParamClassFromCallParameters(dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullableReference::class), callParams) as ParamsWithNullableReference
+        val result = createParamClassFromCallParameters(
+            dev.klerkframework.klerk.misc.ObjectSchema.of(ParamsWithNullableReference::class),
+            callParams,
+        ) as ParamsWithNullableReference
         assertNull(result.favourite, "the '(none)' option should be parsed as null")
     }
 }

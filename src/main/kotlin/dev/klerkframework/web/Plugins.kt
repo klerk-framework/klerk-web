@@ -9,7 +9,7 @@ import kotlinx.html.*
 internal suspend fun <C : KlerkContext, V> renderPlugins(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     support.respondPage(call, "Plugins") {
             header {
@@ -22,10 +22,12 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
                     p { +"No plugins" }
                 } else {
                     ul {
-                        plugins.forEach { plugin ->
+                        for (plugin in plugins) {
                             li {
                                 if (plugin is AdminUIPluginIntegration<C, V>) {
-                                    a(href = "${support.pathProvider.withPrefix()}plugin?name=${plugin.name}") { +plugin.name }
+                                    a(href = "${support.pathProvider.withPrefix()}plugin?name=${plugin.name}") {
+                                        +plugin.name
+                                    }
                                 } else {
                                     +plugin.name
                                 }

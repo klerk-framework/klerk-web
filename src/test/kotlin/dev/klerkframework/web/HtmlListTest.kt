@@ -35,7 +35,7 @@ fun main() {
                         ).build(
                             klerk.specification.views.authors.all,
                             this,
-                            call
+                            call,
                         )
                     }
 

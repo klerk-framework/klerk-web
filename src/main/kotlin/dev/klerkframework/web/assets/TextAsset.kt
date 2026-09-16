@@ -56,7 +56,7 @@ public data class CreateTextAssetParams(
     val path: AssetPath,
     val contentType: AssetContentType,
     val hash: Base64hash,
-    val brotli: CompressedAsset?
+    val brotli: CompressedAsset?,
 )
 
 private fun <C : KlerkContext, V> newTextAsset(args: VoidEventArgs<TextAsset, CreateTextAssetParams, C, V>): TextAsset {
@@ -89,6 +89,7 @@ public class Base64hash(value: String) : StringContainer(value) {
 
     public companion object {
         private val md = MessageDigest.getInstance("SHA-256")
+        /** The hash of the UTF-8 bytes of [string]. */
         public fun from(string: String): Base64hash = from(string.toByteArray())
 
         /** Both callers run while the application is starting, which is the only reason sharing [md] is safe. */

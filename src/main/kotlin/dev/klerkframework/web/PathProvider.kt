@@ -11,23 +11,23 @@ import kotlin.reflect.KClass
 /**
  * Builds the URLs klerk-web uses to link between pages. It says nothing about what a page looks like - that is
  * [Layout].
- *
- * @param base Base path for the application, typically "/"
- * @param prefix Prefix for the generated pages, e.g. "admin/"
  */
 public interface PathProvider {
+    /** Base path for the application, typically "/". */
     public val base: String
+    /** Prefix for the generated pages, e.g. "admin/". */
     public val prefix: String
+    /** Where assets are served from. */
     public val assetsBase: String
+    /** Where the generated event forms are served. */
     public val autoButtons: String
 
     /** Where [dev.klerkframework.web.attached.attachedDataRoutes] is mounted. */
     public val attachedDataBase: String get() = "${base}_attached"
 
     /** The path to the list page for [kClass] — every instance of that model. Pairs with [pathForItem]. */
-    public fun pathForList(kClass: KClass<out Any>): String {
-        return base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
-    }
+    public fun pathForList(kClass: KClass<out Any>): String =
+        base + prefix + (kClass.simpleName?.lowercase() ?: error("KClass.simpleName cannot be null"))
 
     /**
      * The path to the detail view of a single model, or null if there is no detail view for [kClass]. Callers must
@@ -39,6 +39,7 @@ public interface PathProvider {
      * As [pathForItem], but takes the id as a string so that a route pattern (e.g. "{id}") can be built.
      */
     public fun pathForItem(kClass: KClass<out Any>, id: String): String?
+    /** The URL of an asset. */
     public fun assetPath(resource: String): String = "$assetsBase/$resource"
 
     /**
@@ -48,7 +49,7 @@ public interface PathProvider {
      * has been deleted, so an id alone is not a safe cache key. Get it from
      * `klerk.attachedData.getMetadata(id, context).hash`.
      *
-     * @param filename an optional last segment, ignored when serving. Use it to give a download a human name.
+     * [filename] is an optional last segment, ignored when serving. Use it to give a download a human name.
      */
     public fun attachedDataPath(id: AttachedBlobID, hash: String, filename: String? = null): String =
         attachedDataPath("$id", hash, filename)
@@ -68,13 +69,14 @@ public interface PathProvider {
     private fun attachedDataPath(id: String, hash: String, filename: String?): String =
         "$attachedDataBase/$id/$hash" + (filename?.let { "/${it.encodeURLPathPart()}" } ?: "")
 
+    /** The base path followed by the prefix. */
     public fun withPrefix(): String = "$base$prefix"
 }
 
 /** Paths of the form `base + prefix + modelname` and `base + prefix + modelname/id`. */
 public data class DefaultPathProvider(
-    public override val base: String = "/",
-    public override val prefix: String = "",
+    override val base: String = "/",
+    override val prefix: String = "",
 ) : PathProvider {
 
     override val assetsBase: String = "${base}_assets"

@@ -49,7 +49,9 @@ internal fun <C : KlerkContext, V> buildCreateEvents(
 }
 
 /**
- * @param eventFilter which events to generate forms for. Events klerk-web cannot render a form for - for example
+ * Generates a form for every event, and the buttons that lead to them.
+ *
+ * [eventFilter] decides which events to generate forms for. Events klerk-web cannot render a form for - for example
  * ones taking a collection of references, a nested value object or attached data - are skipped automatically and
  * reported at startup; use this to exclude further events that you want to render yourself.
  */
@@ -83,10 +85,10 @@ public class AutoButtons<C: KlerkContext, V>(
         klerk.specification.parametersSchema(event) == null || event in renderableEvents
 
     internal fun urlFor(event: EventReference, modelId: ModelID<*>?, paths: CompletionPaths): String {
-        var url =
-            "${pathProvider.autoButtons}?eventId=${event.urlEncode()}&_showOptionalParameters=true&${paths.toQueryParamsString()}"
+        var url = "${pathProvider.autoButtons}?eventId=${event.urlEncode()}&_showOptionalParameters=true&" +
+            paths.toQueryParamsString()
         if (modelId != null) {
-            url = url.plus("&modelId=${modelId}")
+            url = url.plus("&modelId=$modelId")
         }
         return url
     }
@@ -98,9 +100,8 @@ public class AutoButtons<C: KlerkContext, V>(
  * Renders nothing when klerk-web has no form for the event - either because it was excluded, or because it cannot
  * be rendered (which is reported when the application starts). Render such events yourself.
  *
- * @param onCancelPath where to go if the user cancels the form. Defaults to "/".
- * @param onSuccessAndModelExistPath where to go after a successful event, if the model still exists.
- * @param onErrorPath where to go if the event fails.
+ * The user is sent to [onCancelPath] (default "/") if they cancel the form, to [onSuccessAndModelExistPath] after a
+ * successful event if the model still exists, and to [onErrorPath] if the event fails.
  */
 context(support: WebSupport<C, V>)
 public fun <C : KlerkContext, V> FlowContent.eventButton(
@@ -110,7 +111,9 @@ public fun <C : KlerkContext, V> FlowContent.eventButton(
     onCancelPath: String? = null,
     onSuccessAndModelExistPath: String? = null,
     onErrorPath: String? = null,
-): Unit = eventButton(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
+) {
+    eventButton(event.id, modelId, context, onCancelPath, onSuccessAndModelExistPath, onErrorPath)
+}
 
 /** As [eventButton], but takes the event by reference. */
 context(support: WebSupport<C, V>)
@@ -141,5 +144,6 @@ public fun <C : KlerkContext, V> FlowContent.eventButton(
 }
 
 /** The routes that render an event's form and handle its submission. */
-public fun <C : KlerkContext, V> Route.autoButtonsRoutes(autoButtons: AutoButtons<C, V>): Unit =
+public fun <C : KlerkContext, V> Route.autoButtonsRoutes(autoButtons: AutoButtons<C, V>) {
     autoButtons.registerInto(this)
+}

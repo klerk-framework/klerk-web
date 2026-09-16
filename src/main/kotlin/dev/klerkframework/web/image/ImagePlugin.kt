@@ -88,31 +88,38 @@ private val sourceContentTypes = setOf("image/jpeg", "image/png", "image/gif", "
  * Variants are stored by width and format rather than by template, so two templates that share a width share the
  * file.
  *
- * @param variantDirectory where generated images are kept. A cache: losing it costs regeneration and nothing else,
+ * [variantDirectory] is where generated images are kept. It is a cache: losing it costs regeneration and nothing else,
  * so it does not belong in a backup. It is node-local, so each node of a multi-node application has its own.
- * @param formats the formats a template is served in unless it declares its own. Null picks a sensible pair for
- * the processor; see [ImagePlugin.formats].
- * @param processor what does the scaling. There is deliberately no default: it decides where images an attacker
- * uploaded are decoded. [ImageIoProcessor] needs nothing installed and is the development answer.
- * @param stagingDirectory where an original is put while [processor] works on it. The default is the system
- * temporary directory, which is right for a processor running inside this JVM; point it at the volume shared with an
- * image transformer running beside the application, so that the transformer can read the file it is handed.
- * @param maxConcurrentRenders how many images may be rendered at once. This is the bounded transcode queue. Note
- * that it does not bound [prepareImageKeepExif], which runs once per upload.
- * @param renderWait how long a request for a variant that does not exist yet waits for it. Past this the request
- * is answered `503`, so it has to be generous enough that a slow answer means an overloaded application rather
- * than merely a cold one: a page of cold images serialises through [maxConcurrentRenders].
- * @param retryAfter how long a scheduled-but-not-yet-produced variant is left alone before another request may
- * schedule it again.
- * @param sweepExpression how often the directory is reconciled against Klerk, as a cron expression.
- * @param maxVariantBytes how much [variantDirectory] may hold before the sweep starts evicting whole images,
- * oldest first. Null, the default, is unbounded: klerk-web cannot know how much disk it has been given. An evicted
- * image costs one render the next time it is asked for, and that render is one a request waits for, so choose a
- * budget that is not reached often.
+ *
+ * [formats] are the formats a template is served in unless it declares its own. Null picks a sensible pair for the
+ * processor; see [ImagePlugin.formats].
+ *
+ * [processor] does the scaling. There is deliberately no default: it decides where images an attacker uploaded are
+ * decoded. [ImageIoProcessor] needs nothing installed and is the development answer.
+ *
+ * [stagingDirectory] is where an original is put while [processor] works on it. The default is the system temporary
+ * directory, which is right for a processor running inside this JVM; point it at the volume shared with an image
+ * transformer running beside the application, so that the transformer can read the file it is handed.
+ *
+ * [maxConcurrentRenders] is how many images may be rendered at once. This is the bounded transcode queue. Note that it
+ * does not bound [prepareImageKeepExif], which runs once per upload.
+ *
+ * [renderWait] is how long a request for a variant that does not exist yet waits for it. Past this the request is
+ * answered `503`, so it has to be generous enough that a slow answer means an overloaded application rather than
+ * merely a cold one: a page of cold images serialises through [maxConcurrentRenders].
+ *
+ * [retryAfter] is how long a scheduled-but-not-yet-produced variant is left alone before another request may schedule
+ * it again. [sweepExpression] is how often the directory is reconciled against Klerk, as a cron expression.
+ *
+ * [maxVariantBytes] is how much [variantDirectory] may hold before the sweep starts evicting whole images, oldest
+ * first. Null, the default, is unbounded: klerk-web cannot know how much disk it has been given. An evicted image costs
+ * one render the next time it is asked for, and that render is one a request waits for, so choose a budget that is
+ * not reached often.
  */
 public class ImagePlugin<C : KlerkContext, V>(
     variantDirectory: Path,
     formats: Set<String>? = null,
+    /** Does the scaling. */
     public val processor: ImageProcessor,
     private val stagingDirectory: Path? = null,
     private val maxConcurrentRenders: Int = 2,
@@ -194,7 +201,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         val default =
             ImageRendition(name, media = null, widths = widths, sizes = measured, crop = crop, formats = served)
         val template = ImageTemplate(default, builder.alternatives.toList(), loading, fetchPriority, this)
-        (listOf(default) + template.alternatives).forEach { rendition ->
+        for (rendition in (listOf(default) + template.alternatives)) {
             require(renditions.putIfAbsent(rendition.name, rendition) == null) {
                 "There is already an image template or alternative called '${rendition.name}'"
             }
@@ -224,7 +231,9 @@ public class ImagePlugin<C : KlerkContext, V>(
             processor.probe(source)
         } catch (e: Exception) {
             throw IllegalStateException("The image asset '$name' could not be read", e)
-        } ?: throw IllegalStateException("The image asset '$name' is not an image ${processor::class.simpleName} can read")
+        } ?: throw IllegalStateException(
+            "The image asset '$name' is not an image ${processor::class.simpleName} can read",
+        )
         check(info.pixels <= processor.limits.maxPixels) {
             "The image asset '$name' is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
                     "${processor.limits.maxPixels} are allowed"
@@ -244,8 +253,8 @@ public class ImagePlugin<C : KlerkContext, V>(
      * [renderWait] for a job that will never succeed. An image nothing can render would otherwise cost a held
      * connection on every request, for as long as it exists.
      */
-    private val refused: MutableSet<String> =
-        Collections.newSetFromMap(Collections.synchronizedMap(object : LinkedHashMap<String, Boolean>(128, 0.75f, true) {
+    private val refused: MutableSet<String> = Collections.newSetFromMap(
+        Collections.synchronizedMap(object : LinkedHashMap<String, Boolean>(128, 0.75f, true) {
             override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 1000
         }))
 
@@ -313,7 +322,9 @@ public class ImagePlugin<C : KlerkContext, V>(
     }
 
     /** Whether [contentType] is something this plugin will scale. */
-    internal fun handles(contentType: String?): Boolean = contentType != null && sourceContentTypes.contains(contentType)
+    internal fun handles(
+        contentType: String?,
+    ): Boolean = contentType != null && sourceContentTypes.contains(contentType)
 
     /**
      * Whether a URL's last segment names a registered template or alternative at all, as opposed to naming a
@@ -364,7 +375,7 @@ public class ImagePlugin<C : KlerkContext, V>(
      * Polls the file rather than the job: a caller can arrive before the job was scheduled, after it has finished,
      * or after a restart carried it away, and a file that either exists or does not has none of those cases.
      *
-     * @return the file, or null if it was refused or is still not there.
+     * Returns the file, or null if it was refused or is still not there.
      */
     internal suspend fun awaitVariant(id: String, hash: String, variant: RequestedVariant): Path? {
         val key = variant.key(id, hash)
@@ -387,8 +398,8 @@ public class ImagePlugin<C : KlerkContext, V>(
      * What is known about an image: its real size.
      *
      * Comes from the variant directory once anything has been generated, and before that from what
-     * [prepareImageKeepExif] worked out while the file was being attached — written through to disk here, where the id is
-     * finally known. Null when neither has happened, in which case a page renders without `width`/`height`.
+     * [prepareImageKeepExif] worked out while the file was being attached — written through to disk here, where the id
+     * is finally known. Null when neither has happened, in which case a page renders without `width`/`height`.
      */
     public fun sidecar(id: AttachedDataID, hash: String): ImageSidecar? = sidecar("${id.value}", hash)
 
@@ -445,7 +456,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         if (info.pixels > processor.limits.maxPixels) {
             return BlobPreAttachStepResult.Reject(
                 "The image is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
-                        "${processor.limits.maxPixels} are allowed"
+                        "${processor.limits.maxPixels} are allowed",
             )
         }
         described[args.metadata.hash] = ImageSidecar(info.width, info.height)
@@ -493,7 +504,7 @@ public class ImagePlugin<C : KlerkContext, V>(
             if (info.pixels > processor.limits.maxPixels) {
                 return BlobPreAttachStepResult.Reject(
                     "The image is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
-                            "${processor.limits.maxPixels} are allowed"
+                            "${processor.limits.maxPixels} are allowed",
                 )
             }
             val bytes = withContext(Dispatchers.IO) { Files.readAllBytes(stripped) }
@@ -549,14 +560,14 @@ public class ImagePlugin<C : KlerkContext, V>(
     /** Deletes what belongs to attached data that is gone, or whose content has been replaced. */
     internal suspend fun sweep() {
         val context = systemContext()
-        store.all().forEach { (id, hash) ->
+        for ((id, hash) in store.all()) {
             if (id == ASSET) {
                 // A redeploy that changes an image changes its hash, so the variants of the old one are garbage.
                 if (!assets.containsKey(hash)) {
                     log.info { "Deleting the variants of the image asset $hash, which is no longer registered" }
                     store.delete(id, hash)
                 }
-                return@forEach
+                continue
             }
             val numeric = id.toIntOrNull()
             val metadata = if (numeric == null) null else try {

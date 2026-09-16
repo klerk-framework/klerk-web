@@ -95,7 +95,9 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
     override val maxDepth: Int = Int.MAX_VALUE
     override val maxDescendants: Int = Int.MAX_VALUE
 
-    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String, Context, MyCollections> {
+    override suspend fun step(
+        args: JobStepArgs.Local<String, Context, MyCollections>,
+    ): JobResult<String, Context, MyCollections> {
         if (args.job.step == 0 && args.job.attempt == 0) {
             val nextRun = args.context.time + 15.seconds
             return JobResult.Yield(
@@ -264,7 +266,7 @@ fun Application.configureRouting(
         pathProvider = pathProvider,
         layout = layout,
         classProvider = MyClassProvider,
-        useTableForDetails = false
+        useTableForDetails = false,
         )
     val support = WebSupport(klerk, ApplicationCall::ctx, pathProvider, layout, MyClassProvider)
     // The two roles a flower image plays here: a thumbnail in the gallery, and the image the detail page is about.
@@ -327,14 +329,16 @@ fun Application.configureRouting(
     }
 }
 
-fun HEAD.favicon(): Unit =
+fun HEAD.favicon() {
     link {
         rel = "icon"
         type = "image/svg+xml"
         sizes = "any"
         href =
-            "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
+            "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22>" +
+                "<text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
     }
+}
 
 private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
     call.respondHtml {

@@ -23,15 +23,17 @@ private val log = KotlinLogging.logger {}
  * Every part of this can be assembled by hand instead; see [WebSupport], [ModelListPage], [ModelDetailPage],
  * [TableTemplate], [FormTemplate] and [AutoButtons].
  *
- * @param canSeeAdminUI gates the Admin UI's operations pages. It is an internal tool - see [AdminUI].
- * @param eventFilter which events to generate forms for, see [AutoButtons].
- * @param attachedDataCacheControl the `Cache-Control` for attached data, see [WebSupport].
+ * [canSeeAdminUI] gates the Admin UI's operations pages; it is an internal tool - see [AdminUI]. [eventFilter] decides
+ * which events to generate forms for, see [AutoButtons]. [attachedDataCacheControl] decides the `Cache-Control` for
+ * attached data, see [WebSupport].
  */
 public class KlerkWeb<C : KlerkContext, V>(
     private val klerk: Klerk<C, V>,
     contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
     canSeeAdminUI: suspend (C) -> Boolean,
+    /** Where the pages live. */
     public val pathProvider: PathProvider = DefaultPathProvider(),
+    /** Where the Admin UI pages live. */
     public val adminPathProvider: PathProvider = DefaultPathProvider(pathProvider.base, "admin/"),
     layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
     classProvider: CssClassProvider? = null,
@@ -43,6 +45,7 @@ public class KlerkWeb<C : KlerkContext, V>(
     public val support: WebSupport<C, V> =
         WebSupport(klerk, contextProvider, pathProvider, layout, classProvider, eventFilter, attachedDataCacheControl)
 
+    /** The generated event forms and buttons. */
     public val autoButtons: AutoButtons<C, V> get() = support.autoButtons
 
     private val adminUI: AdminUI<C, V> = AdminUI(
@@ -57,7 +60,10 @@ public class KlerkWeb<C : KlerkContext, V>(
     ): FlowContent.() -> Unit = {
         nav {
             ul {
-                klerk.specification.managedModels.filter { it.kClass in models }.sortedBy { it.kClass.simpleName }.forEach { model ->
+                val shown = klerk.specification.managedModels
+                    .filter { it.kClass in models }
+                    .sortedBy { it.kClass.simpleName }
+                for (model in shown) {
                     li {
                         a(href = pathProvider.pathForList(model.kClass)) { +translator(model) }
                     }
@@ -75,13 +81,13 @@ public class KlerkWeb<C : KlerkContext, V>(
             route.modelListRoutes(
                 ModelListPage<Any, C, V>(
                     model.kClass, support, pathProvider.pathForList(model.kClass), humanName,
-                )
+                ),
             )
             pathProvider.pathForItem(model.kClass, "{id}")?.let {
                 log.info { "Registering route: $it" }
             }
             route.modelDetailRoutes(
-                ModelDetailPage<Any, C, V>(model.kClass, support, humanName, useTable = useTableForDetails)
+                ModelDetailPage<Any, C, V>(model.kClass, support, humanName, useTable = useTableForDetails),
             )
         }
     }
@@ -102,7 +108,9 @@ public class KlerkWeb<C : KlerkContext, V>(
 public fun <C : KlerkContext, V> Route.klerkWebRoutes(
     klerkWeb: KlerkWeb<C, V>,
     models: Set<KClass<*>> = emptySet(),
-): Unit = klerkWeb.registerInto(this, models)
+) {
+    klerkWeb.registerInto(this, models)
+}
 
 /** A `<nav>` with a link to the list page of each model in [models]. Pass the same set as [klerkWebRoutes]. */
 public fun <C : KlerkContext, V> FlowContent.modelsNav(

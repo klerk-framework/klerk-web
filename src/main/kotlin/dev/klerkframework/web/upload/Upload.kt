@@ -37,7 +37,7 @@ public data class Upload(
     /** [dev.klerkframework.klerk.ActorIdentity.id], when the actor is a model. */
     val actorReference: ActorReference?,
     /** [dev.klerkframework.klerk.ActorIdentity.externalId], when the actor has one. */
-    val actorExternalId: ActorExternalId?,
+    val actorExternalId: ActorExternalID?,
 ) {
     /** True once every declared byte has arrived. */
     public val isComplete: Boolean
@@ -57,8 +57,9 @@ public enum class UploadStates {
 }
 
 /**
- * @param lifetime how long an upload may sit in one state before it is abandoned. Applies to both states, so a
- * completed upload that is never submitted is cleaned up on the same terms as one that stalled halfway.
+ * The state machine of an [Upload]. [lifetime] is how long an upload may sit in one state before it is abandoned. It
+ * applies to both states, so a completed upload that is never submitted is cleaned up on the same terms as one that
+ * stalled halfway.
  */
 internal fun <C : KlerkContext, V> uploadStateMachine(lifetime: Duration): StateMachine<Upload, Enum<*>, C, V> =
     stateMachine {
@@ -101,7 +102,8 @@ internal fun <C : KlerkContext, V> uploadStateMachine(lifetime: Duration): State
 public object CreateUpload : VoidEventWithParameters<Upload, CreateUploadParams>(EventVisibility.Application)
 
 /** Issued by [UploadPlugin] after each chunk has been written to the staging file. */
-public object RecordUploadedBytes : InstanceEventWithParameters<Upload, RecordUploadedBytesParams>(EventVisibility.Application)
+public object RecordUploadedBytes :
+    InstanceEventWithParameters<Upload, RecordUploadedBytesParams>(EventVisibility.Application)
 
 /** Issued by [UploadPlugin] when an upload is terminated by the client, or once its bytes have been attached. */
 public object DeleteUpload : InstanceEventNoParameters<Upload>(EventVisibility.Application)
@@ -135,19 +137,19 @@ private fun <C : KlerkContext, V> newUpload(args: VoidEventArgs<Upload, CreateUp
         // Taken from the context, never from the parameters: an upload belongs to whoever started it.
         actorType = UploaderActorType(actor.type.storedValue),
         actorReference = actor.id?.let { ActorReference(it.value) },
-        actorExternalId = actor.externalId?.let { ActorExternalId(it) },
+        actorExternalId = actor.externalId?.let { ActorExternalID(it) },
     )
 }
 
 private fun <C : KlerkContext, V> withReceivedBytes(
-    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>
+    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>,
 ): Upload = args.model.props.copy(receivedBytes = args.command.params.receivedBytes)
 
 /**
  * Decided from the parameters rather than the model, since the update above has not been applied to [args] yet.
  */
 private fun <C : KlerkContext, V> completesTheUpload(
-    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>
+    args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>,
 ): Boolean = args.command.params.receivedBytes.value >=
         args.model.props.declaredSize.value
 
@@ -187,7 +189,7 @@ public class ActorReference(value: Int) : IntContainer(value) {
 }
 
 /** The external id of the actor, when it has one. */
-public class ActorExternalId(value: Long) : LongContainer(value) {
+public class ActorExternalID(value: Long) : LongContainer(value) {
     override val min: Long = Long.MIN_VALUE
     override val max: Long = Long.MAX_VALUE
 }

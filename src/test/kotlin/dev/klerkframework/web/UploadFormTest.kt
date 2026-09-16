@@ -38,7 +38,15 @@ class UploadFormTest {
 
     private fun context() = Context(actor)
 
-    private fun ApplicationTestBuilder.setup(): Triple<Klerk<Context, MyCollections>, UploadPlugin<Context, MyCollections>, FormTemplate<CreateDocumentParams, Context, MyCollections>> {
+    private fun ApplicationTestBuilder.setup(): Triple<
+
+        Klerk<Context, MyCollections>,
+
+        UploadPlugin<Context, MyCollections>,
+
+        FormTemplate<CreateDocumentParams, Context, MyCollections>,
+
+    > {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
@@ -85,7 +93,9 @@ class UploadFormTest {
                 }
                 get("/new") {
                     val ctx = context()
-                    val form = klerk.read(ctx) { template.build(call, null, this, translator = ctx.translation, context = ctx) }
+                    val form = klerk.read(ctx) {
+                        template.build(call, null, this, translator = ctx.translation, context = ctx)
+                    }
                     call.respondHtml { body { eventForm(form) } }
                 }
                 post("/documents") {
@@ -151,7 +161,7 @@ class UploadFormTest {
                     IDEMPOTENCE_KEY to CommandToken.simple().toString(),
                     "title" to "My notes",
                     "content" to upload.value.toString(),
-                ).formUrlEncode()
+                ).formUrlEncode(),
             )
         }
 
@@ -181,7 +191,7 @@ class UploadFormTest {
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "From the browser")
                 append("content", upload.value.toString())
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -206,7 +216,7 @@ class UploadFormTest {
                     append(HttpHeaders.ContentType, "text/plain")
                     append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
                 })
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -236,7 +246,7 @@ class UploadFormTest {
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "My notes")
                 append("content", upload.value.toString())
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -254,7 +264,7 @@ class UploadFormTest {
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "My notes")
                 append("content", upload.value.toString())
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -287,7 +297,7 @@ class UploadFormTest {
                     append(HttpHeaders.ContentType, "text/plain")
                     append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
                 })
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -316,7 +326,7 @@ class UploadFormTest {
                     IDEMPOTENCE_KEY to CommandToken.simple().toString(),
                     "title" to "No token",
                     "content" to upload.value.toString(),
-                ).formUrlEncode()
+                ).formUrlEncode(),
             )
         }
 
@@ -346,7 +356,7 @@ class UploadFormTest {
                     append(HttpHeaders.ContentType, "text/plain")
                     append(HttpHeaders.ContentDisposition, "filename=\"big.txt\"")
                 })
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -411,7 +421,7 @@ class UploadFormTest {
                     IDEMPOTENCE_KEY to CommandToken.simple().toString(),
                     "title" to "Infected",
                     "content" to upload.value.toString(),
-                ).formUrlEncode()
+                ).formUrlEncode(),
             )
         }
 
@@ -434,7 +444,7 @@ class UploadFormTest {
                     append(HttpHeaders.ContentType, "text/plain")
                     append(HttpHeaders.ContentDisposition, "filename=\"notes.txt\"")
                 })
-            }
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -462,7 +472,7 @@ class UploadFormTest {
                     IDEMPOTENCE_KEY to CommandToken.simple().toString(),
                     "title" to "Not mine",
                     "content" to upload.value.toString(),
-                ).formUrlEncode()
+                ).formUrlEncode(),
             )
         }
 

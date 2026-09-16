@@ -35,20 +35,22 @@ internal fun autoRefresh(seconds: Int): HEAD.() -> Unit = {
 }
 
 
-internal fun FlowContent.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ): Unit = nav {
-    val name = camelCaseToPretty(requireNotNull(clazz.simpleName))
-    a(href = pathProvider.withPrefix()) { +"Home" }
-    unsafe {
-        +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
-    }
-    if (isDetails) {
-        a(href = pathProvider.pathForList(clazz)) { +name }
+internal fun FlowContent.breadcrumbs(clazz: KClass<out Any>, pathProvider: PathProvider, isDetails: Boolean = false ) {
+    nav {
+        val name = camelCaseToPretty(requireNotNull(clazz.simpleName))
+        a(href = pathProvider.withPrefix()) { +"Home" }
         unsafe {
             +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
         }
-        +"Details"
-    } else {
-        +name
+        if (isDetails) {
+            a(href = pathProvider.pathForList(clazz)) { +name }
+            unsafe {
+                +"$NON_BREAKING_SPACE>$NON_BREAKING_SPACE"
+            }
+            +"Details"
+        } else {
+            +name
+        }
     }
 }
 
@@ -103,6 +105,9 @@ internal val dateTimeFormatter = LocalDateTime.Format {
     second()
 }
 
+internal fun formatTime(instant: kotlin.time.Instant): String =
+    dateTimeFormatter.format(instant.toLocalDateTime(TimeZone.currentSystemDefault()))
+
 /**
  * Human-readable rendering of the temporal containers, whose stored value is a number (epoch day or
  * microseconds). Returns null for anything else, so the caller can fall back to its usual rendering.
@@ -125,7 +130,10 @@ private fun <V : Any, T : DataContainer<V>> T.ifAuthorized(render: (V) -> String
 
 
 /** Produces a complete HTML document inside a read. Use [Layout.page] to get the same head as the generated pages. */
-public fun <C : KlerkContext, V> Reader<C, V>.html(status: HttpStatusCode = HttpStatusCode.OK, block: HTML.() -> Unit) : TextContent {
+public fun <C : KlerkContext, V> Reader<C, V>.html(
+    status: HttpStatusCode = HttpStatusCode.OK,
+    block: HTML.() -> Unit,
+) : TextContent {
     val text = buildString {
         append("<!DOCTYPE html>\n")
         appendHTML().html(block = block)

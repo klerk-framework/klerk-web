@@ -163,6 +163,9 @@ class PaginationTest {
             "/cursor?filterString=cursor&cursor=new",
             withQueryParam("/cursor?filterString=cursor&cursor=old", "cursor", "new"),
         )
-        assertEquals("/cursor?filterString=cursor&cursor=new", withQueryParam("/cursor?filterString=cursor", "cursor", "new"))
+        assertEquals(
+            "/cursor?filterString=cursor&cursor=new",
+            withQueryParam("/cursor?filterString=cursor", "cursor", "new"),
+        )
     }
 }

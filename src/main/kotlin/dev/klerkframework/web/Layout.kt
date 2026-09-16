@@ -9,17 +9,16 @@ import kotlinx.html.*
  * This is the building block that owns page structure. [PathProvider] only builds URLs; it does not know what a page
  * looks like.
  *
- * @param css a stylesheet served by the assets plugin (see [dev.klerkframework.web.assets.AssetsPlugin]).
- * @param externalCssPath a stylesheet served elsewhere, e.g. "https://example.com/classless.css". Mutually
- * exclusive with [css].
- * @param assetsBase where assets are served from. Must match the [PathProvider] used for the same pages.
- * @param lang the value of the `lang` attribute.
- * @param extraHead rendered last in `<head>`, for your own meta tags, scripts or icons.
+ * [extraHead] is rendered last in `<head>`, for your own meta tags, scripts or icons.
  */
 public open class Layout(
+    /** A stylesheet served by the assets plugin (see [dev.klerkframework.web.assets.AssetsPlugin]). */
     public val css: CssAsset? = null,
+    /** A stylesheet served elsewhere, e.g. "https://example.com/classless.css". Mutually exclusive with [css]. */
     public val externalCssPath: String? = null,
+    /** Where assets are served from. Must match the [PathProvider] used for the same pages. */
     public val assetsBase: String = "/_assets",
+    /** The value of the `lang` attribute. */
     public val lang: String = "en",
     private val extraHead: (HEAD.() -> Unit)? = null,
 ) {
@@ -35,9 +34,8 @@ public open class Layout(
     public fun cssUrl(): String? = externalCssPath ?: css?.let { "$assetsBase/${it.getPathAndHash()}" }
 
     /**
-     * A complete document.
-     *
-     * @param pageHead rendered after [extraHead], for what only this page needs.
+     * A complete document titled [title]. [pageHead] is rendered after the layout's own head content, for what only
+     * this page needs.
      */
     public open fun page(
         title: String,

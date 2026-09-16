@@ -6,18 +6,20 @@ import kotlin.time.Duration.Companion.seconds
 
 /** The size of an image, as read from it rather than as claimed by anybody. */
 public data class ImageInfo(val width: Int, val height: Int) {
+    /** The number of pixels. */
     public val pixels: Long get() = width.toLong() * height.toLong()
 }
 
 /**
  * What an [ImageProcessor] refuses, whatever else it can do.
- *
- * @param maxPixels the largest image that may be decoded, in pixels. Checked *before* decoding: a 1 kB PNG can
- * declare 100 megapixels, and decoding it is how a small file becomes a large heap.
- * @param timeout how long one render may take.
  */
 public data class ImageLimits(
+    /**
+     * The largest image that may be decoded, in pixels. Checked *before* decoding: a 1 kB PNG can declare 100
+     * megapixels, and decoding it is how a small file becomes a large heap.
+     */
     val maxPixels: Long = 50_000_000,
+    /** How long one render may take. */
     val timeout: Duration = 30.seconds,
 )
 
@@ -57,6 +59,7 @@ public interface ImageProcessor {
     /** The formats this processor can write, as bare names: `jpeg`, `png`, `webp`, `avif`. */
     public val outputFormats: Set<String>
 
+    /** What this processor refuses. */
     public val limits: ImageLimits
 
     /**
@@ -80,8 +83,8 @@ public interface ImageProcessor {
      * Called while an image is being uploaded, where there is nothing to render yet. Generating a variant does not
      * call this — [render] reports the same thing — so a processor that has to make a roundtrip makes one.
      *
-     * @return null if the file is not an image this processor understands. This is a measurement rather than a
-     * check: it must not throw for an unreadable file.
+     * Returns null if the file is not an image this processor understands. This is a measurement rather than a check:
+     * it must not throw for an unreadable file.
      */
     public suspend fun probe(source: Path): ImageInfo?
 
@@ -96,7 +99,8 @@ public interface ImageProcessor {
      * This is what [dev.klerkframework.web.image.ImagePlugin.prepareImage] calls, once, as the file is attached, so
      * it runs against bytes a stranger chose and is worth the same suspicion as [render].
      *
-     * @return the size of [source] as displayed, so that stripping and measuring are one roundtrip.
+     * Returns the size of [source] as displayed, so that stripping and measuring are one roundtrip.
+     *
      * @throws ImageRefused if the source is too large to decode, or is not an image this processor understands.
      * Anything else means the failure was temporary and the upload is worth retrying.
      */
@@ -113,8 +117,9 @@ public interface ImageProcessor {
      * source that cannot fill it, `crop.widthOf(probe(source))`. The crop is taken after the image has been turned
      * the right way up, so a photograph shot sideways loses the edges the viewer sees at the edges.
      *
-     * @return the size of [source] as displayed — what [probe] would have returned for it. Klerk needs this to lay
+     * Returns the size of [source] as displayed — what [probe] would have returned for it. Klerk needs this to lay
      * pages out, and asking for it here is what keeps generating a variant to one roundtrip.
+     *
      * @throws ImageRefused if the source is too large to decode, or is not an image.
      */
     public suspend fun render(source: Path, target: Path, width: Int, format: String, crop: Crop? = null): ImageInfo

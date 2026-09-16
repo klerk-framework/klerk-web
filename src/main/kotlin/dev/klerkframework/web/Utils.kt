@@ -18,7 +18,7 @@ public fun <M : Any> FlowContent.modelProperties(
     val reflected = ModelDisplay(model)
     table(classesFor("table")) {
         tbody(classesFor("tbody")) {
-            ObjectSchema.of(model.props::class).fields.forEach { field ->
+            for (field in ObjectSchema.of(model.props::class).fields) {
                 tr(classesFor("tr")) {
                     td(classesFor("td")) { +field.name }
                     td(classesFor("td")) { +field.get(model.props).toString() }
@@ -31,7 +31,7 @@ public fun <M : Any> FlowContent.modelProperties(
             summary { +"Metadata" }
             table {
                 tbody {
-                    reflected.getMeta().forEach { property ->
+                    for (property in reflected.getMeta()) {
                         tr(classesFor("tr")) {
                             td(classesFor("td")) { apply(property.renderNameNonBreakingHtml()) }
                             td(classesFor("td")) {
@@ -68,13 +68,11 @@ public enum class UiPart {
  */
 public fun interface CssClassProvider {
     /**
-     * Returns the CSS classes to put on an element that klerk-web renders. Return an empty set to leave it
-     * unstyled, which is what a classless CSS expects.
+     * Returns the CSS classes to put on an [element] (e.g. "table", "td" or "input") that klerk-web renders in
+     * [part]. [property] is the name of the model or parameter property the element belongs to, and [model] the model
+     * being rendered, if any.
      *
-     * @param part where the element sits.
-     * @param element the HTML element name, e.g. "table", "td" or "input".
-     * @param property the name of the model or parameter property the element belongs to, if any.
-     * @param model the model being rendered, if any.
+     * Return an empty set to leave the element unstyled, which is what a classless CSS expects.
      */
     public fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String>
 }

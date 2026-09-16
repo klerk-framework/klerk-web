@@ -18,9 +18,8 @@ import kotlin.reflect.KClass
  *
  * Register its route, or call [respond] from a route of your own.
  *
- * @param eventLogPath where the history of a model can be seen, if anywhere.
- * @param useTable renders the properties in a `<table>` instead of a `<dl>`.
- * @param extraContent rendered after the event buttons.
+ * [eventLogPath] is where the history of a model can be seen, if anywhere. [extraContent] is rendered after the event
+ * buttons. [useTable] renders the properties in a `<table>` instead of a `<dl>`.
  */
 public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     private val kClass: KClass<out Any>,
@@ -33,11 +32,13 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     private val klerk: Klerk<C, V> = support.klerk
     private val pathProvider: PathProvider = support.pathProvider
 
-    internal fun registerInto(route: Route): Unit = with(route) {
-        // A null path means the PathProvider says this model has no detail view, so no route is registered.
-        pathProvider.pathForItem(kClass, "{id}")?.let { path ->
-            get(path) {
-                respond(call)
+    internal fun registerInto(route: Route) {
+        with(route) {
+            // A null path means the PathProvider says this model has no detail view, so no route is registered.
+            pathProvider.pathForItem(kClass, "{id}")?.let { path ->
+                get(path) {
+                    respond(call)
+                }
             }
         }
     }
@@ -73,7 +74,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             apply(renderMeta(reflected))
 
             h3 { +"Commands" }
-            events.forEach { event ->
+            for (event in events) {
                 p {
                     eventButton(
                         event,
@@ -118,14 +119,16 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
      */
     private fun Reader<C, V>.attachedDataHashes(reflected: ModelDisplay<Any>): Map<Any, String> {
         val result = mutableMapOf<Any, String>()
-        reflected.getProperties().forEach { property ->
+        for (property in reflected.getProperties()) {
             val value = property.value
             if (value !is AttachedDataContainer<*>) {
-                return@forEach
+                continue
             }
             val entry: Pair<Any, String>? = when (value) {
-                is AttachedBlobContainer -> attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
-                is AttachedStringContainer -> attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                is AttachedBlobContainer ->
+                    attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
+                is AttachedStringContainer ->
+                    attachedData.getMetadataOrNull(value.id.untyped())?.let { value.id to it.hash }
                 else -> null
             }
             entry?.let { result[it.first] = it.second }
@@ -143,7 +146,8 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         @Suppress("UNCHECKED_CAST")
         val propsClass = property.getRelatedModelPropsClass() as? KClass<out Any>
         val href = when {
-            modelId is ModelID<*> && propsClass != null -> pathProvider.pathForItem(propsClass, modelId.value.toString())
+            modelId is ModelID<*> && propsClass != null ->
+                pathProvider.pathForItem(propsClass, modelId.value.toString())
             modelId is AttachedBlobContainer -> attachedHashes[modelId.id]?.let {
                 pathProvider.attachedDataPath(modelId.id, it)
             }
@@ -164,7 +168,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         if (useTable) {
             table(classesFor("table")) {
                 tbody {
-                    reflected.getProperties().forEach { property ->
+                    for (property in reflected.getProperties()) {
                         tr(classesFor("tr", property.name())) {
                             td(classesFor("td", property.name())) { apply(propertyName(property, context)) }
                             td(classesFor("td", property.name())) { apply(propertyValue(property, attachedHashes)) }
@@ -174,7 +178,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
             }
         } else {
             dl(classesFor("dl")) {
-                reflected.getProperties().forEach { property ->
+                for (property in reflected.getProperties()) {
                     dt(classesFor("dt", property.name())) { apply(propertyName(property, context)) }
                     dd(classesFor("dd", property.name())) { apply(propertyValue(property, attachedHashes)) }
                 }
@@ -186,7 +190,7 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
         details {
             summary { +"Meta" }
             dl {
-                reflected.getMeta().forEach { property ->
+                for (property in reflected.getMeta()) {
                     dt { apply(property.renderNameNonBreakingHtml()) }
                     dd {
                         property.description()?.let { title = it }
@@ -198,10 +202,12 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
     }
 
     private fun renderRelations(reflected: ModelDisplay<Any>): FlowContent.() -> Unit = {
-        reflected.referencesPretty().forEach { relatedList ->
+        for (relatedList in reflected.referencesPretty()) {
             details {
                 summary { +relatedList.key }
-                relatedList.value.forEach { +it.toString() }
+                for (related in relatedList.value) {
+                    +related.toString()
+                }
             }
         }
 
@@ -217,16 +223,16 @@ public class ModelDetailPage<T : Any, C : KlerkContext, V>(
                         }
                     }
                     tbody {
-                        referencesToThis.forEach {
-                            val target = it.original.props::class
-                            val href = pathProvider.pathForItem(target, it.id)
+                        for (reference in referencesToThis) {
+                            val target = reference.original.props::class
+                            val href = pathProvider.pathForItem(target, reference.id)
                             tr {
                                 td {
                                     val name = target.simpleName ?: "Unknown"
                                     if (href != null) a(href = href) { +name } else +name
                                 }
                                 td {
-                                    if (href != null) a(href = href) { +"$it" } else +"$it"
+                                    if (href != null) a(href = href) { +"$reference" } else +"$reference"
                                 }
                             }
                         }
@@ -242,5 +248,6 @@ internal fun EventReference.urlEncode(): String = toString().encodeURLPathPart()
 internal fun EventReference.Companion.urlDecode(encoded: String): EventReference = parse(encoded.decodeURLPart())
 
 /** The detail route for one model. Registers nothing when [PathProvider.pathForItem] returns null for it. */
-public fun <T : Any, C : KlerkContext, V> Route.modelDetailRoutes(page: ModelDetailPage<T, C, V>): Unit =
+public fun <T : Any, C : KlerkContext, V> Route.modelDetailRoutes(page: ModelDetailPage<T, C, V>) {
     page.registerInto(this)
+}

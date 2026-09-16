@@ -58,7 +58,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
         } catch (e: NotImplementedError) {
             throw IllegalStateException(
                 "klerk-web cannot build a form for the event '$eventReference': ${e.message}. " +
-                        "Either add support for the data type, or exclude the event from the generated UI.", e
+                        "Either add support for the data type, or exclude the event from the generated UI.", e,
             )
         }
     }
@@ -106,8 +106,11 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
 
             val modelIdQueryParams = if (id != null) mapOf("modelId" to id.toString()) else emptyMap
             val form = klerk.read(context) {
-                // TODO: this if statement should not check for "Update", that specification should be injected into the template somehow. A function?
-                val params = if (eventReference.eventName.contains("Update") && eventReference.modelName == eventWithParameters.parameters.kClass.simpleName && id != null) get(id).props else null
+                // TODO: this if statement should not check for "Update", that specification should be injected into the
+                // template somehow. A function?
+                val isUpdate = eventReference.eventName.contains("Update") &&
+                    eventReference.modelName == eventWithParameters.parameters.kClass.simpleName
+                val params = if (isUpdate && id != null) get(id).props else null
                 template.build(
                     call,
                     params = params,
@@ -182,7 +185,6 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             //  val buttonTargets = parseButtonTargets(call, null)
             val eventReference = EventReference.parse(requireNotNull(queryParameters["eventId"]))
             val id = queryParameters["modelId"]?.let { ModelID<Any>(it.toInt()) }
-            //val eventWithParameters = EventWithParameters(eventReference, requireNotNull(klerk.specification.parametersSchema(eventReference)))
             val parameters = klerk.specification.parametersSchema(eventReference)
             val event = klerk.specification.event(eventReference)
 
@@ -206,7 +208,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                     call,
                     support,
                     key,
-                    null
+                    null,
                 )
             } else {
                 when (val parseResult = template.parse(call, context)) {
@@ -222,7 +224,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                             call,
                             support,
                             parseResult.key,
-                            parseResult.params
+                            parseResult.params,
                         )
                     }
                 }
@@ -237,7 +239,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             call: ApplicationCall,
             support: WebSupport<C, V>,
             key: CommandToken,
-            params: Any?
+            params: Any?,
         ) {
             val options = ProcessingOptions(token = key)
             val command = Command.dynamic(event, id, params)
@@ -265,7 +267,9 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
                         h3 { +"Event was executed" }
                         apply(renderSuccess(eventResult))
                         br
-                        a(href = if (modelId == null || modelWasDeleted) completionPaths.cancel else completionPaths.model) {
+                        val next =
+                            if (modelId == null || modelWasDeleted) completionPaths.cancel else completionPaths.model
+                        a(href = next) {
                             button { +"Ok" }
                         }
                     }
@@ -318,7 +322,8 @@ internal fun valueWithCorrectType(value: String?, field: SchemaField): Any? {
             PropertyType.Float -> field.createContainer(value.toFloat())
             PropertyType.Double -> field.createContainer(value.toDouble())
             PropertyType.Instant -> {
-                // A datetime-local input sends local time without a zone, so it is interpreted in the server's time zone.
+                // A datetime-local input sends local time without a zone, so it is interpreted in the server's time
+                // zone.
                 val local = LocalDateTime.parse(if (value.count { it == ':' } == 1) "$value:00" else value)
                 field.createContainer(local.toInstant(TimeZone.currentSystemDefault()))
             }
@@ -341,7 +346,7 @@ private suspend fun <C : KlerkContext, V> isCrudUpdate(
     id: ModelID<Any>?,
     e: EventWithParameters<*>,
     context: C,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ): Boolean {
     if (id == null) return false
     val model = klerk.read(context) { get(id) }
@@ -349,33 +354,44 @@ private suspend fun <C : KlerkContext, V> isCrudUpdate(
 }
 
 private fun renderSuccess(result: CommandResult.Success<out Any>): FlowContent.() -> Unit = {
-    result.createdModels.forEach { p { +"Model (id: $it) was created" } }
-    result.updatedModels.forEach { p { +"Model (id: $it) was updated" } }
-    result.deletedModels.forEach { p { +"Model (id: $it) was deleted" } }
-    result.jobs.forEach { p { +"Job (id: $it) was created" } }
+    for (id in result.createdModels) {
+        p { +"Model (id: $id) was created" }
+    }
+    for (id in result.updatedModels) {
+        p { +"Model (id: $id) was updated" }
+    }
+    for (id in result.deletedModels) {
+        p { +"Model (id: $id) was deleted" }
+    }
+    for (jobId in result.jobs) {
+        p { +"Job (id: $jobId) was created" }
+    }
 }
 
 /**
- * Utility to encode and decode the button targets from query parameters.
+ * Where to redirect after a form, encoded in and decoded from query parameters.
  *
- * @param cancel The path to redirect to when the user clicks the cancel button. Also used when the command was
- * executed successfully but there is no relevant model (e.g. it was deleted).
- * @param model The path to redirect to when the command was executed successfully and the model exists.
- * @param error The path to redirect to when an error occurs.
+ * [cancel] is used when the user clicks the cancel button, and also when the command succeeded but there is no
+ * relevant model (e.g. it was deleted). [model] is used when the command succeeded and the model exists, and [error]
+ * when an error occurs.
  */
-public data class CompletionPaths(internal val cancel: String, internal val model: String?, internal val error: String) {
+public data class CompletionPaths(
+    internal val cancel: String,
+    internal val model: String?,
+    internal val error: String,
+) {
 
     internal fun toQueryParams(): Map<String, String> {
         if (model == null) {
             return mapOf(
                 "bt_cancel" to Base64.UrlSafe.encode(cancel.encodeToByteArray()),
-                "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray())
+                "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray()),
             )
         }
         return mapOf(
             "bt_cancel" to Base64.UrlSafe.encode(cancel.encodeToByteArray()),
             "bt_model" to Base64.UrlSafe.encode(model.encodeToByteArray()),
-            "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray())
+            "bt_error" to Base64.UrlSafe.encode(error.encodeToByteArray()),
         )
     }
 
@@ -383,14 +399,16 @@ public data class CompletionPaths(internal val cancel: String, internal val mode
 
     internal companion object {
         fun parse(call: ApplicationCall, id: ModelID<out Any>?): CompletionPaths {
-            var parsedModelPath = call.request.queryParameters["bt_model"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/"
+            fun decoded(name: String) =
+                call.request.queryParameters[name]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/"
+            var parsedModelPath = decoded("bt_model")
             if (id != null) {
                 parsedModelPath = parsedModelPath.replace("{id}", id.toString())
             }
             return CompletionPaths(
-                cancel = call.request.queryParameters["bt_cancel"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/",
+                cancel = decoded("bt_cancel"),
                 model = parsedModelPath,
-                error = call.request.queryParameters["bt_error"]?.let { Base64.UrlSafe.decode(it).decodeToString() } ?: "/",
+                error = decoded("bt_error"),
             )
         }
     }

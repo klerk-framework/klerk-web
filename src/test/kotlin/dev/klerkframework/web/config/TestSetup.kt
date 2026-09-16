@@ -145,10 +145,13 @@ fun canReadAllProperties(args: PropertyReadRuleArgs<Context, MyCollections>): Po
 
 fun unauthenticatedCannotReadAstrid(args: ModelReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     val props = args.model.props
-    return if (props is Author && props.firstName.value == "Astrid" && args.context.actor is Unauthenticated) Deny else Pass
+    val isAstrid = props is Author && props.firstName.value == "Astrid"
+    return if (isAstrid && args.context.actor is Unauthenticated) Deny else Pass
 }
 
-fun `Everybody can do everything`(argCommandContextReader: CommandRuleArgs<*, Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can do everything`(
+    argCommandContextReader: CommandRuleArgs<*, Context, MyCollections>,
+): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
@@ -166,7 +169,9 @@ fun `Everybody can read attached data`(args: AttachedDataReadRuleArgs<Context, M
 }
 
 /** An upload becomes attached data, so an application with file uploads needs a rule like this one. */
-fun `Everybody can prepare attached data`(args: AttachedDataWriteRuleArgs<Context, MyCollections>): PositiveAuthorization {
+fun `Everybody can prepare attached data`(
+    args: AttachedDataWriteRuleArgs<Context, MyCollections>,
+): PositiveAuthorization {
     return PositiveAuthorization.Allow
 }
 
@@ -175,14 +180,12 @@ fun `Everybody can read`(args: ModelReadRuleArgs<Context, MyCollections>): Posit
 }
 
 fun pelleCannotReadOnMornings(
-    args: ModelReadRuleArgs<Context, MyCollections>
+    args: ModelReadRuleArgs<Context, MyCollections>,
 ): NegativeAuthorization {
     try {
         if (args.context.user?.props?.name?.value.equals("Pelle")) {
-            return if (args.context.time.toLocalDateTime(TimeZone.currentSystemDefault()).time < LocalTime.fromSecondOfDay(
-                    3600 * 12
-                )
-            ) Deny else Pass
+            val localTime = args.context.time.toLocalDateTime(TimeZone.currentSystemDefault()).time
+            return if (localTime < LocalTime.fromSecondOfDay(3600 * 12)) Deny else Pass
         }
     } catch (e: Exception) {
         //
@@ -281,7 +284,8 @@ data class CreateAuthorParams(
         setOf(::augustStrindbergCannotHaveCertainPhoneNumber, ::primeMustBeHigherThanAge)
 
     private fun augustStrindbergCannotHaveCertainPhoneNumber(): PropertyCollectionValidity {
-        return if (firstName.value == "August" && lastName.value == "Strindberg" && phone.value == "123456") Invalid() else Valid
+        val isAugust = firstName.value == "August" && lastName.value == "Strindberg"
+        return if (isAugust && phone.value == "123456") Invalid() else Valid
     }
 
     fun primeMustBeHigherThanAge(): PropertyCollectionValidity {
@@ -437,18 +441,22 @@ fun onEnterAmateurStateAction(args: LifecycleArgs<Author, Context, MyCollections
 }
 
 
-fun notifyBookStores(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
+fun notifyBookStores(
+    args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>,
+): List<DeclaredJob<Context, MyCollections>> {
     return listOf(MyJob.declare(""))
 }
 
 fun changeNameOfAuthor(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): Author {
     return args.model.props.copy(
         firstName = args.command.params.updatedFirstName,
-        lastName = args.command.params.updatedLastName
+        lastName = args.command.params.updatedLastName,
     )
 }
 
-fun eventsToDeleteAuthorAndBooks(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>): List<Command<Any, Any>> {
+fun eventsToDeleteAuthorAndBooks(
+    args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>,
+): List<Command<Any, Any>> {
     args.reader.apply {
         val result: MutableList<Command<Any, Any>> = mutableListOf()
         val books = referencing(Book::class, requireNotNull(args.model.id))
@@ -460,7 +468,7 @@ fun eventsToDeleteAuthorAndBooks(args: InstanceEventArgs<Author, Nothing?, Conte
         @Suppress("UNCHECKED_CAST")
         result.add(
             Command(DeleteAuthor, requireNotNull(args.model.id))
-                    as Command<Any, Any>
+                    as Command<Any, Any>,
         )
 
         return result
@@ -489,23 +497,34 @@ fun updateAuthor(args: InstanceEventArgs<Author, Author, Context, MyCollections>
 }
 
 
-fun onlyAuthenticationIdentityCanCreateDaniel(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
-    return if (args.command.params.firstName.value == "Daniel" && args.context.actor != AuthenticationIdentity) Invalid() else Valid
+fun onlyAuthenticationIdentityCanCreateDaniel(
+    args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
+): PropertyCollectionValidity {
+    val isDaniel = args.command.params.firstName.value == "Daniel"
+    return if (isDaniel && args.context.actor != AuthenticationIdentity) Invalid() else Valid
 }
 
-fun cannotHaveAnAwfulName(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
-    return if (args.command.params.firstName.value == "Mike" && args.command.params.lastName.value == "Litoris") Invalid() else Valid
+fun cannotHaveAnAwfulName(
+    args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
+): PropertyCollectionValidity {
+    val params = args.command.params
+    return if (params.firstName.value == "Mike" && params.lastName.value == "Litoris") Invalid() else Valid
 }
 
-fun secretTokenShouldBeZeroIfNameStartsWithM(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
-    return if (args.command.params.firstName.value.startsWith("M") && args.command.params.secretToken.value != 0L) Invalid() else Valid
+fun secretTokenShouldBeZeroIfNameStartsWithM(
+    args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
+): PropertyCollectionValidity {
+    val params = args.command.params
+    return if (params.firstName.value.startsWith("M") && params.secretToken.value != 0L) Invalid() else Valid
 }
 
 fun preventUnauthenticated(context: Context): PropertyCollectionValidity {
     return if (context.actor == Unauthenticated) Invalid() else Valid
 }
 
-fun onlyAllowAuthorNameAstridIfThereIsNoRowling(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>): PropertyCollectionValidity {
+fun onlyAllowAuthorNameAstridIfThereIsNoRowling(
+    args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
+): PropertyCollectionValidity {
     args.reader.apply {
         if (args.command.params.firstName.value != "Astrid") {
             return Valid
@@ -563,7 +582,7 @@ suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID
                 favouritePrimeNumber = PrimeNumber(31),
                 isLikedByMyDaughter = IsLikedByMyDaughter(false),
                 nullableFirstName = null,
-            )
+            ),
         ),
         Context.system(),
     )
@@ -574,7 +593,7 @@ suspend fun createAuthorAstrid(klerk: Klerk<Context, MyCollections>): ModelID<Au
     val result = klerk.handle(
         Command(
             CreateAuthor,
-            createAstridParameters
+            createAstridParameters,
         ),
         Context.system(),
     )
@@ -602,8 +621,8 @@ suspend fun createBookHarryPotter1(klerk: Klerk<Context, MyCollections>, author:
                 coAuthors = emptySet(),
                 previousBooksInSameSeries = emptyList(),
                 tags = setOf(BookTag("Fiction"), BookTag("Children")),
-                averageScore = AverageScore(0f)
-            )
+                averageScore = AverageScore(0f),
+            ),
         ),
         Context.system(),
     )
@@ -614,7 +633,7 @@ suspend fun createBookHarryPotter2(
     klerk: Klerk<Context, MyCollections>,
     author: ModelID<Author>,
     previousBooksInSameSeries: List<ModelID<Book>>,
-    coAuthors: Set<ModelID<Author>>
+    coAuthors: Set<ModelID<Author>>,
 ): ModelID<Book> {
     val result = klerk.handle(
         Command(
@@ -625,8 +644,8 @@ suspend fun createBookHarryPotter2(
                 coAuthors = coAuthors,
                 previousBooksInSameSeries = previousBooksInSameSeries,
                 tags = setOf(BookTag("Fiction"), BookTag("Children")),
-                averageScore = AverageScore(0f)
-            )
+                averageScore = AverageScore(0f),
+            ),
         ),
         Context.system(),
     )
@@ -790,7 +809,7 @@ object ChangeName :
 
 sealed class AlwaysFalseDecisions(
     override val name: String,
-    override val function: (InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>) -> Boolean
+    override val function: (InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>) -> Boolean,
 ) : Decision<Boolean, InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>> {
     data object Something : AlwaysFalseDecisions("This will always be false", ::alwaysFalse)
 }
@@ -803,7 +822,9 @@ fun alwaysFalse(args: InstanceEventArgs<Author, CreateAuthorParams, Context, MyC
 object AlwaysFalseAlgorithm :
     FlowChartAlgorithm<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>("Always false") {
 
-    override fun configure(): AlgorithmBuilder<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>.() -> Unit =
+    override fun configure():
+
+        AlgorithmBuilder<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>.() -> Unit =
         {
             start(Something)
             booleanNode(Something) {
@@ -849,7 +870,9 @@ object MyJob : JobType.Local<String, Context, MyCollections>() {
     override val name: JobName = JobName("my-job")
     override val agent: JobAgent = JobAgent.System
 
-    override suspend fun step(args: JobStepArgs.Local<String, Context, MyCollections>): JobResult<String, Context, MyCollections> {
+    override suspend fun step(
+        args: JobStepArgs.Local<String, Context, MyCollections>,
+    ): JobResult<String, Context, MyCollections> {
         println("Did MyJob")
         return JobResult.Success()
     }
@@ -974,7 +997,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(true),
                     nullableFirstName = null,
-                )
+                ),
             ),
             Context.system(),
         )
@@ -983,12 +1006,12 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
             klerk.handle(
                 Command(
                     ImproveAuthor,
-                    requireNotNull(result.getOrThrow().primaryModel)
+                    requireNotNull(result.getOrThrow().primaryModel),
                 ),
                 context = Context.system(),
                 ProcessingOptions(
-                    CommandToken.simple()
-                )
+                    CommandToken.simple(),
+                ),
             )
         }
 
@@ -1007,8 +1030,8 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                         coAuthors = emptySet(),
                         previousBooksInSameSeries = emptyList(),
                         tags = setOf(BookTag("Fiction"), BookTag("Children")),
-                        averageScore = AverageScore(0f)
-                    )
+                        averageScore = AverageScore(0f),
+                    ),
                 ),
                 Context.system(),
             )
@@ -1026,7 +1049,7 @@ enum class BookStates {
 
 fun bookStateMachine(
     allAuthors: ModelView<Author, Context>,
-    collections: MyCollections
+    collections: MyCollections,
 ): StateMachine<Book, BookStates, Context, MyCollections> =
     stateMachine {
 
@@ -1171,7 +1194,11 @@ class DocumentContent(id: AttachedBlobID) : AttachedBlobContainer(id) {
 /** Stands in for a virus scanner: cheap, deterministic, and it refuses rather than rewrites. */
 suspend fun refuseTheWordVirus(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
     val text = args.value.readBytes().decodeToString()
-    return if (text.contains("virus")) BlobPreAttachStepResult.Reject("the file looks infected") else BlobPreAttachStepResult.Pass
+    return if (text.contains("virus")) {
+        BlobPreAttachStepResult.Reject("the file looks infected")
+    } else {
+        BlobPreAttachStepResult.Pass
+    }
 }
 
 /**
@@ -1237,7 +1264,7 @@ private fun newNote(args: VoidEventArgs<Note, CreateNoteParams, Context, MyColle
  * browser it may pick a 10 MB file, and the rule then refuses it with a bare `403` that says nothing about why.
  */
 fun noUploadLargerThanTenMegabytes(
-    args: CommandRuleArgs<*, Context, MyCollections>
+    args: CommandRuleArgs<*, Context, MyCollections>,
 ): NegativeAuthorization {
     val params = args.command.params
     if (params !is CreateUploadParams) {
@@ -1280,7 +1307,9 @@ fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Cont
     }
 }
 
-private fun newPublication(args: VoidEventArgs<Publication, CreatePublicationParams, Context, MyCollections>): Publication =
+private fun newPublication(
+    args: VoidEventArgs<Publication, CreatePublicationParams, Context, MyCollections>,
+): Publication =
     Publication(args.command.params.cover, args.command.params.body, args.command.params.draft)
 
 // An image that klerk-web has measured while it was being attached, so that a page can be laid out before any
@@ -1322,7 +1351,9 @@ private fun newPhoto(args: VoidEventArgs<Photo, CreatePhotoParams, Context, MyCo
  * Only actor 1 may read a publication's private data, so that a denial can be told from a hit. The public properties
  * of the same model are unaffected: no read rule is evaluated for public data, not even a negative one.
  */
-fun `Only the author can read a publication`(args: AttachedDataReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
+fun `Only the author can read a publication`(
+    args: AttachedDataReadRuleArgs<Context, MyCollections>,
+): NegativeAuthorization {
     if (args.owner.props !is Publication) {
         return Pass
     }

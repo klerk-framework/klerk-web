@@ -48,7 +48,8 @@ private const val OFFSET_OCTET_STREAM = "application/offset+octet-stream"
  *
  * | | |
  * |---|---|
- * | `POST {path}` | starts an upload; `Upload-Length` and `Upload-Metadata` describe it. Responds `201` with `Location`. |
+ * | `POST {path}` | starts an upload; `Upload-Length` and `Upload-Metadata` describe it. Responds `201` with
+ * `Location`. |
  * | `HEAD {path}/{id}` | the current `Upload-Offset`, i.e. where to resume. |
  * | `PATCH {path}/{id}` | appends bytes at `Upload-Offset`. `409` if that is not where the upload is. |
  * | `DELETE {path}/{id}` | discards the upload and its bytes. |
@@ -57,9 +58,9 @@ private const val OFFSET_OCTET_STREAM = "application/offset+octet-stream"
  * continued by the actor that created it. An upload that does not exist and one belonging to somebody else give the
  * same `404`, so the endpoints cannot be used to find out which uploads exist.
  *
- * @param path where the endpoints are mounted. Remembered by the plugin, so that forms know where to send files.
- * @param maxSize the largest upload these routes will start, advertised as `Tus-Max-Size`. A limit that depends on
- * who is asking belongs in an authorization rule on [CreateUpload] instead.
+ * The endpoints are mounted at [path], which the plugin remembers so that forms know where to send files. [maxSize] is
+ * the largest upload these routes will start, advertised as `Tus-Max-Size`. A limit that depends on who is asking
+ * belongs in an authorization rule on [CreateUpload] instead.
  */
 public fun <C : KlerkContext, V> Route.uploadRoutes(
     support: WebSupport<C, V>,
@@ -104,7 +105,8 @@ public fun <C : KlerkContext, V> Route.uploadRoutes(
             plugin.create(
                 context = context,
                 filename = metadata["filename"]?.take(255) ?: "upload",
-                declaredContentType = metadata["contentType"]?.take(255) ?: ContentType.Application.OctetStream.toString(),
+                declaredContentType = metadata["contentType"]?.take(255)
+                    ?: ContentType.Application.OctetStream.toString(),
                 declaredSize = length,
             )
         } catch (_: AuthorizationException) {
@@ -240,7 +242,8 @@ internal fun parseUploadMetadata(header: String?): Map<String, String> {
 }
 
 /**
- * The [AttachedBlobContainer] declared for a property of an event's parameters, or null if there is no such declaration.
+ * The [AttachedBlobContainer] declared for a property of an event's parameters, or null if there is no such
+ * declaration.
  *
  * Used to apply a property's own limit at the moment an upload starts. Everything it is given comes from the client,
  * so nothing here may be trusted to *permit* anything — only to restrict further than the endpoint already does.

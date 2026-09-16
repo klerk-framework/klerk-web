@@ -169,7 +169,10 @@ class DocExamplesTest {
     // docs/images.md
     @Test
     fun `the images example compiles`() = testApplication {
-        val images = ImagePlugin<Context, MyCollections>(Files.createTempDirectory("klerk-doc-images"), processor = ImageIoProcessor())
+        val images = ImagePlugin<Context, MyCollections>(
+            Files.createTempDirectory("klerk-doc-images"),
+            processor = ImageIoProcessor(),
+        )
         val hero = images.template(
             "hero",
             widths = setOf(640, 1280, 2560),

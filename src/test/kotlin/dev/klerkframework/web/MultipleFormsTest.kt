@@ -78,7 +78,7 @@ class MultipleFormsTest {
         assertEquals(
             inputIds.toSet().size,
             inputIds.size,
-            "Input ids must be unique across forms, but got: $inputIds"
+            "Input ids must be unique across forms, but got: $inputIds",
         )
 
         // One token in the response, repeated in both forms - not one Set-Cookie per form.

@@ -56,7 +56,7 @@ class AttachedDataRoutesTest {
             routing {
                 attachedDataRoutes(support)
                 modelDetailRoutes(ModelDetailPage<Publication, Context, MyCollections>(
-                    Publication::class, support, "Publication"
+                    Publication::class, support, "Publication",
                 ))
             }
         }
@@ -70,7 +70,7 @@ class AttachedDataRoutesTest {
         val result = klerk.handle(
             Command(
                 CreatePublication,
-                CreatePublicationParams(PublicCover(cover), PublicBody(body), SecretDraft(draft))
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), SecretDraft(draft)),
             ),
             author,
         )
@@ -182,7 +182,9 @@ class AttachedDataRoutesTest {
             val meta = klerk.attachedData.getMetadata(draft.id, author)
 
             val denied = client.get(DefaultPathProvider().attachedDataPath(draft.id, meta.hash))
-            val missing = client.get(DefaultPathProvider().attachedDataPath(draft.id, meta.hash).replace("/${draft.id}/", "/99999/"))
+            val missing = client.get(
+                DefaultPathProvider().attachedDataPath(draft.id, meta.hash).replace("/${draft.id}/", "/99999/"),
+            )
 
             assertEquals(HttpStatusCode.NotFound, denied.status)
             assertEquals(missing.status, denied.status)

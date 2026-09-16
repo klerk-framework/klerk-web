@@ -21,6 +21,7 @@ public class ModelDisplay<T : Any>(public val original: Model<T>) {
 
     override fun toString(): String = original.toString()
 
+    /** The id of the model. */
     public val id: ModelID<*>
         get() = original.id
 
@@ -35,8 +36,8 @@ public class ModelDisplay<T : Any>(public val original: Model<T>) {
      * more detailed information. Call it inside a read block.
      */
     public fun populateRelations(reader: ModelReader<*, *>) {
-        schema.forEachLeaf(original.props) { leaf ->
-            val reference = leaf.value as? ModelID<*> ?: return@forEachLeaf
+        for (leaf in schema.leaves(original.props)) {
+            val reference = leaf.value as? ModelID<*> ?: continue
             @Suppress("UNCHECKED_CAST")
             relatedModels[reference] = reader.get(reference as ModelID<Any>)
         }
@@ -81,9 +82,11 @@ public class ModelDisplay<T : Any>(public val original: Model<T>) {
 
 /** A single property of a [Model] or its props, paired with its value for display purposes. */
 public class DisplayProperty internal constructor(
+    /** The property. */
     public val property: KProperty1<*, *>,
+    /** The value of the property. */
     public val value: Any?,
-    private val relatedModels: MutableMap<ModelID<*>, Model<Any>>
+    private val relatedModels: MutableMap<ModelID<*>, Model<Any>>,
 ) {
 
     override fun toString(): String {
@@ -94,7 +97,7 @@ public class DisplayProperty internal constructor(
         }
     }
 
-    /** @return a human-readable rendering of the value if it's a [ModelID] or [Instant], else `null`. */
+    /** A human-readable rendering of the value if it's a [ModelID] or [Instant], else `null`. */
     public fun description(): String? {
         if (value is ModelID<*>) {
             val referencedModelName = (relatedModels[value] ?: "").toString()
@@ -107,16 +110,19 @@ public class DisplayProperty internal constructor(
         return null
     }
 
-    public fun name(): String {
-        return camelCaseToPretty(property.name)
-    }
+    /** The property name, as a human-readable phrase. */
+    public fun name(): String = camelCaseToPretty(property.name)
 
-    /** @return the props class of the related model if [value] is a [ModelID] that has been resolved (see [ModelDisplay.populateRelations]), else `null`. */
+    /**
+     * The props class of the related model if [value] is a [ModelID] that has been resolved (see
+     * [ModelDisplay.populateRelations]), else `null`.
+     */
     public fun getRelatedModelPropsClass(): KClass<*>? {
         val model = relatedModels[value] ?: return null
         return model.props::class
     }
 
+    /** The description of the property in [translation], or null if it has none. */
     public fun describe(translation: KlerkTranslation): String? =
         translation.propertyDescription(property)
 

@@ -120,10 +120,14 @@ private fun <C : KlerkContext, V> FlowContent.render(
     picture {
         // The browser takes the first source whose media and type it likes, so an alternative must offer every
         // format: unlike the default, it cannot fall through to the <img>.
-        alternatives.forEach { alternative ->
-            formats.forEach { format -> renderSource(alternative, format) }
+        for (alternative in alternatives) {
+            for (format in formats) {
+                renderSource(alternative, format)
+            }
         }
-        formats.dropLast(1).forEach { format -> renderSource(fallback, format) }
+        for (format in formats.dropLast(1)) {
+            renderSource(fallback, format)
+        }
         renderImg(fallback, formats.last(), alt, effectiveLoading, effectivePriority, classes)
     }
 }

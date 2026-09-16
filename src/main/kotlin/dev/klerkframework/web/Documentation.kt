@@ -34,15 +34,18 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
             val forModel = call.request.queryParameters["model"]
             if (forModel == null) {
                 h1 { +"Documentation" }
-                apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, context.translation.klerk, csrfToken))
+                val translation = context.translation.klerk
+                apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, translation, csrfToken))
                 apply(renderAuthorizationRules(klerk.specification.authorization, context.translation.klerk))
                 apply(renderViews(klerk.specification.views))
                 apply(renderPluginsDocumentation(klerk.specification.plugins))
                 hr()
                 ul {
-                    klerk.specification.managedModels.forEach { managedModel ->
+                    for (managedModel in klerk.specification.managedModels) {
                         li {
-                            a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") { +managedModel.kClass.simpleName.toString() }
+                            a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") {
+                                +managedModel.kClass.simpleName.toString()
+                            }
                         }
                     }
                 }
@@ -69,10 +72,12 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     }
 }
 
-private fun <C : KlerkContext, V> renderPluginsDocumentation(plugins: List<KlerkPlugin<C, V>>): FlowContent.() -> Unit = {
+private fun <C : KlerkContext, V> renderPluginsDocumentation(
+    plugins: List<KlerkPlugin<C, V>>,
+): FlowContent.() -> Unit = {
     h2 { +"Plugins" }
     ul {
-        plugins.forEach { plugin ->
+        for (plugin in plugins) {
             li { +"${plugin.name}: ${plugin.description}" }
         }
     }
@@ -87,7 +92,7 @@ private fun <C : KlerkContext, V> renderModels(
 ): FlowContent.() -> Unit = {
     apply(addMermaidScript())
     h2 { +"Models" }
-    models.forEach { model ->
+    for (model in models) {
         h3 { +(model.kClass.simpleName ?: "") }
         apply(renderModelProperties(model.kClass, documentationPath, csrfToken))
         apply(renderStatemachine(model.stateMachine, klerk, translation))
@@ -109,10 +114,14 @@ private fun <C : KlerkContext, V> renderStatemachine(
 
 }
 
-private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: String, csrfToken: String): FlowContent.() -> Unit = {
+private fun renderModelProperties(
+    kClass: KClass<out Any>,
+    documentationPath: String,
+    csrfToken: String,
+): FlowContent.() -> Unit = {
     h4 { +"Properties" }
     ul {
-        ObjectSchema.of(kClass).fields.forEach { prop ->
+        for (prop in ObjectSchema.of(kClass).fields) {
             li { +prop.name }
             table {
                 tr {
@@ -132,7 +141,7 @@ private fun renderModelProperties(kClass: KClass<out Any>, documentationPath: St
                         }
                     }
                 }
-                prop.validationRulesDescriptions.forEach { entry ->
+                for (entry in prop.validationRulesDescriptions) {
                     tr {
                         td { +entry.key }
                         td { +entry.value }
@@ -161,11 +170,14 @@ private fun <V> renderViews(views: V): FlowContent.() -> Unit = {
 
 }
 
-internal fun renderAlgorithms(documentationPath: String, algorithms: Set<FlowChartAlgorithm<*, *>>): FlowContent.() -> Unit = {
+internal fun renderAlgorithms(
+    documentationPath: String,
+    algorithms: Set<FlowChartAlgorithm<*, *>>,
+): FlowContent.() -> Unit = {
     h2 { +"Algorithms" }
-    algorithms.forEach {
-        val url = URLEncoder.encode(it::class.qualifiedName, Charset.defaultCharset())
-        a(href = "$documentationPath/algorithms/${url}") { +it::class.qualifiedName.toString() }
+    for (algorithm in algorithms) {
+        val url = URLEncoder.encode(algorithm::class.qualifiedName, Charset.defaultCharset())
+        a(href = "$documentationPath/algorithms/$url") { +algorithm::class.qualifiedName.toString() }
     }
 }
 
@@ -178,7 +190,7 @@ private fun <C : KlerkContext, V> renderEvents(
 ): FlowContent.() -> Unit =
     {
         h5 { +"Events" }
-        stateMachine.eventReferences.forEach { externalEvent ->
+        for (externalEvent in stateMachine.eventReferences) {
             val parameters = klerk.specification.parametersSchema(externalEvent)
             h6 { +externalEvent.toString() }
             ul {
@@ -191,7 +203,7 @@ private fun <C : KlerkContext, V> renderEvents(
                             summary { +"Parameters" }
                             ul {
                                 style = noBullets
-                                parameters.fields.forEach { parameter ->
+                                for (parameter in parameters.fields) {
                                     details {
                                         summary { +parameter.name }
                                         table {
@@ -223,7 +235,7 @@ private fun <C : KlerkContext, V> renderEvents(
                                                 }
                                             }
 
-                                            parameter.validationRulesDescriptions.forEach { entry ->
+                                            for (entry in parameter.validationRulesDescriptions) {
                                                 tr {
                                                     td { +entry.key }
                                                     td { +entry.value }
@@ -240,9 +252,9 @@ private fun <C : KlerkContext, V> renderEvents(
                     details {
                         summary { +"Validation rules" }
                         ul {
-                            klerk.specification.contextRulesFor(externalEvent).forEach {
+                            for (rule in klerk.specification.contextRulesFor(externalEvent)) {
                                 li {
-                                    +"Context: ${translation.function(it)}"
+                                    +"Context: ${translation.function(rule)}"
                                 }
                             }
                         }
@@ -261,56 +273,56 @@ internal fun <V> renderAuthorizationRules(
     h3 { +"Events" }
     h4 { +"Positive" }
     ul {
-        specification.eventPositiveRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.eventPositiveRules) {
+            li { +translation.function(rule) }
         }
     }
     h4 { +"Negative" }
     ul {
-        specification.eventNegativeRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.eventNegativeRules) {
+            li { +translation.function(rule) }
         }
     }
 
     h3 { +"Read models" }
     h4 { +"Positive" }
     ul {
-        specification.readModelPositiveRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.readModelPositiveRules) {
+            li { +translation.function(rule) }
         }
     }
     h4 { +"Negative" }
     ul {
-        specification.readModelNegativeRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.readModelNegativeRules) {
+            li { +translation.function(rule) }
         }
     }
 
     h3 { +"Read model properties" }
     h4 { +"Positive" }
     ul {
-        specification.readPropertyPositiveRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.readPropertyPositiveRules) {
+            li { +translation.function(rule) }
         }
     }
     h4 { +"Negative" }
     ul {
-        specification.readPropertyNegativeRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.readPropertyNegativeRules) {
+            li { +translation.function(rule) }
         }
     }
 
     h3 { +"Event log" }
     h4 { +"Positive" }
     ul {
-        specification.eventLogPositiveRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.eventLogPositiveRules) {
+            li { +translation.function(rule) }
         }
     }
     h4 { +"Negative" }
     ul {
-        specification.eventLogNegativeRules.forEach {
-            li { +translation.function(it) }
+        for (rule in specification.eventLogNegativeRules) {
+            li { +translation.function(rule) }
         }
     }
 }

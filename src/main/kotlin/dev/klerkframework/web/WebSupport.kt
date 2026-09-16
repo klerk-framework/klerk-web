@@ -18,20 +18,27 @@ import kotlinx.html.HEAD
  *
  * Pass the same instance to every block so that the pages link to each other and look alike. The Admin UI uses one
  * of its own, with an "admin/" prefix - see [withPathProvider].
- *
- * @param contextProvider see [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/introduction.md).
- * @param classProvider optional; leave it out when using a classless CSS.
- * @param eventFilter which events to generate forms for, see [AutoButtons].
- * @param attachedDataCacheControl the `Cache-Control` [attachedDataRoutes] sends for a value, decided from its
- * metadata — its visibility, its size, its `custom` entries. See [defaultAttachedDataCacheControl].
  */
 public class WebSupport<C : KlerkContext, V>(
+    /** The application. */
     public val klerk: Klerk<C, V>,
+    /**
+     * Builds the context for a call. See
+     * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/introduction.md).
+     */
     public val contextProvider: suspend (call: ApplicationCall, Klerk<C, V>) -> C,
+    /** Where pages live. */
     public val pathProvider: PathProvider = DefaultPathProvider(),
+    /** What pages look like. */
     public val layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
+    /** How elements are styled. Leave it out when using a classless CSS. */
     public val classProvider: CssClassProvider? = null,
+    /** Which events to generate forms for, see [AutoButtons]. */
     public val eventFilter: (EventReference) -> Boolean = { true },
+    /**
+     * The `Cache-Control` [attachedDataRoutes] sends for a value, decided from its metadata — its visibility, its
+     * size, its `custom` entries. See [defaultAttachedDataCacheControl].
+     */
     public val attachedDataCacheControl: (AttachedDataMetadata) -> String = defaultAttachedDataCacheControl,
 ) {
     /** Renders a button for an event, and the form behind it. */
@@ -54,9 +61,8 @@ public class WebSupport<C : KlerkContext, V>(
      * }
      * ```
      *
-     * To render a fragment instead of a whole page, use `with(support) { ... }`.
-     *
-     * @param pageHead rendered last in `<head>`, for what only this page needs.
+     * To render a fragment instead of a whole page, use `with(support) { ... }`. [pageHead] is rendered last in
+     * `<head>`, for what only this page needs.
      */
     public suspend fun respondPage(
         call: ApplicationCall,

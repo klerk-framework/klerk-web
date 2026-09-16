@@ -97,7 +97,7 @@ class ImageVariantsTest {
         val result = klerk.handle(
             Command(
                 CreatePublication,
-                CreatePublicationParams(PublicCover(cover), PublicBody(body), null)
+                CreatePublicationParams(PublicCover(cover), PublicBody(body), null),
             ),
             author,
         )
@@ -162,7 +162,8 @@ class ImageVariantsTest {
         val cold = client.get(path)
 
         assertEquals(HttpStatusCode.OK, cold.status)
-        // The real variant, cacheable like any other - nothing stands in for it, so nothing has to be kept out of a cache.
+        // The real variant, cacheable like any other - nothing stands in for it, so nothing has to be kept out of a
+        // cache.
         assertEquals("public, max-age=2419200, immutable", cold.headers[HttpHeaders.CacheControl])
         val bytes = cold.readRawBytes()
         assertTrue(bytes.size < png().size, "expected the variant, not the original")

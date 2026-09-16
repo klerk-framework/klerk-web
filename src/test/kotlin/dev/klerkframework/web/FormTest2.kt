@@ -144,7 +144,11 @@ val myClassProvider: CssClassProvider = CssClassProvider { part, element, proper
 }
 
 fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {
-    link(rel = "icon", href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>\uD83C\uDFAF</text></svg>")
+    link(
+        rel = "icon",
+        href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22>" +
+            "<text y=%22.9em%22 font-size=%2290%22>\uD83C\uDFAF</text></svg>",
+    )
 }
 
 suspend fun <T:Any> renderForm(
@@ -152,7 +156,7 @@ suspend fun <T:Any> renderForm(
     klerk: Klerk<Context, MyCollections>,
     template: FormTemplate<T, Context, MyCollections>,
     params: T?,
-    parseResult: Parsed<T>? = null
+    parseResult: Parsed<T>? = null,
 ) {
     val context = Context.swedishUnauthenticated()
     val form2 = klerk.read(context) {

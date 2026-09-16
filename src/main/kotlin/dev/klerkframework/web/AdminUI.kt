@@ -17,10 +17,11 @@ import kotlin.reflect.KClass
  * building blocks instead. See
  * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/admin-ui.md).
  *
- * @param support where the admin pages live and what they look like. Give it a [PathProvider] with a prefix, e.g.
+ * [support] says where the admin pages live and what they look like. Give it a [PathProvider] with a prefix, e.g.
  * `DefaultPathProvider(prefix = "admin/")`.
- * @param canSeeAdminUI decides whether the operations pages are shown at all; they answer 404 when it returns false.
- * The pages themselves are additionally subject to Klerk's own authorization rules.
+ *
+ * [canSeeAdminUI] decides whether the operations pages are shown at all; they answer 404 when it returns false. The
+ * pages themselves are additionally subject to Klerk's own authorization rules.
  */
 public class AdminUI<C : KlerkContext, V>(
     internal val support: WebSupport<C, V>,
@@ -54,14 +55,13 @@ public class AdminUI<C : KlerkContext, V>(
             }
 
         val pairs = klerk.specification.managedClasses.map { managedClass ->
-            val humanName =
-                managedClass.simpleName!!.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+            val humanName = managedClass.simpleName!!.replaceFirstChar { it.titlecase(Locale.getDefault()) }
             val modelPathPart = managedClass.simpleName!!.lowercase()
             val pathToList = "${pathProvider.withPrefix()}$modelPathPart"
 
             val listView = ModelListPage<Any, C, V>(managedClass, support, pathToList, humanName)
             val detailView = ModelDetailPage<Any, C, V>(
-                managedClass, support, humanName, eventLogPath, customAfterEventButtonsOnDetailView
+                managedClass, support, humanName, eventLogPath, customAfterEventButtonsOnDetailView,
             )
             Pair(listView, detailView)
         }
@@ -70,117 +70,122 @@ public class AdminUI<C : KlerkContext, V>(
 
     }
 
-    internal fun registerInto(route: Route): Unit = with(route) {
-        listViews.forEach { modelListRoutes(it) }
-        detailViews.forEach { modelDetailRoutes(it) }
-
-        get(pathProvider.withPrefix()) {
-            requireAdmin(call) {
-                renderMain(call)
+    internal fun registerInto(route: Route) {
+        with(route) {
+            for (listView in listViews) {
+                modelListRoutes(listView)
             }
-        }
-
-        get(eventLogPath) {
-            requireAdmin(call) {
-                renderEventLog(call, support, klerk)
+            for (detailView in detailViews) {
+                modelDetailRoutes(detailView)
             }
-        }
 
-        get("$eventLogPath/{id}") {
-            requireAdmin(call) {
-                renderEventLogDetails(call, support, klerk)
+            get(pathProvider.withPrefix()) {
+                requireAdmin(call) {
+                    renderMain(call)
+                }
             }
-        }
 
-        get(jobsPath) {
-            requireAdmin(call) {
-                renderJobs(call, support, jobsPath, klerk)
+            get(eventLogPath) {
+                requireAdmin(call) {
+                    renderEventLog(call, support, klerk)
+                }
             }
-        }
 
-        get("$jobsPath/types") {
-            requireAdmin(call) {
-                renderJobTypes(call, support, jobsPath, klerk)
+            get("$eventLogPath/{id}") {
+                requireAdmin(call) {
+                    renderEventLogDetails(call, support, klerk)
+                }
             }
-        }
 
-        get("$jobsPath/{id}") {
-            requireAdmin(call) {
-                renderJobDetails(call, support, jobsPath, klerk)
+            get(jobsPath) {
+                requireAdmin(call) {
+                    renderJobs(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        post("$jobsPath/{id}/cancel") {
-            requireAdmin(call) {
-                handleJobCancel(call, support, jobsPath, klerk)
+            get("$jobsPath/types") {
+                requireAdmin(call) {
+                    renderJobTypes(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        post("$jobsPath/{id}/resume") {
-            requireAdmin(call) {
-                handleJobResume(call, support, jobsPath, klerk)
+            get("$jobsPath/{id}") {
+                requireAdmin(call) {
+                    renderJobDetails(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        post("$jobsPath/{id}/delete") {
-            requireAdmin(call) {
-                handleJobDelete(call, support, jobsPath, klerk)
+            post("$jobsPath/{id}/cancel") {
+                requireAdmin(call) {
+                    handleJobCancel(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        get(metricsPath) {
-            requireAdmin(call) {
-                renderMetrics(call, support, metricsPath, klerk)
+            post("$jobsPath/{id}/resume") {
+                requireAdmin(call) {
+                    handleJobResume(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        get(settingsPath) {
-            requireAdmin(call) {
-                renderSettings(call, support, klerk)
+            post("$jobsPath/{id}/delete") {
+                requireAdmin(call) {
+                    handleJobDelete(call, support, jobsPath, klerk)
+                }
             }
-        }
 
-        get(documentationPath) {
-            requireAdmin(call) {
-                renderDocumentation(call, support, klerk, documentationPath, knownAlgorithms)
+            get(metricsPath) {
+                requireAdmin(call) {
+                    renderMetrics(call, support, metricsPath, klerk)
+                }
             }
-        }
 
-        post("$documentationPath/functionInvocation") {
-            requireAdmin(call) {
-                renderFunctionInvocation(call, support, klerk)
+            get(settingsPath) {
+                requireAdmin(call) {
+                    renderSettings(call, support, klerk)
+                }
             }
-        }
 
-        get("$documentationPath/algorithms/{name}") {
-            requireAdmin(call) {
-                renderAlgorithm(call, support, knownAlgorithms)
+            get(documentationPath) {
+                requireAdmin(call) {
+                    renderDocumentation(call, support, klerk, documentationPath, knownAlgorithms)
+                }
             }
-        }
 
-        get(pluginsPath) {
-            requireAdmin(call) {
-                renderPlugins(call, support, klerk)
+            post("$documentationPath/functionInvocation") {
+                requireAdmin(call) {
+                    renderFunctionInvocation(call, support, klerk)
+                }
             }
-        }
 
-        get("${pathProvider.withPrefix()}plugin") {
-            requireAdmin(call) {
-                renderPluginPage(call, support, klerk)
+            get("$documentationPath/algorithms/{name}") {
+                requireAdmin(call) {
+                    renderAlgorithm(call, support, knownAlgorithms)
+                }
             }
-        }
 
-        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
-            plugin.registerExtraRoutes(this, pathProvider)
-        }
-
-        get(logPath) {
-            requireAdmin(call) {
-                renderLog(call, support, klerk)
+            get(pluginsPath) {
+                requireAdmin(call) {
+                    renderPlugins(call, support, klerk)
+                }
             }
+
+            get("${pathProvider.withPrefix()}plugin") {
+                requireAdmin(call) {
+                    renderPluginPage(call, support, klerk)
+                }
+            }
+
+            for (plugin in klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>()) {
+                plugin.registerExtraRoutes(this, pathProvider)
+            }
+
+            get(logPath) {
+                requireAdmin(call) {
+                    renderLog(call, support, klerk)
+                }
+            }
+
         }
-
-
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
@@ -224,10 +229,12 @@ public class AdminUI<C : KlerkContext, V>(
                             a(href = settingsPath) { button { +"Settings" } }
                         }
 
-                        klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>().forEach { plugin ->
+                        for (plugin in klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>()) {
                             span {
                                 style = "margin: 10px;"
-                                a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") { button { +plugin.page.buttonText } }
+                                a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") {
+                                    button { +plugin.page.buttonText }
+                                }
                             }
 
                         }
@@ -236,7 +243,7 @@ public class AdminUI<C : KlerkContext, V>(
 
                 h2 { +"Data" }
                 table {
-                    listViews.forEach { view ->
+                    for (view in listViews) {
                         tr {
                             td {
                                 a(href = view.pathToList) {
@@ -263,32 +270,7 @@ public class AdminUI<C : KlerkContext, V>(
 
 }
 
-/**
- * A Klerk plugin that gives itself a page in the Admin UI and routes of its own. See
- * [the documentation](https://github.com/klerkframework/klerk-web/blob/main/docs/plugins.md).
- */
-public interface AdminUIPluginIntegration<C : KlerkContext, V> : KlerkPlugin<C, V> {
-
-    public val page: PluginPage<C, V>
-
-    /** Called when the Admin UI registers its routes. Mount them under [PathProvider.withPrefix]. */
-    public fun registerExtraRoutes(route: Route, pathProvider: PathProvider)
-
-}
-
-/** A plugin's own page in the Admin UI. */
-public interface PluginPage<C : KlerkContext, V> {
-    /** The text of the button in the Admin UI's navigation. */
-    public val buttonText: String
-
-    /** Responds with the page. Use [WebSupport.layout] so it matches the rest of the console. */
-    public suspend fun respond(
-        call: ApplicationCall,
-        support: WebSupport<C, V>,
-        klerk: Klerk<C, V>
-    ): Unit
-
-}
-
 /** The Admin UI's routes. It is an internal tool - see [AdminUI]. */
-public fun <C : KlerkContext, V> Route.adminUiRoutes(adminUI: AdminUI<C, V>): Unit = adminUI.registerInto(this)
+public fun <C : KlerkContext, V> Route.adminUiRoutes(adminUI: AdminUI<C, V>) {
+    adminUI.registerInto(this)
+}

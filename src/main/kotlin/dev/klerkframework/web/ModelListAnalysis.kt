@@ -12,7 +12,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     call: ApplicationCall,
     support: WebSupport<C, V>,
     klerk: Klerk<C, V>,
-    kClass: KClass<out Any>
+    kClass: KClass<out Any>,
 ) {
     val context = support.contextProvider(call, klerk)
     val modelView = klerk.specification.modelViews(kClass)
@@ -23,14 +23,14 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                 h1 { +"Details" }
                 +kClass.toString()
                 h2 { +"Views" }
-                modelView.views.forEach { collection ->
+                for (collection in modelView.views) {
                     h6 { +(collection.id.toString()) }
                     val groupedByState = with(this@read) { collection.asSequenceOrThrow() }.groupBy { it.state }
                     val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
                     +"Total count: ${countPerState.values.sum()}"
                     ul {
-                        groupedByState.keys.forEach {
-                            li { +"${it}: ${countPerState[it]}" }
+                        for (state in groupedByState.keys) {
+                            li { +"$state: ${countPerState[state]}" }
                         }
                     }
                 }

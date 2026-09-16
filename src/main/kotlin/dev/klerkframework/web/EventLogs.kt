@@ -14,7 +14,7 @@ private val prettyJson = Json { prettyPrint = true }
 internal suspend fun <C : KlerkContext, V> renderEventLog(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
 
@@ -47,9 +47,9 @@ internal suspend fun <C : KlerkContext, V> renderEventLog(
                     }
                 }
                 tbody {
-                    events.forEach { event ->
+                    for (event in events) {
                         tr {
-                            td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
+                            td { +formatTime(event.time) }
                             td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
                             td { a(href = "_eventlog/${event.sequenceNumber}") { +event.eventReference.eventName } }
                             if (forModel == null) td { +event.model.toString() }
@@ -63,7 +63,7 @@ internal suspend fun <C : KlerkContext, V> renderEventLog(
 internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    klerk: Klerk<C, V>
+    klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
     val sequenceNumber = requireNotNull(call.parameters["id"]).toLong()

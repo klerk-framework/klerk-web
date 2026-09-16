@@ -98,7 +98,11 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
         val image = setup.described(ImageSidecar(4000, 3000))
 
-        val html = createHTML().div { with(support) { image(setup.gallery, image, alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(setup.gallery, image, alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("srcset="), html)
     }
@@ -129,7 +133,10 @@ class ImageMarkupTest {
         val html = setup.render(setup.described(ImageSidecar(4000, 3000)))
 
         assertTrue(
-            html.contains("""srcset="/_attached/42/ab12cd/gallery-320.png 320w, /_attached/42/ab12cd/gallery-640.png 640w""""),
+            html.contains(
+                """srcset="/_attached/42/ab12cd/gallery-320.png 320w, """ +
+                    """/_attached/42/ab12cd/gallery-640.png 640w"""",
+            ),
             html,
         )
         assertTrue(html.contains("""src="/_attached/42/ab12cd/gallery-640.png""""), html)
@@ -180,7 +187,11 @@ class ImageMarkupTest {
         val bare = setup.images.template("bare", widths = setOf(320, 640))
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(bare, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(bare, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("""sizes="auto, 100vw""""), html)
         assertTrue(html.contains("""loading="lazy""""), html)
@@ -192,7 +203,11 @@ class ImageMarkupTest {
         val eager = setup.images.template("eagerbare", widths = setOf(320, 640), loading = ImageLoading.Eager)
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(eager, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(eager, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("""sizes="100vw""""), html)
         assertFalse(html.contains("auto"), html)
@@ -203,7 +218,12 @@ class ImageMarkupTest {
         val setup = setup()
 
         val thrown = assertFailsWith<IllegalArgumentException> {
-            setup.images.template("contradiction", widths = setOf(320), sizes = "auto, 320px", loading = ImageLoading.Eager)
+            setup.images.template(
+                "contradiction",
+                widths = setOf(320),
+                sizes = "auto, 320px",
+                loading = ImageLoading.Eager,
+            )
         }
 
         assertTrue(thrown.message!!.contains("lazily loaded"), thrown.message)
@@ -258,7 +278,9 @@ class ImageMarkupTest {
 
         // described(null) writes no sidecar, so nothing knows the image's own proportions - but a crop is a ratio
         // the template declared, so the box is known anyway.
-        val html = createHTML().div { with(support) { image(square, setup.described(null), alt = "A photo") } }
+        val html = createHTML().div {
+            with(support) { image(square, setup.described(null), alt = "A photo") }
+        }
 
         assertTrue(html.contains("""width="200""""), html)
         assertTrue(html.contains("""height="200""""), html)
@@ -279,7 +301,11 @@ class ImageMarkupTest {
         val logo = setup.images.template("logo", widths = setOf(120, 240), sizes = "120px", formats = setOf("png"))
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") } }
+        val html = createHTML().div {
+
+            with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") }
+
+        }
 
         // One format, so a plain <img> - and nothing offers the jpeg the plugin would otherwise have added.
         assertFalse(html.contains("<picture"), html)
@@ -293,7 +319,11 @@ class ImageMarkupTest {
         val logo = setup.images.template("logo", widths = setOf(120), sizes = "120px", formats = setOf("png"))
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") } }
+        val html = createHTML().div {
+
+            with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") }
+
+        }
 
         assertTrue(html.contains("/_attached/42/ab12cd/logo-120.png"), html)
     }
@@ -334,7 +364,11 @@ class ImageMarkupTest {
         )
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("""loading="eager""""), html)
         assertTrue(html.contains("""fetchpriority="high""""), html)
@@ -347,7 +381,11 @@ class ImageMarkupTest {
         val auto = setup.images.template("auto", widths = setOf(320, 640), sizes = "auto, 320px")
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(auto, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(auto, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("""sizes="auto, 320px""""), html)
         assertTrue(html.contains("""loading="lazy""""), html)
@@ -361,7 +399,12 @@ class ImageMarkupTest {
 
         val html = createHTML().div {
             with(support) {
-                image(deferred, setup.described(ImageSidecar(4000, 3000)), alt = "A photo", loading = ImageLoading.Eager)
+                image(
+                    deferred,
+                    setup.described(ImageSidecar(4000, 3000)),
+                    alt = "A photo",
+                    loading = ImageLoading.Eager,
+                )
             }
         }
 
@@ -375,7 +418,12 @@ class ImageMarkupTest {
 
         // eager: the browser never measures it
         assertFailsWith<IllegalArgumentException> {
-            setup.images.template("eager-auto", widths = setOf(320), sizes = "auto, 320px", loading = ImageLoading.Eager)
+            setup.images.template(
+                "eager-auto",
+                widths = setOf(320),
+                sizes = "auto, 320px",
+                loading = ImageLoading.Eager,
+            )
         }
         // no fallback: a browser that does not know 'auto' would use 100vw
         assertFailsWith<IllegalArgumentException> {
@@ -396,7 +444,11 @@ class ImageMarkupTest {
         }
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         val mobile = html.indexOf("hero-mobile-320.png")
         val desktop = html.indexOf("hero-1280.png")
@@ -415,7 +467,11 @@ class ImageMarkupTest {
         val tall = setup.images.template("tall", widths = setOf(640, 2560), sizes = "100vw", crop = Crop(4, 5))
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(tall, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(tall, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
+
+        }
 
         assertTrue(html.contains("tall-640.png 640w"), html)
         assertFalse(html.contains("2560w"), html)
@@ -428,7 +484,11 @@ class ImageMarkupTest {
         val square = setup.images.template("square", widths = setOf(320), sizes = "48px", crop = Crop(1, 1))
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
-        val html = createHTML().div { with(support) { image(square, setup.described(ImageSidecar(800, 400)), alt = "A photo") } }
+        val html = createHTML().div {
+
+            with(support) { image(square, setup.described(ImageSidecar(800, 400)), alt = "A photo") }
+
+        }
 
         assertFalse(html.contains("<picture"), html)
         // a square out of 800x400 is 400x400, so 320 is servable and stays square

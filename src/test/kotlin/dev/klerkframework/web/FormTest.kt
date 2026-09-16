@@ -42,8 +42,8 @@ fun main() {
 
             val improveResult = klerk.handle(
                 Command(ImproveAuthor, rowling), Context.system(), ProcessingOptions(
-                    CommandToken.simple()
-                )
+                    CommandToken.simple(),
+                ),
             )
             println(improveResult)
 
@@ -87,7 +87,8 @@ fun main() {
                                     params,
                                     this,
                                     translator = context.translation,
-                                    // referenceSelects = mapOf(TestParams::book to collections.books.all, TestParams::author to collections.authors.all),
+                                    // referenceSelects = mapOf(TestParams::book to collections.books.all,
+                                    // TestParams::author to collections.authors.all),
                                     //enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
                                     context = context,
                                 )
@@ -122,13 +123,13 @@ fun main() {
                                         result.params::class.memberProperties.forEach {
                                             if (it.returnType.isSubtypeOf(
                                                     DataContainer::class.starProjectedType.withNullability(
-                                                        false
-                                                    )
+                                                        false,
+                                                    ),
                                                 ) ||
                                                 it.returnType.isSubtypeOf(
                                                     DataContainer::class.starProjectedType.withNullability(
-                                                        true
-                                                    )
+                                                        true,
+                                                    ),
                                                 )
                                             ) {
                                                 val value = it.getter.call(result.params) as DataContainer<*>?
@@ -136,26 +137,26 @@ fun main() {
                                                 br
                                             } else if (it.returnType.isSubtypeOf(
                                                     ModelID::class.starProjectedType.withNullability(
-                                                        false
-                                                    )
+                                                        false,
+                                                    ),
                                                 ) ||
                                                 it.returnType.isSubtypeOf(
                                                     ModelID::class.starProjectedType.withNullability(
-                                                        true
-                                                    )
+                                                        true,
+                                                    ),
                                                 )
                                             ) {
                                                 +"${it.name}: ?"
                                                 br
                                             } else if (it.returnType.isSubtypeOf(
                                                     Enum::class.starProjectedType.withNullability(
-                                                        false
-                                                    )
+                                                        false,
+                                                    ),
                                                 ) ||
                                                 it.returnType.isSubtypeOf(
                                                     Enum::class.starProjectedType.withNullability(
-                                                        true
-                                                    )
+                                                        true,
+                                                    ),
                                                 )
                                             ) {
                                                 +"${it.name}: ${it.getter.call(result.params)}"
@@ -209,4 +210,9 @@ class Email(value: String) : StringContainer(value) {
 }
 
 val emailRegexRFC5322 =
-    """(?:[a-z0-9!#${'$'}%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#${'$'}%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"""
+    """(?:[a-z0-9!#${'$'}%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#${'$'}%&'*+/=?^_`{|}~-]+)*|""" +
+        """"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@""" +
+        """(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?""" +
+        """|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}""" +
+        """(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])""" +
+        """|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"""

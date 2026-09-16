@@ -57,7 +57,8 @@ class BuildingBlocksTest {
         klerk.meta.start()
         val author = createAuthorJKRowling(klerk)
         val book = createBookHarryPotter1(klerk, author)
-        val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true }, pathProvider = NoBookDetails())
+        val klerkWeb =
+            KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true }, pathProvider = NoBookDetails())
 
         application { routing { klerkWebRoutes(klerkWeb, setOf(Book::class)) } }
 

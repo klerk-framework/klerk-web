@@ -51,7 +51,7 @@ internal object Csrf {
                     path = "/",
                     maxAge = MAX_AGE_SECONDS.toInt(),
                     extensions = mapOf("SameSite" to "Strict"),
-                )
+                ),
             )
         } catch (e: UnsupportedOperationException) {
             log.error { "The form must be built before call.respond is called" }

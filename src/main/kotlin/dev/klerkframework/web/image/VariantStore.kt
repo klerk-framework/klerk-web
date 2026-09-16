@@ -75,7 +75,8 @@ internal class VariantStore(private val root: Path) {
     fun writeSidecar(id: String, hash: String, sidecar: ImageSidecar) {
         val directory = directoryFor(id, hash)
         Files.createDirectories(directory)
-        writeAtomically(directory.resolve(SIDECAR)) { Files.writeString(it, Json.encodeToString(ImageSidecar.serializer(), sidecar)) }
+        val json = Json.encodeToString(ImageSidecar.serializer(), sidecar)
+        writeAtomically(directory.resolve(SIDECAR)) { Files.writeString(it, json) }
         sidecars[key(id, hash)] = sidecar
     }
 
@@ -125,9 +126,7 @@ internal class VariantStore(private val root: Path) {
      * A whole directory at a time: the sidecar and the variants of one image belong together, and dropping the
      * sidecar while keeping its variants would silently cost every page the image's dimensions. Ordered by when a
      * directory was last written rather than when it was last served, because access times cannot be relied on and
-     * this is a cache whose miss costs one render.
-     *
-     * @return how many images were evicted.
+     * this is a cache whose miss costs one render. Returns how many images were evicted.
      */
     fun evictTo(budget: Long): Int {
         var held = totalBytes()
@@ -160,10 +159,10 @@ internal class VariantStore(private val root: Path) {
                 // The generator writes and deletes temporary files here, so a file may vanish mid-walk.
                 runCatching {
                     Files.list(path).use { files ->
-                        files.forEach {
+                        for (file in files) {
                             runCatching {
-                                bytes += Files.size(it)
-                                modified = maxOf(modified, Files.getLastModifiedTime(it).toMillis())
+                                bytes += Files.size(file)
+                                modified = maxOf(modified, Files.getLastModifiedTime(file).toMillis())
                             }
                         }
                     }

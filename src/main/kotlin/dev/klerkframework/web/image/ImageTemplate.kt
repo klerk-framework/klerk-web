@@ -63,11 +63,17 @@ internal fun Crop?.encodedOrNone(): String = this?.encoded() ?: NO_CROP
  * declared with [ImageTemplate.Builder.on]; every rendition of one template shares its formats.
  */
 public class ImageRendition internal constructor(
+    /** Identifies the rendition in the URL of every variant it renders. */
     public val name: String,
+    /** The media condition that picks this rendition, or null for the template's default. */
     public val media: String?,
+    /** The widths this rendition is served in. */
     public val widths: Set<Int>,
+    /** How wide the image is rendered, as the CSS `sizes` attribute. */
     public val sizes: String,
+    /** The shape every variant is cut to, or null to keep the image's own. */
     public val crop: Crop?,
+    /** The formats this rendition is served in. */
     public val formats: Set<String>,
 ) {
 
@@ -109,13 +115,15 @@ public class ImageRendition internal constructor(
  * }
  * ```
  *
- * @param name identifies the template in the URL of every variant it renders — `hero-640.jpeg`. Lower-case letters,
+ * The `name` identifies the template in the URL of every variant it renders — `hero-640.jpeg`. Lower-case letters,
  * digits and dashes. Renaming a template abandons what has been generated under the old name; that is a cache, so it
  * costs regeneration and nothing else.
- * @param widths the ladder this role is offered and served in. It is an allow-list as well as a `srcset`: a request
- * for any other width is a `404`. Nothing is generated until a browser asks for it, so widths that turn out to be
- * unused cost nothing.
- * @param sizes how wide the image is rendered, as the CSS `sizes` attribute. `100vw` for something full-width,
+ *
+ * The `widths` are the ladder this role is offered and served in. It is an allow-list as well as a `srcset`: a
+ * request for any other width is a `404`. Nothing is generated until a browser asks for it, so widths that turn out
+ * to be unused cost nothing.
+ *
+ * The `sizes` say how wide the image is rendered, as the CSS `sizes` attribute. `100vw` for something full-width,
  * `(max-width: 600px) 100vw, 600px` for a column, `48px` for an avatar. `auto, 48px` asks the browser to measure
  * the image itself and use `48px` where it cannot; `auto` is only honoured on a lazily loaded image, and needs
  * that fallback because the browsers that do not know it are still numerous.
@@ -124,7 +132,8 @@ public class ImageRendition internal constructor(
  * it cannot — or plain `100vw` on an eager template, which a browser would never measure. That is a working
  * default rather than a good one: it is a fact about your stylesheet, so a thumbnail that is really 160 px wide
  * fetches the largest variant until you say so.
- * @param crop the shape every variant is cut to, or null to keep the image's own. `Crop(1, 1)` is how an avatar
+ *
+ * The `crop` is the shape every variant is cut to, or null to keep the image's own. `Crop(1, 1)` is how an avatar
  * stays square whatever was uploaded.
  *
  * Worth declaring when the slot's shape differs materially from what people upload, because then the file is the
@@ -132,28 +141,36 @@ public class ImageRendition internal constructor(
  * the shapes are close, since a crop is its own set of generated files. Size, shape and format are the only things
  * decided here: anything that does not change how many bytes travel — blur, grayscale, rounded corners, rotation —
  * belongs in CSS.
- * @param loading whether the browser may defer the fetch. Leave it lazy for everything except the image that is
- * visible without scrolling — deferring that one delays the page's largest paint.
- * @param fetchPriority `High` for the one image the page is about, null to say nothing.
  */
 public class ImageTemplate<C : KlerkContext, V> internal constructor(
+    /** The rendition used when no alternative's media condition matches. */
     public val default: ImageRendition,
+    /** Renditions picked by a media condition, in order. */
     public val alternatives: List<ImageRendition>,
+    /**
+     * Whether the browser may defer the fetch. Leave it lazy for everything except the image that is visible without
+     * scrolling — deferring that one delays the page's largest paint.
+     */
     public val loading: ImageLoading,
+    /** `High` for the one image the page is about, null to say nothing. */
     public val fetchPriority: FetchPriority?,
     internal val images: ImagePlugin<C, V>,
 ) {
 
+    /** Identifies the template in the URL of every variant it renders. */
     public val name: String get() = default.name
+    /** The widths the default rendition is served in. */
     public val widths: Set<Int> get() = default.widths
+    /** The CSS `sizes` of the default rendition. */
     public val sizes: String get() = default.sizes
+    /** The shape the default rendition is cut to, or null to keep the image's own. */
     public val crop: Crop? get() = default.crop
 
     /** The formats every rendition of this template is served in. */
     public val formats: Set<String> get() = default.formats
 
     init {
-        (listOf(default) + alternatives).forEach { rendition ->
+        for (rendition in (listOf(default) + alternatives)) {
             if (usesAutoSizes(rendition.sizes)) {
                 require(loading == ImageLoading.Lazy) {
                     "'${rendition.name}' asks for sizes=auto, which a browser only honours on a lazily loaded " +
@@ -165,8 +182,10 @@ public class ImageTemplate<C : KlerkContext, V> internal constructor(
                 }
             }
         }
-        alternatives.forEach {
-            require(!it.media.isNullOrBlank()) { "The alternative '${it.name}' needs a media condition to be picked" }
+        for (alternative in alternatives) {
+            require(!alternative.media.isNullOrBlank()) {
+                "The alternative '${alternative.name}' needs a media condition to be picked"
+            }
         }
     }
 

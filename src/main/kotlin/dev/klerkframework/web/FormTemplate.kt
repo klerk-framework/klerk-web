@@ -1,31 +1,20 @@
 package dev.klerkframework.web
 
-import kotlinx.serialization.Serializable
 import dev.klerkframework.klerk.validation.PropertyCollectionValidity
-import dev.klerkframework.klerk.validation.Valid
 import kotlinx.serialization.json.Json
 import dev.klerkframework.klerk.*
 import dev.klerkframework.klerk.view.ModelView
 import dev.klerkframework.klerk.view.asSequence
-import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
-import dev.klerkframework.klerk.camelCaseToPretty
-import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.read.Reader
-import dev.klerkframework.klerk.validation.PropertyValidity
-import dev.klerkframework.web.assets.JsAsset
-import dev.klerkframework.web.assets.formJs
-import dev.klerkframework.web.assets.uploadJs
 import dev.klerkframework.web.upload.Upload
 import dev.klerkframework.web.upload.UploadPlugin
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
-import dev.klerkframework.web.assets.klerkFormValidationJsFile
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -34,9 +23,6 @@ import io.ktor.server.response.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.format
 import kotlinx.html.*
 import kotlinx.html.InputType.*
 import mu.KotlinLogging
@@ -46,9 +32,9 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 import kotlin.time.Duration.Companion.minutes
 
-private val fileLog = KotlinLogging.logger {}
+internal val fileLog = KotlinLogging.logger {}
 
-private val CSRF_TOKEN = Csrf.TOKEN_NAME
+internal val CSRF_TOKEN = Csrf.TOKEN_NAME
 /** How long a blob prepared from an upload waits for its command. Long enough to fix a form and submit again. */
 private val UPLOAD_BLOB_LEASE = 15.minutes
 
@@ -56,9 +42,6 @@ private val UPLOAD_BLOB_LEASE = 15.minutes
 private const val MAX_REFERENCE_OPTIONS = 300
 
 internal val IDEMPOTENCE_KEY: String = if (isDevelopmentMode()) "idempotence-key" else "__Host-idempotence-key"
-
-
-
 
 /** Passed to a form's label provider. */
 public data class UIElementData(val propertyName: String, val dataContainer: DataContainer<*>, val enabled: Boolean)
@@ -76,7 +59,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     internal val layout: Layout = Layout(assetsBase = pathProvider.assetsBase),
     /** Required for [file]: the plugin that received the bytes, so that [parse] can turn an upload into a blob. */
     internal val uploads: UploadPlugin<C, V>? = null,
-    init: FormTemplate<T, C, V>.() -> Unit
+    init: FormTemplate<T, C, V>.() -> Unit,
 ) {
     private val log = KotlinLogging.logger {}
 
@@ -101,59 +84,65 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         validate()
     }
 
-    public fun text(property: KProperty1<*, StringContainer?>): Unit {
+    /** A text input for [property]. */
+    public fun text(property: KProperty1<*, StringContainer?>) {
         inputs.add(Pair(property.name, text))
     }
 
     private fun text(parameter: SchemaField) = inputs.add(Pair(parameter.name, text))
 
-    public fun email(property: KProperty1<*, StringContainer?>): Unit {
+    /** An email input for [property]. */
+    public fun email(property: KProperty1<*, StringContainer?>) {
         inputs.add(Pair(property.name, email))
     }
 
     private fun email(parameter: SchemaField) =
         inputs.add(Pair(parameter.name, email)) // use <input type="text" inputmode="email"> instead?
 
-    public fun password(property: KProperty1<*, StringContainer?>): Unit {
+    /** A password input for [property]. */
+    public fun password(property: KProperty1<*, StringContainer?>) {
         inputs.add(Pair(property.name, password))
     }
 
     private fun password(parameter: SchemaField) = inputs.add(Pair(parameter.name, password))
 
-    public fun number(property: KProperty1<*, DataContainer<*>?>): Unit {
+    /** A number input for [property]. */
+    public fun number(property: KProperty1<*, DataContainer<*>?>) {
         inputs.add(Pair(property.name, number))
     }
 
     private fun number(parameter: SchemaField) = inputs.add(Pair(parameter.name, number))
 
-    public fun checkbox(property: KProperty1<*, BooleanContainer?>): Unit {
+    /** A checkbox for [property]. */
+    public fun checkbox(property: KProperty1<*, BooleanContainer?>) {
         inputs.add(Pair(property.name, checkBox))
     }
 
     private fun checkbox(parameter: SchemaField) = inputs.add(Pair(parameter.name, checkBox))
 
     /** A `datetime-local` input. The value is interpreted in the browser's time zone. */
-    public fun dateTime(property: KProperty1<*, InstantContainer?>): Unit {
+    public fun dateTime(property: KProperty1<*, InstantContainer?>) {
         inputs.add(Pair(property.name, dateTimeLocal))
     }
 
     private fun dateTime(parameter: SchemaField) = inputs.add(Pair(parameter.name, dateTimeLocal))
 
     /** A `date` input — a calendar date with no time of day or time zone. */
-    public fun date(property: KProperty1<*, DateContainer?>): Unit {
+    public fun date(property: KProperty1<*, DateContainer?>) {
         inputs.add(Pair(property.name, InputType.date))
     }
 
     private fun date(parameter: SchemaField) = inputs.add(Pair(parameter.name, InputType.date))
 
     /** A number of seconds. */
-    public fun duration(property: KProperty1<*, DurationContainer?>): Unit {
+    public fun duration(property: KProperty1<*, DurationContainer?>) {
         inputs.add(Pair(property.name, number))
     }
 
     private fun duration(parameter: SchemaField) = inputs.add(Pair(parameter.name, number))
 
-    public fun hidden(property: KProperty1<*, Any?>): Unit {
+    /** A hidden input for [property], whose value comes from the params the form is built with. */
+    public fun hidden(property: KProperty1<*, Any?>) {
         inputs.add(Pair(property.name, hidden))
     }
 
@@ -168,21 +157,22 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * Requires an `uploads` plugin on the template. Without JavaScript the field still works: the file is posted with
      * the form and uploaded in one request before the parameters are parsed.
      */
-    public fun file(property: KProperty1<*, AttachedBlobContainer?>): Unit {
+    public fun file(property: KProperty1<*, AttachedBlobContainer?>) {
         fileInputs.add(property.name)
     }
 
     /**
-     * The [AttachedBlobContainer] class the property holds, which is what `prepare` needs in order to know what the file must
-     * be and what has to happen to it first.
+     * The [AttachedBlobContainer] class the property holds, which is what `prepare` needs in order to know what the
+     * file must be and what has to happen to it first.
      *
      * [blobDeclarationFor] answers "what does this property declare"; this answers "which declaration is it".
      */
     internal fun blobClassFor(propertyName: String): KClass<out AttachedBlobContainer> {
         val field = parameters.field(propertyName)?.takeIf { !it.isCollection }
         return field?.blobDeclaration ?: throw IllegalArgumentException(
-            "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but ${parameters.kClass.simpleName}." +
-                    "$propertyName is ${field?.valueClass?.simpleName ?: "not a parameter at all"}"
+            "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but " +
+                    "${parameters.kClass.simpleName}.$propertyName is " +
+                    "${field?.valueClass?.simpleName ?: "not a parameter at all"}",
         )
     }
 
@@ -200,7 +190,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             .onFailure { e -> log.warn(e) { "Could not read the declaration of $propertyName" } }.getOrNull()
     }
 
-    public fun selectReference(property: KProperty1<*, ModelID<out Any>?>): Unit {
+    /** A select of the models [property] may refer to. */
+    public fun selectReference(property: KProperty1<*, ModelID<out Any>?>) {
         selectReferences.add(property.name)
     }
 
@@ -212,11 +203,16 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         private fun selectEnum(parameter: SchemaField) = selectEnums.add(parameter.name)
      */
 
-    public fun populatedAfterSubmit(property: KProperty1<*, Any?>): Unit {
+    /** Leaves [property] out of the form. Your code supplies its value when the submitted form is parsed. */
+    public fun populatedAfterSubmit(property: KProperty1<*, Any?>) {
         propsPopulatedAfterSubmit.add(property.name)
     }
 
-    public fun remaining(inHtmlDetails: String? = null): Unit {
+    /**
+     * Adds an input of the default kind for every property not declared yet. If [inHtmlDetails] is given, they are
+     * rendered in a collapsed `<details>` with that summary.
+     */
+    public fun remaining(inHtmlDetails: String? = null) {
         htmlDetailsSummary = inHtmlDetails
         val remaining = parameters.fields
             .filter { p -> inputs.none { input -> input.first == p.name } }
@@ -247,18 +243,19 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                         "The property '${p.name}' refers to attached data. Declare it with file() if it is an " +
                                 "AttachedBlobID the user should upload, or with hidden()/populatedAfterSubmit() if " +
                                 "your own code supplies it. remaining() never renders one by itself, since uploading " +
-                                "requires the Uploads plugin."
+                                "requires the Uploads plugin.",
                     )
 
                     else -> throw IllegalStateException(
                         "klerk-web cannot render the property '${p.name}' of type '${p.type?.name ?: "unknown"}'." +
                                 " If you are writing the form yourself, declare that property with hidden() or" +
-                                " populatedAfterSubmit() instead of leaving it to remaining()."
+                                " populatedAfterSubmit() instead of leaving it to remaining().",
                     )
                 }
             }
     }
 
+    /** Builds a form for one request, pre-filled with [params] if given. Render it with [eventForm]. */
     public fun build(
         call: ApplicationCall,
         params: T?,
@@ -268,7 +265,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         path: String? = null,
         queryParams: Map<String, String> = emptyMap(),
         translator: Translation,
-        context: C
+        context: C,
     ): EventForm<T, C, V> {
         val csrfToken = Csrf.issue(call)
 
@@ -322,10 +319,22 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 if (options.size > MAX_REFERENCE_OPTIONS) {
                     TODO("Too many options")
                 } else {
-                    // suggestedEvents can be used if there is a need to first create a model that is then used in this event.
+                    // suggestedEvents can be used if there is a need to first create a model that is then used in this
+                    // event.
                     val referencedModel = eventParameter.referencedModel
-                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) emptyList() else with(reader) { possibleVoidEvents(referencedModel) }
-                    result.add(ReferencePropertyWithOptions(eventParameter.name, eventParameter.isNullable, options, suggestedEvents))
+                    val suggestedEvents = if (options.isNotEmpty() || referencedModel == null) {
+                        emptyList()
+                    } else {
+                        with(reader) { possibleVoidEvents(referencedModel) }
+                    }
+                    result.add(
+                        ReferencePropertyWithOptions(
+                            eventParameter.name,
+                            eventParameter.isNullable,
+                            options,
+                            suggestedEvents,
+                        ),
+                    )
                 }
             }
 
@@ -335,7 +344,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 with(reader) { entry.value.asSequence().toList() },
                 emptyList(),
             )
-        }
+        },
         )
         return result
     }
@@ -348,7 +357,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         if (fileInputs.isNotEmpty() && uploads == null) {
             throw IllegalStateException(
                 "The form declares file(${fileInputs.joinToString(", ")}) but has no 'uploads' plugin. Pass the " +
-                        "UploadPlugin to the FormTemplate, and register its routes."
+                        "UploadPlugin to the FormTemplate, and register its routes.",
             )
         }
 
@@ -362,7 +371,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             throw IllegalStateException(
                 "Form for class ${parameters.kClass} is missing declaration for ${
                     missing.map { it.name }.joinToString(", ")
-                }"
+                }",
             )
         }
         val tooMany = inputs        // also selects and other stuff...
@@ -374,7 +383,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     tooMany.joinToString(
                         ", "
                     )
-                }"
+                }",
             )
         }
     }
@@ -387,12 +396,13 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * reported, so the user gets every offending field marked at once. The remaining level - the authorization and
      * business rules - is evaluated by Klerk when the command is issued.
      *
-     * @param context the caller's context. Used to translate the messages the user will read.
+     * The messages the user will read are translated according to [context].
      */
     public suspend fun parse(
         call: ApplicationCall,
         context: C,
-        populatedAfterSubmit: Map<KProperty1<*, Any?>, DataContainer<*>> = emptyMap(),      // not only DataContainer, also references. Collections?
+        // not only DataContainer, also references. Collections?
+        populatedAfterSubmit: Map<KProperty1<*, Any?>, DataContainer<*>> = emptyMap(),
     ): ParseResult<T> {
         // The form validation script submits the form on every change, so a dry run happens while the user is still
         // filling the form in - and must leave the file alone. See [DRY_RUN_BLOB].
@@ -408,7 +418,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 receiveMultipartAsParameters(call, context, isDryRun)
             } catch (e: UploadRefused) {
                 // A file the property or the application's rules will not have. The user gets the reason, not a 500.
-                return ParseResult.Invalid(setOf(BadRequestProblem(e.message ?: "The file was refused", KlerkErrorCode.NotFound)))
+                val problem = BadRequestProblem(e.message ?: "The file was refused", KlerkErrorCode.NotFound)
+                return ParseResult.Invalid(setOf(problem))
             }
         } else {
             val submitted = call.receiveParameters()
@@ -423,28 +434,31 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val key = callParams[IDEMPOTENCE_KEY]?.let { CommandToken.parse(it) }
             ?: throw IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
-        callParams.forEach { name, _ ->
-            if (name != CSRF_TOKEN && name != IDEMPOTENCE_KEY && inputs.none { it.first == name } && selectReferences.none { it == name } && selectEnums.none { it == name } && fileInputs.none { it == name } && !name.startsWith(
-                    "null-toggle-"
-                )) {
+        for (name in callParams.names()) {
+            val expected = name == CSRF_TOKEN || name == IDEMPOTENCE_KEY || name.startsWith("null-toggle-") ||
+                inputs.any { it.first == name } || name in selectReferences || name in selectEnums || name in fileInputs
+            if (!expected) {
                 throw IllegalArgumentException("Parameter $name is not expected to be present in request")
             }
         }
 
         val allParams = callParams.plus(ParametersBuilder().apply {
-            populatedAfterSubmit.forEach { p -> append(p.key.name, p.value.valueWithoutAuthorization.toString()) }
+            for (p in populatedAfterSubmit) {
+                append(p.key.name, p.value.valueWithoutAuthorization.toString())
+            }
         }.build())
 
-
-        // someday maybe: https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#verifying-origin-with-standard-headers
+        // someday maybe:
+        // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
+        // #verifying-origin-with-standard-headers
         try {
             @Suppress("UNCHECKED_CAST")
             val paramsClass = createParamClassFromCallParameters(parameters, allParams) as T
 
             // Level 1: each property on its own.
             val propertyValidationProblems = mutableSetOf<InvalidPropertyProblem>()
-            parameters.fields.forEach { field ->
-                val container = field.get(paramsClass) as? DataContainer<*> ?: return@forEach
+            for (field in parameters.fields) {
+                val container = field.get(paramsClass) as? DataContainer<*> ?: continue
                 container.validate(field.name, context.translation)?.let { propertyValidationProblems.add(it) }
             }
 
@@ -463,7 +477,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 return ParseResult.Invalid(validationProblems.toSet())
             }
 
-
             if (isDryRun) {
                 return ParseResult.DryRun(paramsClass, key)
             }
@@ -473,9 +486,9 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 setOf(
                     BadRequestProblem(
                         e.message ?: "Could not parse",
-                        KlerkErrorCode.Internal
-                    )
-                )
+                        KlerkErrorCode.Internal,
+                    ),
+                ),
             )
         }
     }
@@ -492,7 +505,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * The blob is leased for a few minutes rather than the usual one: a user may sit on a form with problems in it
      * for a while, and every attempt should not have to upload the file again.
      *
-     * @param isDryRun a dry run stands the file in with [DRY_RUN_BLOB] instead, leaving the upload untouched.
+     * A dry run ([isDryRun]) stands the file in with [DRY_RUN_BLOB] instead, leaving the upload untouched.
      */
     private suspend fun resolveUploads(submitted: Parameters, context: C, isDryRun: Boolean): Parameters {
         if (fileInputs.isEmpty()) {
@@ -504,7 +517,9 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         for (name in submitted.names()) {
             val values = submitted.getAll(name) ?: continue
             if (!fileInputs.contains(name)) {
-                values.forEach { builder.append(name, it) }
+                for (value in values) {
+                    builder.append(name, value)
+                }
                 continue
             }
             val uploadId = values.firstOrNull()?.takeIf { it.isNotBlank() }?.toIntOrNull() ?: continue
@@ -536,8 +551,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
      * * as a **form field holding an upload id**, when the script uploaded the bytes beforehand. The enctype is on the
      *   form either way, so this is the ordinary case, not the exception.
      *
-     * @param isDryRun a dry run stands the file in with [DRY_RUN_BLOB] instead, so nothing is stored. The
-     * application's own upload rule is still consulted, since that is what the user is asking about.
+     * A dry run ([isDryRun]) stands the file in with [DRY_RUN_BLOB] instead, so nothing is stored. The application's
+     * own upload rule is still consulted, since that is what the user is asking about.
      */
     private suspend fun receiveMultipartAsParameters(call: ApplicationCall, context: C, isDryRun: Boolean): Parameters {
         val builder = ParametersBuilder()
@@ -629,12 +644,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
 
         if (submittedUploads.isNotEmpty() && Csrf.isValid(call, builder[CSRF_TOKEN])) {
             val plugin = requireNotNull(uploads) { "The form has a file field but no uploads plugin" }
-            submittedUploads.forEach { (name, uploadId) ->
+            for ((name, uploadId) in submittedUploads) {
                 // A field that also arrived as bytes has already been dealt with; the bytes win.
-                val id = uploadId.toIntOrNull()?.takeIf { !fromFileParts.contains(name) } ?: return@forEach
+                val id = uploadId.toIntOrNull()?.takeIf { !fromFileParts.contains(name) } ?: continue
                 if (isDryRun) {
                     builder.appendBlob(name, DRY_RUN_BLOB)
-                    return@forEach
+                    continue
                 }
                 val blob = withContext(Dispatchers.IO) {
                     plugin.toAttachedData(
@@ -650,6 +665,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         return builder.build()
     }
 
+    /** Decides the label of each input. Returning null keeps the default label. */
     public fun labelProvider(labelProvider: (UIElementData) -> String?) {
         this.labelProvider = labelProvider
     }
@@ -658,7 +674,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val type: InputType,
         val property: KProperty1<*, StringContainer?>,
         val labelText: String,
-        val datatypeValue: StringContainer
+        val datatypeValue: StringContainer,
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
             tag.label {
@@ -685,7 +701,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val type: InputType,
         val property: KProperty1<*, DataContainer<*>?>,
         val labelText: String,
-        val datatypeValue: BooleanContainer
+        val datatypeValue: BooleanContainer,
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
             tag.label {
@@ -710,7 +726,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
     private class DateItem<T>(
         val property: KProperty1<*, String?>,
         val labelText: String,
-        val minFunction: (() -> LocalDate)?
+        val minFunction: (() -> LocalDate)?,
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
             tag.label {
@@ -735,7 +751,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val property: KProperty1<*, String?>,
         val labelText: String,
         val rowsSettings: Int = 10,
-        val columns: Int = 30
+        val columns: Int = 30,
     ) : Item<T> {
         override fun render(tag: HtmlBlockTag, params: T) {
             tag.label {
@@ -780,6 +796,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             }
         }
 
+        /** Responds with the problems. Use when [parse] returns [ParseResult.Invalid]. */
         public suspend fun respondInvalid(result: ParseResult.Invalid<*>, call: ApplicationCall) {
             if (call.request.queryParameters["onlyErrors"]?.equals("true") == true) {
                 call.respond(HttpStatusCode.BadRequest, createBody(result.problems))
@@ -807,10 +824,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                                 .map { it.name }.toSet()
                         val fieldsMustNotBeNull = problems.filter { it.fieldsMustNotBeNull != null }
                             .flatMap { it.fieldsMustNotBeNull ?: emptySet() }.map { it.name }.toSet()
-                        problems.forEach {
-                            if (it.fieldsMustNotBeNull == null && it.fieldsMustBeNull == null) {
+                        for (problem in problems) {
+                            if (problem.fieldsMustNotBeNull == null && problem.fieldsMustBeNull == null) {
                                 // We can't do anything but show the problem to the user
-                                responses.add(ValidationProblemResponse(humanReadable = it.toString(), field = null))
+                                responses.add(
+                                    ValidationProblemResponse(humanReadable = problem.toString(), field = null),
+                                )
                             }
                         }
 
@@ -835,612 +854,6 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         }
     }
 }
-
-@Serializable
-internal data class ValResponse(
-    val propertyProblems: List<ValidationProblemResponse>,
-    val propertyCollectionProblems: List<String>,
-    val fieldsMustBeNull: Set<String>,
-    val fieldsMustNotBeNull: Set<String>
-)
-
-/** One problem in a validation response. [field] is null when the problem is not tied to a single input. */
-@Serializable
-public data class ValidationProblemResponse(public val field: String?, public val humanReadable: String)
-
-/** A form built from a [FormTemplate], ready to be rendered. Several may be rendered on the same page. */
-public class EventForm<T : Any, C : KlerkContext, V>(
-    private val csrfToken: String,
-    private val inputs: List<Pair<String, InputType>>,
-    private val referenceSelects: Set<ReferencePropertyWithOptions>,
-    private val enumSelects: Set<EnumPropertyWithOptions>,
-    private val propsPopulatedAfterSubmit: List<String>,
-    private val fileInputs: List<String>,
-    private val params: T?,
-    private val postPath: String?,
-    private val queryParams: Map<String, String>,
-    private val htmlDetailsSummary: String?,
-    private val htmlDetailsContents: Set<String>,
-    private val template: FormTemplate<T, C, V>,
-    private val translator: Translation,
-    private val context: C,
-    private val currentUri: String,
-    ) {
-    private val log = KotlinLogging.logger {}
-
-    /**
-     * Every id is prefixed with this so that several forms can be rendered on the same page without colliding.
-     * The JavaScript never looks an element up globally; it scopes every lookup to the form element.
-     */
-    private val formId: String = "klerk-form-${generateRandomString().take(10)}"
-
-    private fun elementId(propertyName: String): String = "$formId-$propertyName"
-    private fun labelId(propertyName: String): String = "$formId-label-$propertyName"
-    private fun errorId(propertyName: String): String = "$formId-error-$propertyName"
-
-    /**
-     * A file input plus the hidden field that carries the upload's id.
-     *
-     * The script uploads the chosen file to the plugin's routes and fills in the hidden field; if it never runs, the
-     * file input posts with the form instead and the server does the upload in one go. The `name` is on the hidden
-     * field either way, so the parameter is called the same thing whichever path was taken — except without
-     * JavaScript, where the file input has to carry the name itself.
-     */
-    private fun renderFileInput(propertyName: String): FlowContent.() -> Unit = {
-        label {
-            id = labelId(propertyName)
-            attributes["data-label-for"] = propertyName
-            htmlFor = elementId(propertyName)
-            val property = requireNotNull(template.parameters.field(propertyName)).property
-            +(template.labelProvider?.invoke(
-                UIElementData(propertyName, dummyContainerFor(propertyName), true)
-            ) ?: translator.klerk.property(property))
-        }
-        val declaration = template.blobDeclarationFor(propertyName)
-        input(InputType.file) {
-            id = elementId(propertyName)
-            // Named so that a submit without JavaScript still carries the file. The script removes the name when it
-            // takes over, so the bytes are not sent twice.
-            name = propertyName
-            attributes["data-klerk-file"] = propertyName
-            required = !template.parameters.fields.single { it.name == propertyName }.isNullable
-            // Derived from the property's AttachedBlobContainer, the same way maxlength is derived from a StringContainer.
-            // It only helps the user pick the right file; what actually keeps a wrong one out is the check the
-            // command makes against the bytes.
-            declaration?.accept?.takeIf { it.isNotEmpty() }?.let { accept = it.sorted().joinToString(",") }
-            declaration?.maxSize?.takeIf { it != Long.MAX_VALUE }
-                ?.let { attributes["data-klerk-max-size"] = it.toString() }
-        }
-        hiddenInput {
-            id = "${elementId(propertyName)}-upload"
-            attributes["data-klerk-upload-id"] = propertyName
-        }
-        span(classes = "upload-progress") {
-            id = "${elementId(propertyName)}-progress"
-            attributes["data-klerk-upload-progress"] = propertyName
-        }
-    }
-
-    private fun dummyContainerFor(propertyName: String): DataContainer<*> =
-        template.parameters.fields.single { it.name == propertyName }.dummyContainer()
-
-    private fun renderReferenceSelect(prop: ReferencePropertyWithOptions, params: T?): FlowContent.() -> Unit = {
-        label {
-            id = labelId(prop.propertyName)
-            attributes["data-label-for"] = prop.propertyName
-            htmlFor = elementId(prop.propertyName)
-            /*    if (!enabled) {
-                    style = "opacity: 0.5;"
-                }
-             */
-            +camelCaseToPretty(prop.propertyName)
-        }
-        br()
-        select {
-            id = elementId(prop.propertyName)
-            name = prop.propertyName
-            if (prop.propertyNullable) {
-                option {
-                    value = ""
-                    +"(none)"
-                }
-            }
-            optGroup() {
-                prop.options.forEach { option ->
-                    option {
-                        value = option.id.toString()
-                        params?.let {
-                            val paramValue = getModelIdValue(prop.propertyName, params)
-                            selected = paramValue == option.id.value
-                        }
-                        +option.toString()
-                    }
-                }
-            }
-        }
-    }
-    private fun renderEnumSelect(prop: EnumPropertyWithOptions, params: T?): FlowContent.() -> Unit = {
-        label {
-            id = labelId(prop.propertyName)
-            attributes["data-label-for"] = prop.propertyName
-            htmlFor = elementId(prop.propertyName)
-            +camelCaseToPretty(prop.propertyName)
-        }
-        br()
-        select {
-            id = elementId(prop.propertyName)
-            name = prop.propertyName
-            if (prop.propertyNullable) {
-                option {
-                    value = ""
-                    +"(none)"
-                }
-            }
-            optGroup() {
-                prop.options.forEach { enumValue ->
-                    option {
-                        value = enumValue.name
-                        params?.let {
-                            val paramValue = getEnumValue(prop.propertyName, params)
-                            selected = paramValue == enumValue.name
-                        }
-                        +enumValue.toString()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun renderInput(
-        propertyName: String,
-        type: InputType,
-        parameters: ObjectSchema<T>,
-        params: T?,
-        classProvider: CssClassProvider?,
-    ): FlowContent.() -> Unit =
-        {
-            val prop = parameters.fields.single { it.name == propertyName }
-            val isNullable = prop.isNullable
-            // A prefilled value can legitimately be null (a nullable param that isn't set); fall back to a default so
-            // there is still a container to derive the input type and constraints from.
-            val prefilled: DataContainer<*>? = if (params == null) null else getParamDatatype(propertyName, params)
-            val hasValue = params == null || prefilled != null
-            val value: DataContainer<*> = prefilled
-                ?: prop.defaultContainer
-                ?: prop.dummyContainer()
-
-            if (isNullable && type != InputType.hidden) {
-                apply(renderNullableToggle(propertyName, hasValue))
-            }
-            when (type) {
-                text -> this.apply(
-                    renderTextInput(
-                        propertyName,
-                        value,
-                        text,
-                        classProvider.attr(UiPart.Form, "input", propertyName)
-                    )
-                )
-
-                email -> this.apply(
-                    renderTextInput(
-                        propertyName,
-                        value,
-                        email,
-                        classProvider.attr(UiPart.Form, "input", propertyName)
-                    )
-                )
-
-                password -> this.apply(
-                    renderTextInput(
-                        propertyName,
-                        value,
-                        password,
-                        classProvider.attr(UiPart.Form, "input", propertyName)
-                    )
-                )
-
-                number -> {
-                    when (value) {
-                        is NumberContainer<*> -> this.apply(renderNumberInput(propertyName, value))
-                        is DurationContainer -> this.apply(renderDurationInput(propertyName, value))
-                        else -> throw IllegalStateException(
-                            "Cannot render '$propertyName' as a number: it is a ${value::class.simpleName}"
-                        )
-                    }
-                }
-
-                dateTimeLocal -> this.apply(renderInstantInput(propertyName, value as InstantContainer))
-
-                InputType.date -> this.apply(renderDateInput(propertyName, value as DateContainer))
-
-                checkBox -> this.apply(
-                    renderCheckboxInput(
-                        propertyName,
-                        value,
-                    )
-                )
-
-                InputType.hidden -> {
-                    requireNotNull(params) { "Params cannot be null when there are hidden inputs" }
-                    val modelId = getModelId(propertyName, params)
-                    val valueAsString: String? =
-                        modelId?.toString() ?: getParamDatatype(propertyName, params)?.toString()
-                    this.apply(renderHiddenInput(propertyName, valueAsString))
-                }
-
-                else -> TODO(type.name)
-            }
-        }
-
-    private fun paramValue(propertyName: String, params: T): Any? =
-        requireNotNull(template.parameters.field(propertyName)).get(params)
-
-    private fun getModelId(propertyName: String, params: T): ModelID<*>? = paramValue(propertyName, params) as? ModelID<*>
-
-    private fun createLabel(
-        propertyName: String,
-        //typeInstance: DataContainer<*>,
-        //enabled: Boolean
-    ): FlowContent.() -> Unit = {
-        //val elementData = UIElementData(propertyName, typeInstance, enabled)
-        val description =
-            translator.klerk.propertyDescription(requireNotNull(template.parameters.field(propertyName)).property)
-        if (description != null) {
-            label(classes = "tooltip") {
-                attributes["data-description"] = description
-                id = labelId(propertyName)
-                attributes["data-label-for"] = propertyName
-                htmlFor = elementId(propertyName)
-                //if (!enabled) {
-                //  style = "opacity: 0.5;"
-                //}
-                //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
-//            +translator.translateProperty(propertyName)
-                val property = requireNotNull(template.parameters.field(propertyName)).property
-                +translator.klerk.property(property)
-                //+camelCaseToPretty(propertyName)
-                }
-            } else {
-
-        label {
-            id = labelId(propertyName)
-            attributes["data-label-for"] = propertyName
-            htmlFor = elementId(propertyName)
-            //if (!enabled) {
-            //  style = "opacity: 0.5;"
-            //}
-            //  +(template.labelProvider?.invoke(elementData) ?: camelCaseToPretty(propertyName))
-//            +translator.translateProperty(propertyName)
-            val property = requireNotNull(template.parameters.field(propertyName)).property
-            +translator.klerk.property(property)
-            //+camelCaseToPretty(propertyName)
-        }
-            }
-        //   br()
-    }
-
-    private fun createErrorPlaceholder(propertyName: String): FlowContent.() -> Unit = {
-        span(classes = "input-error-message") {
-            style = "visibility: hidden; min-height: 1.2em; display: inline-block; padding-left: 10px;"
-            id = errorId(propertyName)
-            attributes["data-error-for"] = propertyName
-            role = "alert"
-            +""
-        }
-    }
-
-    private fun renderNullableToggle(
-        propertyName: String,
-        enabled: Boolean,
-    ): FlowContent.() -> Unit = {
-        val checkboxName = "null-toggle-$propertyName"
-        input(checkBox) {
-            id = elementId(checkboxName)
-            name = checkboxName
-            value = "on"
-            checked = enabled
-            autoComplete = "off"
-            attributes["onchange"] = """let e = document.getElementById('${elementId(propertyName)}'); e.style.display = this.checked ? null : "none"; e.disabled = !this.checked;"""
-        }
-    }
-
-    private fun renderHiddenInput(propertyName: String, theValue: String?): FlowContent.() -> Unit = {
-        input(InputType.hidden) {
-            id = elementId(propertyName)
-            name = propertyName
-            theValue?.let {
-                value = theValue
-            }
-        }
-    }
-
-    private fun renderCheckboxInput(
-        propertyName: String,
-        theValue: DataContainer<*>,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        theValue as BooleanContainer
-        input(checkBox) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = "true"
-            checked = theValue.valueOrNullIfNotAuthorized ?: false
-            //  disabled = theValue == null
-        }
-        input(InputType.hidden) {
-            name = propertyName
-            value = "false"
-        }
-        // required = !property.returnType.isMarkedNullable
-    }
-
-    private fun renderNumberInput(
-        propertyName: String,
-        theValue: NumberContainer<*>,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(number) {     // perhaps use `type=text inputmode=numeric` instead?
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-            // required = !property.returnType.isMarkedNullable
-            min = theValue.min.toString()
-            max = theValue.max.toString()
-            if (theValue.hasDecimals) {
-                step = "any"
-            }
-        }
-        apply(createErrorPlaceholder(propertyName))
-    }
-
-
-    /**
-     * A `datetime-local` input. The browser sends local time without a zone, so the submitted value is interpreted
-     * in the server's time zone (see valueWithCorrectType).
-     */
-    private fun renderInstantInput(
-        propertyName: String,
-        theValue: InstantContainer,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(InputType.dateTimeLocal) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized
-                ?.let { theValue.value.toLocalDateTime(TimeZone.currentSystemDefault()).format(dateTimeLocalFormat) }
-                ?: ""
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-        }
-        apply(createErrorPlaceholder(propertyName))
-    }
-
-    /** A `date` input — a calendar date with no time of day or time zone. */
-    private fun renderDateInput(
-        propertyName: String,
-        theValue: DateContainer,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(InputType.date) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.value.toString() } ?: ""
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-        }
-        apply(createErrorPlaceholder(propertyName))
-    }
-
-    /** A duration, expressed as a number of seconds. */
-    private fun renderDurationInput(
-        propertyName: String,
-        theValue: DurationContainer,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        input(number) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.let { theValue.value.inWholeSeconds.toString() } ?: ""
-            step = "1"
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-        }
-        +" seconds"
-        apply(createErrorPlaceholder(propertyName))
-    }
-
-    private fun renderTextInput(
-        propertyName: String,
-        theValue: DataContainer<*>,
-        type: InputType,
-        classes: String?,
-    ): FlowContent.() -> Unit = {
-        apply(createLabel(propertyName))
-        theValue as StringContainer
-        input(type, classes = classes) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized ?: ""
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-            //
-            // disabled = theValue == null
-            theValue.minLength?.let {
-                minLength = it.toString()
-                required = it > 0
-            }
-            theValue.maxLength?.let { maxLength = it.toString() }
-            if (theValue.regexPattern != null) {
-                pattern = theValue.regexPattern!!.toString()
-            } // for some reason, the apply didn't work
-        }
-        apply(createErrorPlaceholder(propertyName))
-    }
-
-    private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? =
-        paramValue(propertyName, params) as DataContainer<*>?
-
-    private fun getModelIdValue(propertyName: String, params: T): Int? = getModelId(propertyName, params)?.value
-
-    private fun getEnumValue(propertyName: String, params: T): String? =
-        (paramValue(propertyName, params) as? EnumContainer<*>)?.valueOrNullIfNotAuthorized?.name
-
-    internal fun renderInto(tag: FlowContent, postPath: String? = null) {
-        val emptyNonNullableReferenceSelects = referenceSelects.filter { !it.propertyNullable && it.options.isEmpty() }
-        if (emptyNonNullableReferenceSelects.isNotEmpty()) {
-            tag.p {
-                +"${template.defaultValues.eventReference.eventName} is not possible since there are no options available for the required field(s): ${
-                    emptyNonNullableReferenceSelects.joinToString(
-                        ", "
-                    ) { it.propertyName }
-                }"
-            }
-
-            emptyNonNullableReferenceSelects.forEach {
-                it.suggestedEvents.forEach { event ->
-                    template.autoButtons?.let { ab ->
-                        tag.p {
-                            with(ab.support) {
-                                eventButton(event, null, context, onCancelPath = currentUri, onSuccessAndModelExistPath = currentUri)
-                            }
-                        }
-                    }
-                }
-            }
-            return
-        }
-        val path = getPath(postPath, queryParams)
-        tag.script {
-            src = template.pathProvider.assetPath(formJs.getPathAndHash()) // "${template.pathProvider.assetsBase}/$klerkFormValidationJsFile"
-            defer = true
-        }
-        if (fileInputs.isNotEmpty()) {
-            tag.script {
-                src = template.pathProvider.assetPath(uploadJs.getPathAndHash())
-                defer = true
-            }
-        }
-        // multipart only when there is a file to send: it is the encoding a submit without JavaScript needs, and
-        // costs nothing when the script has already uploaded the bytes and cleared the file input's name.
-        val encoding = if (fileInputs.isEmpty()) null else FormEncType.multipartFormData
-        tag.form(path, method = FormMethod.post, encType = encoding) {
-                id = formId
-                // The script binds itself to every form carrying this attribute, so no global handler is needed.
-                attributes["data-klerk-form"] = "true"
-                if (fileInputs.isNotEmpty()) {
-                    attributes["data-klerk-upload-path"] = template.uploads?.mountedAt
-                        ?: error("The form has a file field but the uploads plugin has no routes registered")
-                    // Lets the upload endpoint apply the property's own limit before accepting any bytes.
-                    attributes["data-klerk-event"] = template.defaultValues.eventReference.toString()
-                }
-                +System.lineSeparator()
-
-                // csrf-token should be placed before non-hidden inputs (see https://portswigger.net/web-security/csrf/preventing#how-should-csrf-tokens-be-transmitted)
-                hiddenInput(name = CSRF_TOKEN) { value = csrfToken }
-
-                +System.lineSeparator()
-                hiddenInput(name = IDEMPOTENCE_KEY) { value = CommandToken.simple().toString() }
-                +System.lineSeparator()
-                inputs.filterNot { htmlDetailsContents.contains(it.first) }.forEach { (propertyName, type) ->
-                    p {
-                        tag.apply(
-                            renderInput(
-                                propertyName,
-                                type,
-                                template.parameters,
-                                params,
-                                template.classProvider
-                            )
-                        )
-                    }
-                    +System.lineSeparator()
-                }
-                fileInputs.forEach { propertyName ->
-                    p { tag.apply(renderFileInput(propertyName)) }
-                    +System.lineSeparator()
-                }
-                referenceSelects.forEach { refSelect ->
-                    p { tag.apply(renderReferenceSelect(refSelect, params)) }
-                }
-                enumSelects.forEach { enumSelect ->
-                    p { tag.apply(renderEnumSelect(enumSelect, params)) }
-                }
-                if (htmlDetailsContents.isNotEmpty()) {
-                    details {
-                        summary { +(htmlDetailsSummary ?: "Details") }
-                        inputs.filter { htmlDetailsContents.contains(it.first) }.forEach {
-                            tag.apply(
-                                renderInput(
-                                    it.first,
-                                    it.second,
-                                    template.parameters,
-                                    params,
-                                    template.classProvider
-                                )
-                            )
-                        }
-                    }
-                }
-                p {
-                    span(classes = "errormessages") {
-                        id = "$formId-errormessages"
-                        attributes["data-klerk-errormessages"] = "true"
-                        role = "alert"
-                        attributesMapOf(key = "aria-live", value = "assertive")
-                    }
-                }
-
-                submitInput {
-                    value = "Ok"
-                    id = "$formId-submit"
-                    attributes["data-klerk-submit"] = "true"
-                }
-            }
-    }
-
-    private fun getPath(postPath: String?, queryParams: Map<String, String>): String {
-        var path = requireNotNull(
-            postPath ?: this.postPath
-        ) { "postPath must be provided, either when building the form or when rendering the form" }
-        if (path.contains("?")) {
-            path += "&"
-        } else {
-            path += "?"
-        }
-        return "$path${queryParams.map { "${it.key}=${it.value}" }.joinToString("&")}"
-    }
-
-}
-
-/** The outcome of [FormTemplate.parse]. */
-public sealed class ParseResult<T> {
-    /** The request failed the CSRF check and must not be acted on. Respond with [FormTemplate.respondForbidden]. */
-    public class Forbidden<T> : ParseResult<T>()
-    /** The submitted data is not valid. Respond with [FormTemplate.respondInvalid]. */
-    public data class Invalid<T>(val problems: Set<Problem>) : ParseResult<T>()
-    /** The request was a dry run, so respond without issuing the command. */
-    public data class DryRun<T>(val params: T, val key: CommandToken) : ParseResult<T>()
-    /** Valid parameters. Pass [key] as the [dev.klerkframework.klerk.command.ProcessingOptions] token. */
-    public data class Parsed<T>(val params: T, val key: CommandToken) : ParseResult<T>()
-}
-
-/** A reference parameter and the models that may be selected for it. */
-public data class ReferencePropertyWithOptions(
-    val propertyName: String,
-    val propertyNullable: Boolean,
-    val options: List<Model<out Any>>,
-    val suggestedEvents: Collection<VoidEvent<*, *>>
-)
-
-/** An enum parameter and the values that may be selected for it. */
-public data class EnumPropertyWithOptions(
-    val propertyName: String,
-    val propertyNullable: Boolean,
-    val options: Set<Enum<*>>
-)
 
 /**
  * The blob a file field stands in with while a form is being validated.
@@ -1471,7 +884,7 @@ private fun ParametersBuilder.appendBlob(name: String, blob: AttachedBlobID) {
 /** A field left out of the submission gets its default value, if it has one. */
 internal fun createParamClassFromCallParameters(schema: ObjectSchema<*>, callParams: Parameters): Any {
     val values = mutableMapOf<String, Any?>()
-    schema.fields.forEach { field ->
+    for (field in schema.fields) {
         // A nullable reference (renderReferenceSelect) or enum (renderEnumSelect) is a <select> with its own
         // "(none)" option, not a renderInput() field -- so unlike those, it never gets a null-toggle checkbox.
         // Without this check, every nullable reference/enum select was silently forced to null on submit,
@@ -1489,76 +902,6 @@ internal fun createParamClassFromCallParameters(schema: ObjectSchema<*>, callPar
     }
     return schema.create(values)
 }
-
-/**
- * Runs the command as a dry run and responds with the problems, in the shape the bundled form validation script
- * expects. Use it when [FormTemplate.parse] returns [ParseResult.DryRun].
- */
-public suspend fun <M : Any, P : Any, C : KlerkContext, D> respondDryRun(
-    params: P,
-    key: CommandToken,
-    event: VoidEventWithParameters<M, P>,
-    call: ApplicationCall,
-    klerk: Klerk<C, D>,
-    context: C,
-) {
-    val command = Command(event, params)
-    when (val result = klerk.handle(command, context, ProcessingOptions(key, dryRun = true))) {
-        is CommandResult.Failure -> {
-            val fieldProblems = result.problems
-                .filterIsInstance<InvalidPropertyProblem>()
-                .map { ValidationProblemResponse(it.propertyName, it.endUserTranslatedMessage ?: "?") }
-
-            val propertyCollectionProblems = result.problems
-                .filterIsInstance<InvalidPropertyCollectionProblem>()
-                .map { it.endUserTranslatedMessage ?: "Unknown problem" }
-
-            // The details of a failure (violated rule names, model contents) stay on the server. The user is only
-            // told that the event is not possible.
-            fileLog.info { "Dry run failed: $result" }
-            val remainingProblems = result.problems
-                .filterNot { it is InvalidPropertyProblem || it is InvalidPropertyCollectionProblem }
-            val dryRunProblems = if (remainingProblems.isEmpty()) emptyList() else listOf("Not allowed")
-
-            call.respondText(
-                contentType = ContentType.Application.Json,
-                status = HttpStatusCode.UnprocessableEntity,
-                text = Json.encodeToString(
-                    ValidationResponse.serializer(),
-                    ValidationResponse(
-                        propertyProblems = fieldProblems,
-                        propertyCollectionProblems = propertyCollectionProblems,
-                        formProblems = emptyList(),
-                        dryRunProblems = dryRunProblems
-                    )
-                )
-            )
-        }
-
-        is CommandResult.Success -> call.respond(HttpStatusCode.OK)
-    }
-}
-
-/**
- * The JSON that the bundled form validation script expects. Note that [ValResponse] must have the same shape.
- */
-@Serializable
-public data class ValidationResponse(
-    val propertyProblems: List<ValidationProblemResponse>,
-    val propertyCollectionProblems: List<String>,
-    val formProblems: List<String>,
-    val dryRunProblems: List<String>
-)
-
-/**
- * Renders a form built by [FormTemplate.build]. Several forms may be rendered on the same page.
- *
- * @param postPath overrides where the form is submitted, if it was not given when the template was created.
- */
-public fun <T : Any, C : KlerkContext, V> FlowContent.eventForm(
-    form: EventForm<T, C, V>,
-    postPath: String? = null,
-): Unit = form.renderInto(this, postPath)
 
 /** Thrown while reading a submission whose file the application's rules, or the property's limit, refuse. */
 internal class UploadRefused(message: String) : RuntimeException(message)
@@ -1592,5 +935,7 @@ private class LimitedInputStream(private val source: InputStream, private val li
         return count
     }
 
-    override fun close(): Unit = source.close()
+    override fun close() {
+        source.close()
+    }
 }
