@@ -9,7 +9,6 @@ import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.generateFlowChart
-import dev.klerkframework.klerk.misc.generateStateDiagram
 import dev.klerkframework.klerk.statemachine.StateMachine
 import io.ktor.server.application.*
 import io.ktor.server.html.*
