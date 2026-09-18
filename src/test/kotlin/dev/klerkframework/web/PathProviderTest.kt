@@ -1,7 +1,6 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.web.config.Book
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import kotlin.test.Test
 
 class PathProviderTest {
@@ -26,5 +25,4 @@ class PathProviderTest {
         assertEquals("/base/_assets/test", dpp.assetPath("test"))
         assertEquals("/base/_autobuttons", dpp.autoButtons)
     }
-
 }

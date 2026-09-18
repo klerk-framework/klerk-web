@@ -1,11 +1,11 @@
 package dev.klerkframework.web.upload
 
-import dev.klerkframework.klerk.InstanceEventArgs
-import dev.klerkframework.klerk.VoidEventArgs
 import dev.klerkframework.klerk.EventVisibility
+import dev.klerkframework.klerk.InstanceEventArgs
 import dev.klerkframework.klerk.InstanceEventNoParameters
 import dev.klerkframework.klerk.InstanceEventWithParameters
 import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.VoidEventArgs
 import dev.klerkframework.klerk.VoidEventWithParameters
 import dev.klerkframework.klerk.datatypes.IntContainer
 import dev.klerkframework.klerk.datatypes.LongContainer
@@ -122,9 +122,7 @@ public data class CreateUploadParams(
 )
 
 /** Parameters of [RecordUploadedBytes]. */
-public data class RecordUploadedBytesParams(
-    val receivedBytes: ByteCount,
-)
+public data class RecordUploadedBytesParams(val receivedBytes: ByteCount)
 
 private fun <C : KlerkContext, V> newUpload(args: VoidEventArgs<Upload, CreateUploadParams, C, V>): Upload {
     val params = args.command.params
@@ -151,7 +149,7 @@ private fun <C : KlerkContext, V> withReceivedBytes(
 private fun <C : KlerkContext, V> completesTheUpload(
     args: InstanceEventArgs<Upload, RecordUploadedBytesParams, C, V>,
 ): Boolean = args.command.params.receivedBytes.value >=
-        args.model.props.declaredSize.value
+    args.model.props.declaredSize.value
 
 /** The name the client gave the file. Only ever shown or offered as a download name — never used as a path. */
 public class UploadFilename(value: String) : StringContainer(value) {

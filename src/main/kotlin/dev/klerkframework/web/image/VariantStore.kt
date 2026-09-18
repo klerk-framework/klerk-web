@@ -12,10 +12,7 @@ private val log = KotlinLogging.logger {}
 
 /** What the generator learned about an image while it had it decoded. */
 @Serializable
-public data class ImageSidecar(
-    val width: Int,
-    val height: Int,
-)
+public data class ImageSidecar(val width: Int, val height: Int)
 
 /**
  * The generated variants on disk.
@@ -150,26 +147,25 @@ internal class VariantStore(private val root: Path) {
     /** One image's directory, with what it costs and when it was last added to. */
     private class Held(val path: Path, val bytes: Long, val modified: Long)
 
-    private fun directories(): List<Held> =
-        Files.list(root).use { entries ->
-            entries.toList().mapNotNull { path ->
-                if (!Files.isDirectory(path)) return@mapNotNull null
-                var bytes = 0L
-                var modified = 0L
-                // The generator writes and deletes temporary files here, so a file may vanish mid-walk.
-                runCatching {
-                    Files.list(path).use { files ->
-                        for (file in files) {
-                            runCatching {
-                                bytes += Files.size(file)
-                                modified = maxOf(modified, Files.getLastModifiedTime(file).toMillis())
-                            }
+    private fun directories(): List<Held> = Files.list(root).use { entries ->
+        entries.toList().mapNotNull { path ->
+            if (!Files.isDirectory(path)) return@mapNotNull null
+            var bytes = 0L
+            var modified = 0L
+            // The generator writes and deletes temporary files here, so a file may vanish mid-walk.
+            runCatching {
+                Files.list(path).use { files ->
+                    for (file in files) {
+                        runCatching {
+                            bytes += Files.size(file)
+                            modified = maxOf(modified, Files.getLastModifiedTime(file).toMillis())
                         }
                     }
                 }
-                Held(path, bytes, modified)
             }
+            Held(path, bytes, modified)
         }
+    }
 
     private fun writeAtomically(target: Path, write: (Path) -> Unit) {
         val temporary = Files.createTempFile(target.parent, "partial-", ".tmp")

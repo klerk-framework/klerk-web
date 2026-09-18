@@ -1,26 +1,70 @@
 package dev.klerkframework.web.config
-
-import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.validation.PropertyCollectionValidity
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.AttachedDataReadRuleArgs
+import dev.klerkframework.klerk.AttachedDataVisibility
+import dev.klerkframework.klerk.AttachedDataWriteRuleArgs
+import dev.klerkframework.klerk.AttachedStringID
+import dev.klerkframework.klerk.AuthenticationIdentity
+import dev.klerkframework.klerk.CommandRuleArgs
+import dev.klerkframework.klerk.DefaultKlerkTranslation
+import dev.klerkframework.klerk.EventLogRuleArgs
+import dev.klerkframework.klerk.EventReference
+import dev.klerkframework.klerk.EventVisibility
 import dev.klerkframework.klerk.EventVisibility.External
+import dev.klerkframework.klerk.InstanceEventArgs
+import dev.klerkframework.klerk.InstanceEventNoParameters
+import dev.klerkframework.klerk.InstanceEventWithParameters
+import dev.klerkframework.klerk.JobReadRuleArgs
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.KlerkSettings
+import dev.klerkframework.klerk.KlerkTranslation
+import dev.klerkframework.klerk.LifecycleArgs
+import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.ModelReadRuleArgs
+import dev.klerkframework.klerk.NegativeAuthorization
 import dev.klerkframework.klerk.NegativeAuthorization.Deny
 import dev.klerkframework.klerk.NegativeAuthorization.Pass
-import dev.klerkframework.klerk.validation.PropertyCollectionValidity.Invalid
-import dev.klerkframework.klerk.validation.Valid
-import dev.klerkframework.klerk.view.*
+import dev.klerkframework.klerk.PositiveAuthorization
+import dev.klerkframework.klerk.PropertyReadRuleArgs
+import dev.klerkframework.klerk.Specification
+import dev.klerkframework.klerk.SpecificationBuilder
+import dev.klerkframework.klerk.SystemIdentity
+import dev.klerkframework.klerk.Translation
+import dev.klerkframework.klerk.Unauthenticated
+import dev.klerkframework.klerk.Validatable
+import dev.klerkframework.klerk.VoidEventArgs
+import dev.klerkframework.klerk.VoidEventNoParameters
+import dev.klerkframework.klerk.VoidEventWithParameters
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.datatypes.*
-import dev.klerkframework.klerk.job.JobSettings
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
+import dev.klerkframework.klerk.datatypes.AttachedStringContainer
+import dev.klerkframework.klerk.datatypes.BlobPreAttachStep
+import dev.klerkframework.klerk.datatypes.BlobPreAttachStepArgs
+import dev.klerkframework.klerk.datatypes.BlobPreAttachStepResult
+import dev.klerkframework.klerk.datatypes.BooleanContainer
+import dev.klerkframework.klerk.datatypes.DurationContainer
+import dev.klerkframework.klerk.datatypes.EnumContainer
+import dev.klerkframework.klerk.datatypes.FloatContainer
+import dev.klerkframework.klerk.datatypes.GeoPosition
+import dev.klerkframework.klerk.datatypes.GeoPositionContainer
+import dev.klerkframework.klerk.datatypes.InstantContainer
+import dev.klerkframework.klerk.datatypes.IntContainer
+import dev.klerkframework.klerk.datatypes.LongContainer
+import dev.klerkframework.klerk.datatypes.StringContainer
+import dev.klerkframework.klerk.datatypes.noPreAttachProcessing
+import dev.klerkframework.klerk.job.DeclaredJob
+import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobExecution
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobResult
+import dev.klerkframework.klerk.job.JobSettings
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
 import dev.klerkframework.klerk.job.JobsBlock
-import dev.klerkframework.klerk.job.DeclaredJob
-import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.misc.AlgorithmBuilder
 import dev.klerkframework.klerk.misc.Decision
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
@@ -31,11 +75,19 @@ import dev.klerkframework.klerk.storage.AttachedBlobStore
 import dev.klerkframework.klerk.storage.Persistence
 import dev.klerkframework.klerk.storage.RamStorage
 import dev.klerkframework.klerk.storage.SqlPersistence
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity.Invalid
 import dev.klerkframework.klerk.validation.PropertyValidity
+import dev.klerkframework.klerk.validation.Valid
+import dev.klerkframework.klerk.view.ModelView
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
+import dev.klerkframework.klerk.view.asSequenceOrThrow
 import dev.klerkframework.web.assets.AssetsPlugin
-import dev.klerkframework.web.upload.CreateUploadParams
 import dev.klerkframework.web.config.AlwaysFalseDecisions.Something
-import dev.klerkframework.web.config.AuthorStates.*
+import dev.klerkframework.web.config.AuthorStates.Amateur
+import dev.klerkframework.web.config.AuthorStates.Established
+import dev.klerkframework.web.config.AuthorStates.Improving
 import dev.klerkframework.web.css
 import dev.klerkframework.web.image.ImagePlugin
 import dev.klerkframework.web.models.City
@@ -43,7 +95,7 @@ import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.models.cityStateMachine
 import dev.klerkframework.web.models.publisherStateMachine
 import dev.klerkframework.web.myScript
-import kotlinx.coroutines.delay
+import dev.klerkframework.web.upload.CreateUploadParams
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -64,58 +116,56 @@ fun createConfig(
     collections: MyCollections,
     extraJobs: JobsBlock<Context, MyCollections>.() -> Unit = {},
     assets: AssetsPlugin<Context, MyCollections> = AssetsPlugin(setOf(css, myScript)),
-): Specification<Context, MyCollections> {
-    return SpecificationBuilder<Context, MyCollections>(collections).build {
-        managedModels {
-            model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
-            model(Author::class, authorStateMachine(collections), collections.authors)
-            model(Publisher::class, publisherStateMachine(collections), collections.publishers)
-            model(City::class, cityStateMachine(collections), collections.cities)
-            model(Document::class, documentStateMachine(), collections.documents)
-            model(Flower::class, flowerStateMachine(), collections.flowers)
-            model(Note::class, noteStateMachine(), collections.notes)
-            model(Publication::class, publicationStateMachine(), collections.publications)
-            model(Photo::class, photoStateMachine(), collections.photos)
-            //model(Shop::class, cudStateMachine(Shop::class), views.shops)
+): Specification<Context, MyCollections> = SpecificationBuilder<Context, MyCollections>(collections).build {
+    managedModels {
+        model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
+        model(Author::class, authorStateMachine(collections), collections.authors)
+        model(Publisher::class, publisherStateMachine(collections), collections.publishers)
+        model(City::class, cityStateMachine(collections), collections.cities)
+        model(Document::class, documentStateMachine(), collections.documents)
+        model(Flower::class, flowerStateMachine(), collections.flowers)
+        model(Note::class, noteStateMachine(), collections.notes)
+        model(Publication::class, publicationStateMachine(), collections.publications)
+        model(Photo::class, photoStateMachine(), collections.photos)
+        // model(Shop::class, cudStateMachine(Shop::class), views.shops)
+    }
+    jobs {
+        register(MyJob)
+        cron(MyJob, "0 3 * * *") {
+            cursor = ""
+        }
+        extraJobs()
+    }
+    authorization {
+        readModels {
+            positive(::`Everybody can read`)
+            negative(::pelleCannotReadOnMornings, ::unauthenticatedCannotReadAstrid)
+        }
+
+        readProperties {
+            positive(::canReadAllProperties)
+            negative(::cannotReadAstrid)
+        }
+        commands {
+            positive(::`Everybody can do everything`)
+            negative(::noUploadLargerThanTenMegabytes)
+        }
+        eventLog {
+            positive(::`Everybody can read event log`)
         }
         jobs {
-            register(MyJob)
-            cron(MyJob, "0 3 * * *") {
-                cursor = ""
-            }
-            extraJobs()
+            positive(::`Everybody can read jobs`)
         }
-        authorization {
-            readModels {
-                positive(::`Everybody can read`)
-                negative(::pelleCannotReadOnMornings, ::unauthenticatedCannotReadAstrid)
-            }
-
-            readProperties {
-                positive(::canReadAllProperties)
-                negative(::cannotReadAstrid)
-            }
-            commands {
-                positive(::`Everybody can do everything`)
-                negative(::noUploadLargerThanTenMegabytes)
-            }
-            eventLog {
-                positive(::`Everybody can read event log`)
-            }
-            jobs {
-                positive(::`Everybody can read jobs`)
-            }
-            readAttachedData {
-                positive(::`Everybody can read attached data`)
-                negative(::`Only the author can read a publication`)
-            }
-            writeAttachedData {
-                positive(::`Everybody can prepare attached data`)
-            }
+        readAttachedData {
+            positive(::`Everybody can read attached data`)
+            negative(::`Only the author can read a publication`)
         }
-        systemContextProvider(::myContextProvider)
-    }.withPlugin(assets)
-}
+        writeAttachedData {
+            positive(::`Everybody can prepare attached data`)
+        }
+    }
+    systemContextProvider(::myContextProvider)
+}.withPlugin(assets)
 
 /**
  * The settings the tests share.
@@ -131,17 +181,13 @@ fun testSettings(
     jobs = JobSettings(execution = jobExecution),
 )
 
-fun myContextProvider(): Context {
-    return Context(SystemIdentity)
-}
+fun myContextProvider(): Context = Context(SystemIdentity)
 
-fun cannotReadAstrid(args: PropertyReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
-    return if (args.property is FirstName && args.property.valueWithoutAuthorization == "Astrid") Deny else Pass
-}
+fun cannotReadAstrid(args: PropertyReadRuleArgs<Context, MyCollections>): NegativeAuthorization =
+    if (args.property is FirstName && args.property.valueWithoutAuthorization == "Astrid") Deny else Pass
 
-fun canReadAllProperties(args: PropertyReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+fun canReadAllProperties(args: PropertyReadRuleArgs<Context, MyCollections>): PositiveAuthorization =
+    PositiveAuthorization.Allow
 
 fun unauthenticatedCannotReadAstrid(args: ModelReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     val props = args.model.props
@@ -151,37 +197,26 @@ fun unauthenticatedCannotReadAstrid(args: ModelReadRuleArgs<Context, MyCollectio
 
 fun `Everybody can do everything`(
     argCommandContextReader: CommandRuleArgs<*, Context, MyCollections>,
-): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+): PositiveAuthorization = PositiveAuthorization.Allow
 
+fun `Everybody can read event log`(args: EventLogRuleArgs<Context, MyCollections>): PositiveAuthorization =
+    PositiveAuthorization.Allow
 
-fun `Everybody can read event log`(args: EventLogRuleArgs<Context, MyCollections>): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+fun `Everybody can read jobs`(args: JobReadRuleArgs<Context, MyCollections>): PositiveAuthorization =
+    PositiveAuthorization.Allow
 
-fun `Everybody can read jobs`(args: JobReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
-
-fun `Everybody can read attached data`(args: AttachedDataReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+fun `Everybody can read attached data`(args: AttachedDataReadRuleArgs<Context, MyCollections>): PositiveAuthorization =
+    PositiveAuthorization.Allow
 
 /** An upload becomes attached data, so an application with file uploads needs a rule like this one. */
 fun `Everybody can prepare attached data`(
     args: AttachedDataWriteRuleArgs<Context, MyCollections>,
-): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+): PositiveAuthorization = PositiveAuthorization.Allow
 
-fun `Everybody can read`(args: ModelReadRuleArgs<Context, MyCollections>): PositiveAuthorization {
-    return PositiveAuthorization.Allow
-}
+fun `Everybody can read`(args: ModelReadRuleArgs<Context, MyCollections>): PositiveAuthorization =
+    PositiveAuthorization.Allow
 
-fun pelleCannotReadOnMornings(
-    args: ModelReadRuleArgs<Context, MyCollections>,
-): NegativeAuthorization {
+fun pelleCannotReadOnMornings(args: ModelReadRuleArgs<Context, MyCollections>): NegativeAuthorization {
     try {
         if (args.context.user?.props?.name?.value.equals("Pelle")) {
             val localTime = args.context.time.toLocalDateTime(TimeZone.currentSystemDefault()).time
@@ -195,9 +230,7 @@ fun pelleCannotReadOnMornings(
 
 class BookCollections : ModelViews<Book, Context>() {
 
-    fun childrensBooks(): List<ModelID<Book>> {
-        return emptyList()
-    }
+    fun childrensBooks(): List<ModelID<Book>> = emptyList()
 }
 
 class AuthorCollections<V>(val allBooks: ModelView<Book, Context>) : ModelViews<Author, Context>() {
@@ -220,7 +253,6 @@ class AuthorCollections<V>(val allBooks: ModelView<Book, Context>) : ModelViews<
             AuthorsWithAtLeastTwoBooks(all, allBooks)
         establishedGreatWithAtLeastTwoBooks.register("medMinst2Böcker")
     }
-
 }
 
 data class Book(
@@ -248,16 +280,15 @@ data class Author(
 ) : Validatable {
     override fun validators(): Set<() -> PropertyCollectionValidity> = setOf(::noAuthorCanBeNamedJamesClavell)
 
-    private fun noAuthorCanBeNamedJamesClavell(): PropertyCollectionValidity {
-        return if (firstName.value == "James" && lastName.value == "Clavell") Invalid() else Valid
-    }
+    private fun noAuthorCanBeNamedJamesClavell(): PropertyCollectionValidity =
+        if (firstName.value == "James" && lastName.value == "Clavell") Invalid() else Valid
 
     override fun toString(): String = "$firstName $lastName"
 }
 
 class ReleasePartyPosition(value: GeoPosition) : GeoPositionContainer(value)
 
-//data class Shop(val shopName: ShopName, val owner: Reference<Author>) : CudModel
+// data class Shop(val shopName: ShopName, val owner: Reference<Author>) : CudModel
 
 class ShopName(value: String) : StringContainer(value) {
     override val minLength: Int = 1
@@ -288,9 +319,8 @@ data class CreateAuthorParams(
         return if (isAugust && phone.value == "123456") Invalid() else Valid
     }
 
-    fun primeMustBeHigherThanAge(): PropertyCollectionValidity {
-        return if (favouritePrimeNumber.value <= age.value) Invalid() else Valid
-    }
+    fun primeMustBeHigherThanAge(): PropertyCollectionValidity =
+        if (favouritePrimeNumber.value <= age.value) Invalid() else Valid
 }
 
 data class ChangeNameParams(val updatedFirstName: FirstName, val updatedLastName: LastName)
@@ -298,9 +328,8 @@ data class ChangeNameParams(val updatedFirstName: FirstName, val updatedLastName
 fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorStates, Context, MyCollections> =
 
     stateMachine {
-
         event(CreateAuthor) {
-            //validateContext(::preventUnauthenticated)
+            // validateContext(::preventUnauthenticated)
             validateWithParameters(::cannotHaveAnAwfulName)
             validateWithParameters(::secretTokenShouldBeZeroIfNameStartsWithM)
             validateWithParameters(::onlyAuthenticationIdentityCanCreateDaniel)
@@ -319,7 +348,6 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
         event(DeleteAuthor) {}
 
         event(DeleteAuthorAndBooks) {}
-
 
         voidState {
             onEvent(CreateAuthor) {
@@ -363,7 +391,6 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
                 update(::someUpdate)
                 unmanagedJob(::sayHello)
             }
-
         }
 
         state(Improving) {
@@ -375,11 +402,9 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
                 }
                 jobs(::aJob)
             }
-
         }
 
         state(Established) {
-
             atTime(::later) {
                 delete()
             }
@@ -392,43 +417,35 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
                 delete()
             }
         }
-
     }
 
 fun sayCongratulations(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>) {
     println("Congratulations")
 }
 
-fun someUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author {
-    return args.model.props.copy(lastName = LastName("efter"))
-}
+fun someUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author =
+    args.model.props.copy(lastName = LastName("efter"))
 
-fun onExitUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author {
-    return args.model.props.copy(FirstName("Changed name after exit"))
-}
+fun onExitUpdate(args: LifecycleArgs<Author, Context, MyCollections>): Author =
+    args.model.props.copy(FirstName("Changed name after exit"))
 
 fun sayHello(args: LifecycleArgs<Author, Context, MyCollections>) {
     println("Hello!")
 }
 
-fun later(args: LifecycleArgs<Author, Context, MyCollections>): Instant {
-    return args.context.time.plus(30.seconds)
-}
+fun later(args: LifecycleArgs<Author, Context, MyCollections>): Instant = args.context.time.plus(30.seconds)
 
 fun hasTalent(args: LifecycleArgs<Author, Context, MyCollections>): Boolean = true
 fun isAnImpostor(args: LifecycleArgs<Author, Context, MyCollections>): Boolean = false
 
-fun aJob(args: LifecycleArgs<Author, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> {
-    return listOf(MyJob.declare(""))
-}
-
+fun aJob(args: LifecycleArgs<Author, Context, MyCollections>): List<DeclaredJob<Context, MyCollections>> =
+    listOf(MyJob.declare(""))
 
 fun onEnterImprovingStateAction(args: LifecycleArgs<Author, Context, MyCollections>) {
     if (onEnterImprovingStateActionCallback != null) {
         onEnterImprovingStateActionCallback!!()
     }
 }
-
 
 fun showNotification(args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>) {
     println("It was decided that we should show a notification")
@@ -440,19 +457,15 @@ fun onEnterAmateurStateAction(args: LifecycleArgs<Author, Context, MyCollections
     }
 }
 
-
 fun notifyBookStores(
     args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>,
-): List<DeclaredJob<Context, MyCollections>> {
-    return listOf(MyJob.declare(""))
-}
+): List<DeclaredJob<Context, MyCollections>> = listOf(MyJob.declare(""))
 
-fun changeNameOfAuthor(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): Author {
-    return args.model.props.copy(
+fun changeNameOfAuthor(args: InstanceEventArgs<Author, ChangeNameParams, Context, MyCollections>): Author =
+    args.model.props.copy(
         firstName = args.command.params.updatedFirstName,
         lastName = args.command.params.updatedLastName,
     )
-}
 
 fun eventsToDeleteAuthorAndBooks(
     args: InstanceEventArgs<Author, Nothing?, Context, MyCollections>,
@@ -468,7 +481,7 @@ fun eventsToDeleteAuthorAndBooks(
         @Suppress("UNCHECKED_CAST")
         result.add(
             Command(DeleteAuthor, requireNotNull(args.model.id))
-                    as Command<Any, Any>,
+                as Command<Any, Any>,
         )
 
         return result
@@ -486,16 +499,15 @@ fun newAuthor(args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollect
     )
 }
 
-fun newAuthor2(args: VoidEventArgs<Author, Nothing?, Context, MyCollections>): Author {
-    return Author(FirstName("Auto"), LastName("Created"), Address(Street("Somewhere")), DarkThemePreference(false),
-        primaryLanguage = PrimaryLanguage(Languages.English),)
-}
+fun newAuthor2(args: VoidEventArgs<Author, Nothing?, Context, MyCollections>): Author = Author(
+    FirstName("Auto"),
+    LastName("Created"),
+    Address(Street("Somewhere")),
+    DarkThemePreference(false),
+    primaryLanguage = PrimaryLanguage(Languages.English),
+)
 
-
-fun updateAuthor(args: InstanceEventArgs<Author, Author, Context, MyCollections>): Author {
-    return args.command.params
-}
-
+fun updateAuthor(args: InstanceEventArgs<Author, Author, Context, MyCollections>): Author = args.command.params
 
 fun onlyAuthenticationIdentityCanCreateDaniel(
     args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
@@ -518,9 +530,8 @@ fun secretTokenShouldBeZeroIfNameStartsWithM(
     return if (params.firstName.value.startsWith("M") && params.secretToken.value != 0L) Invalid() else Valid
 }
 
-fun preventUnauthenticated(context: Context): PropertyCollectionValidity {
-    return if (context.actor == Unauthenticated) Invalid() else Valid
-}
+fun preventUnauthenticated(context: Context): PropertyCollectionValidity =
+    if (context.actor == Unauthenticated) Invalid() else Valid
 
 fun onlyAllowAuthorNameAstridIfThereIsNoRowling(
     args: VoidEventArgs<Author, CreateAuthorParams, Context, MyCollections>,
@@ -567,7 +578,7 @@ data class MyCollections(
     val notes: ModelViews<Note, Context> = ModelViews(),
     val publications: ModelViews<Publication, Context> = ModelViews(),
     val photos: ModelViews<Photo, Context> = ModelViews(),
-) //, val shops: ModelView<Shop, Context>)
+) // , val shops: ModelView<Shop, Context>)
 
 suspend fun createAuthorJKRowling(klerk: Klerk<Context, MyCollections>): ModelID<Author> {
     val result = klerk.handle(
@@ -670,7 +681,6 @@ class EvenIntContainer(value: Int) : IntContainer(value) {
         }
         return PropertyValidity.Invalid("Must be even")
     }
-
 }
 
 class FirstName(value: String) : StringContainer(value) {
@@ -682,11 +692,12 @@ class FirstName(value: String) : StringContainer(value) {
     override val validators: Set<(String, Translation) -> PropertyValidity> =
         setOf(::mustNotHavePelleInName)
 
-    fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidity {
-        return if (name.contains("Pelle", ignoreCase = true))
-            PropertyValidity.Invalid("Must not contain 'Pelle'") else
+    fun mustNotHavePelleInName(name: String, translation: Translation): PropertyValidity =
+        if (name.contains("Pelle", ignoreCase = true)) {
+            PropertyValidity.Invalid("Must not contain 'Pelle'")
+        } else {
             Valid
-    }
+        }
 }
 
 class LastName(value: String) : StringContainer(value) {
@@ -702,19 +713,20 @@ class BookTitle(value: String) : StringContainer(value) {
     override val regexPattern = ".*"
     override val validators = setOf(::`title must not contain 'alpha'`, ::`title must not start with 'beta'`)
 
-    private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidity {
-        return if (title.contains("alpha")) {
+    private fun `title must not contain 'alpha'`(title: String, translation: Translation): PropertyValidity =
+        if (title.contains("alpha")) {
             PropertyValidity.Invalid()
-        } else Valid
-    }
+        } else {
+            Valid
+        }
 
-    private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidity {
-        return if (title.lowercase().startsWith("beta")) {
+    private fun `title must not start with 'beta'`(title: String, translation: Translation): PropertyValidity =
+        if (title.lowercase().startsWith("beta")) {
             PropertyValidity.Invalid("'beta' must not be the first word")
-        } else Valid
-    }
+        } else {
+            Valid
+        }
 }
-
 
 class BookTag(value: String) : StringContainer(value) {
     override val minLength: Int = 1
@@ -794,9 +806,7 @@ object SQLiteInMemory {
 object CreateAuthor :
     VoidEventWithParameters<Author, CreateAuthorParams>(External)
 
-object UpdateAuthor : InstanceEventWithParameters<Author, Author>(External) {
-
-}
+object UpdateAuthor : InstanceEventWithParameters<Author, Author>(External)
 
 object DeleteAuthor : InstanceEventNoParameters<Author>(External)
 
@@ -814,10 +824,7 @@ sealed class AlwaysFalseDecisions(
     data object Something : AlwaysFalseDecisions("This will always be false", ::alwaysFalse)
 }
 
-fun alwaysFalse(args: InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>): Boolean {
-    return false
-}
-
+fun alwaysFalse(args: InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>): Boolean = false
 
 object AlwaysFalseAlgorithm :
     FlowChartAlgorithm<InstanceEventArgs<Author, CreateAuthorParams, Context, MyCollections>, Boolean>("Always false") {
@@ -844,9 +851,7 @@ data class Context(
 ) : KlerkContext {
 
     companion object {
-        fun fromUser(user: Model<User>): Context {
-            return Context(dev.klerkframework.klerk.ModelIdentity(user), user = user)
-        }
+        fun fromUser(user: Model<User>): Context = Context(dev.klerkframework.klerk.ModelIdentity(user), user = user)
 
         fun unauthenticated(): Context = Context(dev.klerkframework.klerk.Unauthenticated)
 
@@ -857,7 +862,6 @@ data class Context(
         fun swedishUnauthenticated(): Context =
             Context(dev.klerkframework.klerk.Unauthenticated, translation = SwedishTranslation)
     }
-
 }
 
 data class User(val name: FirstName)
@@ -886,57 +890,43 @@ object SwedishTranslation : Translation {
 
 class SwedishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation by default {
 
-    override fun property(property: KProperty1<*, *>): String {
-        return when (property) {
-            CreateAuthorParams::firstName -> "Förnamn på den nya författaren"
-            else -> default.property(property)
-        }
+    override fun property(property: KProperty1<*, *>): String = when (property) {
+        CreateAuthorParams::firstName -> "Förnamn på den nya författaren"
+        else -> default.property(property)
     }
 
-    override fun event(event: EventReference): String {
-        return when (event) {
-            PublishBook.id -> "Publicera bok"
-            CreateAuthor.id -> "Ny författare"
-            else -> default.event(event)
-        }
+    override fun event(event: EventReference): String = when (event) {
+        PublishBook.id -> "Publicera bok"
+        CreateAuthor.id -> "Ny författare"
+        else -> default.event(event)
     }
 
-    override fun invalidProperty(propertyName: String, functionName: String, translationInfo: String?): String {
-        return when (functionName) {
+    override fun invalidProperty(propertyName: String, functionName: String, translationInfo: String?): String =
+        when (functionName) {
             PrimeNumber::mustBePrime.name -> "Måste vara ett primtal"
             else -> default.invalidProperty(propertyName, functionName, translationInfo)
         }
-    }
 
-    override fun function(f: Function<Any>): String {
-        return when (f) {
-            CreateAuthorParams::primeMustBeHigherThanAge -> "tea"
-            else -> default.function(f)
-        }
+    override fun function(f: Function<Any>): String = when (f) {
+        CreateAuthorParams::primeMustBeHigherThanAge -> "tea"
+        else -> default.function(f)
     }
 
     override fun mustBeAtLeast(value: Number): String = "Måste vara minst $value"
 
-    override fun propertyDescription(property: KProperty1<*, *>): String? {
-        return when (property) {
-            CreateAuthorParams::firstName -> "Det namn som kommer först"
-            else -> null
-        }
+    override fun propertyDescription(property: KProperty1<*, *>): String? = when (property) {
+        CreateAuthorParams::firstName -> "Det namn som kommer först"
+        else -> null
     }
-
 }
-
 
 open class EnglishKlerkTranslation(val default: KlerkTranslation) : KlerkTranslation by default {
-    override fun property(property: KProperty1<*, *>): String {
-        return when (property) {
-            CreateAuthorParams::firstName -> "First name of the new writer"
-            CreateAuthorParams::lastName -> "Last name of the new writer"
-            else -> default.property(property)
-        }
+    override fun property(property: KProperty1<*, *>): String = when (property) {
+        CreateAuthorParams::firstName -> "First name of the new writer"
+        CreateAuthorParams::lastName -> "Last name of the new writer"
+        else -> default.property(property)
     }
 }
-
 
 object CreateBook : VoidEventWithParameters<Book, CreateBookParams>(External)
 
@@ -974,11 +964,9 @@ class AuthorsWithAtLeastTwoBooks<V>(
 
     override fun <V> contains(value: ModelID<*>, reader: ModelReader<Context, V>): Boolean =
         memberIds(reader).any { it.value == value.value }
-
 }
 
 suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk: Klerk<Context, MyCollections>) {
-
     val startTime = Clock.System.now()
     val firstNames = setOf("Anna", "Bertil", "Janne", "Filip")
     val lastNames = setOf("Andersson", "Svensson", "Törnkrantz")
@@ -993,7 +981,7 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
                     lastName = LastName(i.toString()),
                     phone = PhoneNumber("+46123456"),
                     secretToken = SecretPasscode(23290409),
-                    //address = Address(Street("Lugna gatan"))
+                    // address = Address(Street("Lugna gatan"))
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(true),
                     nullableFirstName = null,
@@ -1041,7 +1029,6 @@ suspend fun generateSampleData(numberOfAuthors: Int, booksPerAuthor: Int, klerk:
     val eventsPerSecond = if (seconds > 0) (numberOfAuthors * (booksPerAuthor + 1)) / seconds else "?"
 }
 
-
 enum class BookStates {
     Draft,
     Published,
@@ -1050,55 +1037,47 @@ enum class BookStates {
 fun bookStateMachine(
     allAuthors: ModelView<Author, Context>,
     collections: MyCollections,
-): StateMachine<Book, BookStates, Context, MyCollections> =
-    stateMachine {
-
-        event(CreateBook) {
-            validReferences(CreateBookParams::author, collections.authors.all)
-            validReferences(CreateBookParams::coAuthors, collections.authors.all)
-            validReferences(CreateBookParams::previousBooksInSameSeries, collections.books.all)
-        }
-
-        event(PublishBook) {}
-
-        event(DeleteBook) {}
-
-
-
-        voidState {
-            onEvent(CreateBook) {
-                createModel(BookStates.Draft, ::newBook)
-            }
-        }
-
-        state(BookStates.Draft) {
-            onEnter {
-                //action(`Send email to editors`)
-            }
-
-            onEvent(PublishBook) {
-                update(::setPublishTime)
-                transitionTo(BookStates.Published)
-            }
-
-            onEvent(DeleteBook) {
-                delete()
-            }
-
-        }
-
-        state(BookStates.Published) {
-
-            onEvent(DeleteBook) {
-                delete()
-            }
-        }
-
+): StateMachine<Book, BookStates, Context, MyCollections> = stateMachine {
+    event(CreateBook) {
+        validReferences(CreateBookParams::author, collections.authors.all)
+        validReferences(CreateBookParams::coAuthors, collections.authors.all)
+        validReferences(CreateBookParams::previousBooksInSameSeries, collections.books.all)
     }
 
-fun setPublishTime(args: InstanceEventArgs<Book, Nothing?, Context, MyCollections>): Book {
-    return args.model.props.copy(publishedAt = BookWrittenAt(args.context.time))
+    event(PublishBook) {}
+
+    event(DeleteBook) {}
+
+    voidState {
+        onEvent(CreateBook) {
+            createModel(BookStates.Draft, ::newBook)
+        }
+    }
+
+    state(BookStates.Draft) {
+        onEnter {
+            // action(`Send email to editors`)
+        }
+
+        onEvent(PublishBook) {
+            update(::setPublishTime)
+            transitionTo(BookStates.Published)
+        }
+
+        onEvent(DeleteBook) {
+            delete()
+        }
+    }
+
+    state(BookStates.Published) {
+        onEvent(DeleteBook) {
+            delete()
+        }
+    }
 }
+
+fun setPublishTime(args: InstanceEventArgs<Book, Nothing?, Context, MyCollections>): Book =
+    args.model.props.copy(publishedAt = BookWrittenAt(args.context.time))
 
 class PrimeNumber(value: Int) : IntContainer(value) {
     override val min: Int = 1
@@ -1108,10 +1087,8 @@ class PrimeNumber(value: Int) : IntContainer(value) {
 
     private val primeNumbers = setOf(2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31)
 
-    fun mustBePrime(value: Int, translation: Translation): PropertyValidity {
-        return if (primeNumbers.contains(value)) Valid else PropertyValidity.Invalid()
-    }
-
+    fun mustBePrime(value: Int, translation: Translation): PropertyValidity =
+        if (primeNumbers.contains(value)) Valid else PropertyValidity.Invalid()
 }
 
 class IsLikedByMyDaughter(value: Boolean) : BooleanContainer(value)
@@ -1223,13 +1200,9 @@ class FlowerImage(id: AttachedBlobID) : AttachedBlobContainer(id) {
 
 // The delay stands in for a scan that takes a moment, so that the demo shows the user waiting for it. Long enough to
 // be visible, short enough that uploading a flower is not a chore.
-suspend fun removeEXIF(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
-    return BlobPreAttachStepResult.Pass
-}
+suspend fun removeEXIF(args: BlobPreAttachStepArgs): BlobPreAttachStepResult = BlobPreAttachStepResult.Pass
 
-suspend fun resizeImage(args: BlobPreAttachStepArgs): BlobPreAttachStepResult {
-    return BlobPreAttachStepResult.Pass
-}
+suspend fun resizeImage(args: BlobPreAttachStepArgs): BlobPreAttachStepResult = BlobPreAttachStepResult.Pass
 
 // A tiny limit, so that the streaming cap on the no-JavaScript path can be exercised without a large fixture.
 data class Note(val title: DocumentTitle, val content: SmallNote)
@@ -1263,9 +1236,7 @@ private fun newNote(args: VoidEventArgs<Note, CreateNoteParams, Context, MyColle
  * The limit matches [FlowerImage]'s `maxSize`. A quota below what the property declares is a trap: the form tells the
  * browser it may pick a 10 MB file, and the rule then refuses it with a bare `403` that says nothing about why.
  */
-fun noUploadLargerThanTenMegabytes(
-    args: CommandRuleArgs<*, Context, MyCollections>,
-): NegativeAuthorization {
+fun noUploadLargerThanTenMegabytes(args: CommandRuleArgs<*, Context, MyCollections>): NegativeAuthorization {
     val params = args.command.params
     if (params !is CreateUploadParams) {
         return Pass
@@ -1309,8 +1280,7 @@ fun publicationStateMachine(): StateMachine<Publication, PublicationStates, Cont
 
 private fun newPublication(
     args: VoidEventArgs<Publication, CreatePublicationParams, Context, MyCollections>,
-): Publication =
-    Publication(args.command.params.cover, args.command.params.body, args.command.params.draft)
+): Publication = Publication(args.command.params.cover, args.command.params.body, args.command.params.draft)
 
 // An image that klerk-web has measured while it was being attached, so that a page can be laid out before any
 // variant exists.

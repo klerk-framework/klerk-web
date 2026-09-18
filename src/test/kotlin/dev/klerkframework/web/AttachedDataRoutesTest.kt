@@ -1,17 +1,26 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.AttachedDataMetadata
 import dev.klerkframework.klerk.AttachedDataVisibility
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.attached.attachedDataRoutes
 import dev.klerkframework.web.attached.defaultAttachedDataCacheControl
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreatePublication
+import dev.klerkframework.web.config.CreatePublicationParams
+import dev.klerkframework.web.config.DeletePublication
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.PublicBody
+import dev.klerkframework.web.config.PublicCover
+import dev.klerkframework.web.config.Publication
+import dev.klerkframework.web.config.SecretDraft
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -55,9 +64,13 @@ class AttachedDataRoutesTest {
         application {
             routing {
                 attachedDataRoutes(support)
-                modelDetailRoutes(ModelDetailPage<Publication, Context, MyCollections>(
-                    Publication::class, support, "Publication",
-                ))
+                modelDetailRoutes(
+                    ModelDetailPage<Publication, Context, MyCollections>(
+                        Publication::class,
+                        support,
+                        "Publication",
+                    ),
+                )
             }
         }
     }
@@ -235,7 +248,7 @@ class AttachedDataRoutesTest {
 
         assertTrue(
             page.contains("href=\"${DefaultPathProvider().attachedDataPath(cover.id, meta.hash)}\""),
-            "expected a link to the cover in $page"
+            "expected a link to the cover in $page",
         )
         klerk.meta.stop()
     }

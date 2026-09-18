@@ -7,7 +7,12 @@ public enum class FetchPriority { High, Low, Auto }
 
 /** Which part of an image a [Crop] keeps. `North` is the one that matters: faces live near the top. */
 public enum class Gravity {
-    Center, North, South, East, West;
+    Center,
+    North,
+    South,
+    East,
+    West,
+    ;
 
     /** One letter, so that a crop fits in a filename and a job cursor. */
     internal val letter: Char get() = name.first().lowercaseChar()
@@ -30,8 +35,7 @@ public data class Crop(val width: Int, val height: Int, val gravity: Gravity = G
         maxOf(1, minOf(source.width.toLong(), source.height.toLong() * width / height).toInt())
 
     /** The height that goes with [width] pixels of this shape. */
-    internal fun heightFor(width: Int): Int =
-        maxOf(1, Math.round(width.toDouble() * this.height / this.width).toInt())
+    internal fun heightFor(width: Int): Int = maxOf(1, Math.round(width.toDouble() * this.height / this.width).toInt())
 
     /** `16x9c`, for a filename and a job cursor. Parsed by [parseCrop]. */
     internal fun encoded(): String = "${width}x$height${gravity.letter}"
@@ -159,10 +163,13 @@ public class ImageTemplate<C : KlerkContext, V> internal constructor(
 
     /** Identifies the template in the URL of every variant it renders. */
     public val name: String get() = default.name
+
     /** The widths the default rendition is served in. */
     public val widths: Set<Int> get() = default.widths
+
     /** The CSS `sizes` of the default rendition. */
     public val sizes: String get() = default.sizes
+
     /** The shape the default rendition is cut to, or null to keep the image's own. */
     public val crop: Crop? get() = default.crop
 
@@ -174,11 +181,11 @@ public class ImageTemplate<C : KlerkContext, V> internal constructor(
             if (usesAutoSizes(rendition.sizes)) {
                 require(loading == ImageLoading.Lazy) {
                     "'${rendition.name}' asks for sizes=auto, which a browser only honours on a lazily loaded " +
-                            "image. Leave loading lazy, or state the width yourself."
+                        "image. Leave loading lazy, or state the width yourself."
                 }
                 require(rendition.sizes.substringAfter(",", "").isNotBlank()) {
                     "'${rendition.name}' asks for sizes=auto without a fallback. Browsers that do not know 'auto' " +
-                            "fall back to 100vw and fetch the largest variant, so write it as 'auto, 320px'."
+                        "fall back to 100vw and fetch the largest variant, so write it as 'auto, 320px'."
                 }
             }
         }
@@ -198,10 +205,7 @@ public class ImageTemplate<C : KlerkContext, V> internal constructor(
     override fun toString(): String = "ImageTemplate($name)"
 
     /** Declares the alternatives of a template. See [ImagePlugin.template]. */
-    public class Builder internal constructor(
-        private val template: String,
-        private val formats: Set<String>,
-    ) {
+    public class Builder internal constructor(private val template: String, private val formats: Set<String>) {
 
         internal val alternatives: MutableList<ImageRendition> = mutableListOf()
 
@@ -215,13 +219,7 @@ public class ImageTemplate<C : KlerkContext, V> internal constructor(
          * on("mobile", media = "(max-width: 600px)", widths = setOf(320, 640), sizes = "100vw", crop = Crop(4, 5))
          * ```
          */
-        public fun on(
-            name: String,
-            media: String,
-            widths: Set<Int>,
-            sizes: String,
-            crop: Crop? = null,
-        ) {
+        public fun on(name: String, media: String, widths: Set<Int>, sizes: String, crop: Crop? = null) {
             require(media.isNotBlank()) { "The alternative '$name' needs a media condition to be picked" }
             alternatives.add(ImageRendition("$template-$name", media, widths, sizes, crop, formats))
         }
@@ -239,5 +237,4 @@ internal fun usesAutoSizes(sizes: String): Boolean = sizes.substringBefore(',').
  * The same `sizes` without its `auto`, for an image that is not lazily loaded and would therefore have had it
  * ignored. `100vw` is what a browser falls back to when nothing is left, so saying it is no worse and is legible.
  */
-internal fun withoutAutoSizes(sizes: String): String =
-    sizes.substringAfter(",", "").trim().ifBlank { "100vw" }
+internal fun withoutAutoSizes(sizes: String): String = sizes.substringAfter(",", "").trim().ifBlank { "100vw" }

@@ -11,9 +11,9 @@ import java.nio.file.Path
 import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -70,6 +70,7 @@ class ImageIoProcessorTest {
         assertFailsWith<ImageRefused> { small.stripMetadata(source, directory.resolve("refused.jpeg")) }
         Unit
     }
+
     @Test
     fun `a photograph taken sideways is measured as it will be seen`() = runBlocking {
         val upright = jpegWithOrientation(directory, landscape(800, 400), 1)

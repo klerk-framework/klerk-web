@@ -1,12 +1,11 @@
 package dev.klerkframework.web.upload
 
-import dev.klerkframework.klerk.AttachedBlobID
 import dev.klerkframework.klerk.AuthorizationException
 import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.web.Csrf
 import dev.klerkframework.web.WebSupport
 import io.ktor.http.*
@@ -206,8 +205,7 @@ public fun <C : KlerkContext, V> Route.uploadRoutes(
     }
 }
 
-private fun ApplicationCall.uploadId(): ModelID<Upload>? =
-    parameters["id"]?.toIntOrNull()?.let { ModelID(it) }
+private fun ApplicationCall.uploadId(): ModelID<Upload>? = parameters["id"]?.toIntOrNull()?.let { ModelID(it) }
 
 /**
  * The CSRF token, sent as a header rather than a form field because these requests have no form.
@@ -215,8 +213,7 @@ private fun ApplicationCall.uploadId(): ModelID<Upload>? =
  * The cookie is `SameSite=Strict`, so a cross-site request never carries it and can never match — but the token is
  * checked anyway, since "the cookie would not be there" is not something to rely on alone.
  */
-private fun isCsrfValid(call: ApplicationCall): Boolean =
-    Csrf.isValid(call, call.request.header(Csrf.TOKEN_NAME))
+private fun isCsrfValid(call: ApplicationCall): Boolean = Csrf.isValid(call, call.request.header(Csrf.TOKEN_NAME))
 
 /**
  * `Upload-Metadata` is a comma-separated list of `key base64(value)` pairs.

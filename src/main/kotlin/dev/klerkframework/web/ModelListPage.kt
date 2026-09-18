@@ -1,7 +1,11 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.view.*
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.ViewID
+import dev.klerkframework.klerk.VoidEvent
+import dev.klerkframework.klerk.view.ModelView
+import dev.klerkframework.klerk.view.ModelViews
 import io.ktor.client.request.request
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -52,7 +56,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    //private fun <T : Any> detailsPathProvider(model: Model<T>) = "${kClass.simpleName!!}/items/${model.id}"
+    // private fun <T : Any> detailsPathProvider(model: Model<T>) = "${kClass.simpleName!!}/items/${model.id}"
 
     // ------------ List ------------------------------------------------------
 
@@ -79,10 +83,7 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun selectedView(
-        queryParameters: Parameters,
-        modelViews: ModelViews<T, C>,
-    ): ModelView<T, C> {
+    private fun selectedView(queryParameters: Parameters, modelViews: ModelViews<T, C>): ModelView<T, C> {
         val viewId = queryParameters["view"] ?: return modelViews.all
         val decoded = ViewID.parse(URLDecoder.decode(viewId, Charset.forName("utf-8")))
         return modelViews.views.single { it.id == decoded }
@@ -125,7 +126,6 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         ModelViews: ModelViews<T, C>,
         context: C,
     ): FlowContent.() -> Unit = {
-
         modelTable(table)
 
         h3 { +"Events" }
@@ -133,7 +133,9 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
             p {
                 with(support) {
                     eventButton(
-                        event, null, context,
+                        event,
+                        null,
+                        context,
                         onCancelPath = call.request.uri,
                         onSuccessAndModelExistPath = pathProvider.pathForItem(kClass, "{id}"),
                         onErrorPath = pathProvider.base,
@@ -146,7 +148,6 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
             a(href = "${pathProvider.pathForList(kClass)}/analysis") { +"(More details about the list)" }
         }
     }
-
 }
 
 internal fun DisplayProperty.renderNameNonBreakingHtml(): HTMLTag.() -> Unit = {

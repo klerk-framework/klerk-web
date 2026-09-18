@@ -1,21 +1,36 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.validation.PropertyCollectionValidity
-import kotlinx.serialization.json.Json
-import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.view.ModelView
-import dev.klerkframework.klerk.view.asSequence
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.BadRequestProblem
+import dev.klerkframework.klerk.BlobRejectedException
+import dev.klerkframework.klerk.InvalidPropertyCollectionProblem
+import dev.klerkframework.klerk.InvalidPropertyProblem
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.KlerkErrorCode
+import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.Problem
+import dev.klerkframework.klerk.Translation
+import dev.klerkframework.klerk.Validatable
 import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.datatypes.*
+import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
+import dev.klerkframework.klerk.datatypes.BooleanContainer
+import dev.klerkframework.klerk.datatypes.DataContainer
+import dev.klerkframework.klerk.datatypes.DateContainer
+import dev.klerkframework.klerk.datatypes.DurationContainer
+import dev.klerkframework.klerk.datatypes.InstantContainer
+import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
 import dev.klerkframework.klerk.read.Reader
+import dev.klerkframework.klerk.validation.PropertyCollectionValidity
+import dev.klerkframework.klerk.view.ModelView
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.web.upload.Upload
 import dev.klerkframework.web.upload.UploadPlugin
+import io.ktor.http.*
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
-import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
@@ -23,10 +38,17 @@ import io.ktor.server.response.*
 import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.html.*
-import kotlinx.html.InputType.*
-import mu.KotlinLogging
 import kotlinx.datetime.LocalDate
+import kotlinx.html.*
+import kotlinx.html.InputType.checkBox
+import kotlinx.html.InputType.dateTimeLocal
+import kotlinx.html.InputType.email
+import kotlinx.html.InputType.hidden
+import kotlinx.html.InputType.number
+import kotlinx.html.InputType.password
+import kotlinx.html.InputType.text
+import kotlinx.serialization.json.Json
+import mu.KotlinLogging
 import java.io.InputStream
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
@@ -35,6 +57,7 @@ import kotlin.time.Duration.Companion.minutes
 internal val fileLog = KotlinLogging.logger {}
 
 internal val CSRF_TOKEN = Csrf.TOKEN_NAME
+
 /** How long a blob prepared from an upload waits for its command. Long enough to fix a form and submit again. */
 private val UPLOAD_BLOB_LEASE = 15.minutes
 
@@ -171,8 +194,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val field = parameters.field(propertyName)?.takeIf { !it.isCollection }
         return field?.blobDeclaration ?: throw IllegalArgumentException(
             "file('$propertyName') needs a parameter of an AttachedBlobContainer type, but " +
-                    "${parameters.kClass.simpleName}.$propertyName is " +
-                    "${field?.valueClass?.simpleName ?: "not a parameter at all"}",
+                "${parameters.kClass.simpleName}.$propertyName is " +
+                "${field?.valueClass?.simpleName ?: "not a parameter at all"}",
         )
     }
 
@@ -232,7 +255,8 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Boolean -> checkbox(p)
                     PropertyType.Int, PropertyType.Long, PropertyType.Short, PropertyType.Byte,
                     PropertyType.UInt, PropertyType.ULong, PropertyType.UShort, PropertyType.UByte,
-                    PropertyType.Float, PropertyType.Double -> number(p)
+                    PropertyType.Float, PropertyType.Double,
+                    -> number(p)
 
                     PropertyType.Ref -> selectReference(p)
                     PropertyType.Enum -> selectEnum(p)
@@ -241,15 +265,15 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Duration -> duration(p)
                     PropertyType.AttachedDataRef -> throw IllegalStateException(
                         "The property '${p.name}' refers to attached data. Declare it with file() if it is an " +
-                                "AttachedBlobID the user should upload, or with hidden()/populatedAfterSubmit() if " +
-                                "your own code supplies it. remaining() never renders one by itself, since uploading " +
-                                "requires the Uploads plugin.",
+                            "AttachedBlobID the user should upload, or with hidden()/populatedAfterSubmit() if " +
+                            "your own code supplies it. remaining() never renders one by itself, since uploading " +
+                            "requires the Uploads plugin.",
                     )
 
                     else -> throw IllegalStateException(
                         "klerk-web cannot render the property '${p.name}' of type '${p.type?.name ?: "unknown"}'." +
-                                " If you are writing the form yourself, declare that property with hidden() or" +
-                                " populatedAfterSubmit() instead of leaving it to remaining().",
+                            " If you are writing the form yourself, declare that property with hidden() or" +
+                            " populatedAfterSubmit() instead of leaving it to remaining().",
                     )
                 }
             }
@@ -338,13 +362,15 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 }
             }
 
-        result.addAll(developerProvidedModelIDSelects.map { entry ->
-            ReferencePropertyWithOptions(
-                entry.key.name, entry.key.returnType.isMarkedNullable,
-                with(reader) { entry.value.asSequence().toList() },
-                emptyList(),
-            )
-        },
+        result.addAll(
+            developerProvidedModelIDSelects.map { entry ->
+                ReferencePropertyWithOptions(
+                    entry.key.name,
+                    entry.key.returnType.isMarkedNullable,
+                    with(reader) { entry.value.asSequence().toList() },
+                    emptyList(),
+                )
+            },
         )
         return result
     }
@@ -357,7 +383,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         if (fileInputs.isNotEmpty() && uploads == null) {
             throw IllegalStateException(
                 "The form declares file(${fileInputs.joinToString(", ")}) but has no 'uploads' plugin. Pass the " +
-                        "UploadPlugin to the FormTemplate, and register its routes.",
+                    "UploadPlugin to the FormTemplate, and register its routes.",
             )
         }
 
@@ -374,14 +400,14 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 }",
             )
         }
-        val tooMany = inputs        // also selects and other stuff...
+        val tooMany = inputs // also selects and other stuff...
             .map { i -> i.first }
             .filterNot { i -> parameters.fields.map { it.name }.contains(i) }
         if (tooMany.isNotEmpty()) {
             throw IllegalStateException(
                 "Form for class ${parameters.kClass} contains too many declarations: ${
                     tooMany.joinToString(
-                        ", "
+                        ", ",
                     )
                 }",
             )
@@ -435,18 +461,25 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             ?: throw IllegalArgumentException("Missing input: $IDEMPOTENCE_KEY")
 
         for (name in callParams.names()) {
-            val expected = name == CSRF_TOKEN || name == IDEMPOTENCE_KEY || name.startsWith("null-toggle-") ||
-                inputs.any { it.first == name } || name in selectReferences || name in selectEnums || name in fileInputs
+            val expected = name == CSRF_TOKEN ||
+                name == IDEMPOTENCE_KEY ||
+                name.startsWith("null-toggle-") ||
+                inputs.any { it.first == name } ||
+                name in selectReferences ||
+                name in selectEnums ||
+                name in fileInputs
             if (!expected) {
                 throw IllegalArgumentException("Parameter $name is not expected to be present in request")
             }
         }
 
-        val allParams = callParams.plus(ParametersBuilder().apply {
-            for (p in populatedAfterSubmit) {
-                append(p.key.name, p.value.valueWithoutAuthorization.toString())
-            }
-        }.build())
+        val allParams = callParams.plus(
+            ParametersBuilder().apply {
+                for (p in populatedAfterSubmit) {
+                    append(p.key.name, p.value.valueWithoutAuthorization.toString())
+                }
+            }.build(),
+        )
 
         // someday maybe:
         // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
@@ -471,7 +504,9 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                 paramsClass.validators().mapNotNull { rule ->
                     (rule.invoke() as? PropertyCollectionValidity.Invalid)?.toProblem(rule, context.translation)
                 }
-            } else emptyList()
+            } else {
+                emptyList()
+            }
 
             if (validationProblems.isNotEmpty()) {
                 return ParseResult.Invalid(validationProblems.toSet())
@@ -584,7 +619,9 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     // The token is rendered before the file input, so by the time a file part arrives it has been
                     // seen. A request that puts the file first is refused rather than uploaded and then rejected.
                     val authorized = Csrf.isValid(call, builder[CSRF_TOKEN])
-                    if (authorized && name != null && fileInputs.contains(name) &&
+                    if (authorized &&
+                        name != null &&
+                        fileInputs.contains(name) &&
                         part.originalFileName?.isNotBlank() == true
                     ) {
                         val declaration = blobDeclarationFor(name)

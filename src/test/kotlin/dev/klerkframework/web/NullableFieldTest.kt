@@ -1,7 +1,7 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.Author
+import dev.klerkframework.web.config.FirstName
 import io.ktor.http.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

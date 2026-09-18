@@ -1,12 +1,11 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
-import dev.klerkframework.klerk.misc.ObjectSchema
+import dev.klerkframework.klerk.KlerkTranslation
+import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.camelCaseToPretty
+import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.read.ModelReader
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.format.char
 import kotlinx.datetime.toLocalDateTime
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
@@ -65,13 +64,12 @@ public class ModelDisplay<T : Any>(public val original: Model<T>) {
      * The models that each `List` or `Set` of [ModelID]s in the props refers to, keyed by the property's pretty name.
      * Requires [populateRelations] to have been called first, otherwise the lists are empty.
      */
-    public fun referencesPretty(): Map<String, List<Model<Any>>> =
-        schema.fields
-            .filter { it.isCollection && it.valueClass == ModelID::class }
-            .associate { field ->
-                val ids = field.get(original.props) as Collection<*>? ?: emptyList<Any>()
-                field.prettyName to ids.mapNotNull { relatedModels[it as ModelID<*>] }
-            }
+    public fun referencesPretty(): Map<String, List<Model<Any>>> = schema.fields
+        .filter { it.isCollection && it.valueClass == ModelID::class }
+        .associate { field ->
+            val ids = field.get(original.props) as Collection<*>? ?: emptyList<Any>()
+            field.prettyName to ids.mapNotNull { relatedModels[it as ModelID<*>] }
+        }
 
     /**
      * Returns the models that have a reference to this model.
@@ -89,12 +87,10 @@ public class DisplayProperty internal constructor(
     private val relatedModels: MutableMap<ModelID<*>, Model<Any>>,
 ) {
 
-    override fun toString(): String {
-        return if (value is ModelID<*>) {
-            (relatedModels[value] ?: stringify(value)).toString()
-        } else {
-            stringify(value)
-        }
+    override fun toString(): String = if (value is ModelID<*>) {
+        (relatedModels[value] ?: stringify(value)).toString()
+    } else {
+        stringify(value)
     }
 
     /** A human-readable rendering of the value if it's a [ModelID] or [Instant], else `null`. */
@@ -123,17 +119,13 @@ public class DisplayProperty internal constructor(
     }
 
     /** The description of the property in [translation], or null if it has none. */
-    public fun describe(translation: KlerkTranslation): String? =
-        translation.propertyDescription(property)
-
+    public fun describe(translation: KlerkTranslation): String? = translation.propertyDescription(property)
 }
 
-private fun stringify(value: Any?): String {
-    return when (value) {
-        null -> "(null)"
-        is Instant -> dateFormatter.format(value.toLocalDateTime(TimeZone.currentSystemDefault()))
-        is ModelID<*> -> value.toString()
-        is Collection<*> -> value.size.toString()
-        else -> value.toString()
-    }
+private fun stringify(value: Any?): String = when (value) {
+    null -> "(null)"
+    is Instant -> dateFormatter.format(value.toLocalDateTime(TimeZone.currentSystemDefault()))
+    is ModelID<*> -> value.toString()
+    is Collection<*> -> value.size.toString()
+    else -> value.toString()
 }

@@ -1,8 +1,8 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.view.asSequenceOrThrow
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.view.asSequenceOrThrow
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import kotlinx.html.*
@@ -17,24 +17,28 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
     val context = support.contextProvider(call, klerk)
     val modelView = klerk.specification.modelViews(kClass)
 
-    call.respond(klerk.read(context) {
-        html {
-            apply(support.layout.page("Analysis") {
-                h1 { +"Details" }
-                +kClass.toString()
-                h2 { +"Views" }
-                for (collection in modelView.views) {
-                    h6 { +(collection.id.toString()) }
-                    val groupedByState = with(this@read) { collection.asSequenceOrThrow() }.groupBy { it.state }
-                    val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
-                    +"Total count: ${countPerState.values.sum()}"
-                    ul {
-                        for (state in groupedByState.keys) {
-                            li { +"$state: ${countPerState[state]}" }
+    call.respond(
+        klerk.read(context) {
+            html {
+                apply(
+                    support.layout.page("Analysis") {
+                        h1 { +"Details" }
+                        +kClass.toString()
+                        h2 { +"Views" }
+                        for (collection in modelView.views) {
+                            h6 { +(collection.id.toString()) }
+                            val groupedByState = with(this@read) { collection.asSequenceOrThrow() }.groupBy { it.state }
+                            val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
+                            +"Total count: ${countPerState.values.sum()}"
+                            ul {
+                                for (state in groupedByState.keys) {
+                                    li { +"$state: ${countPerState[state]}" }
+                                }
+                            }
                         }
-                    }
-                }
-            })
-        }
-    })
+                    },
+                )
+            }
+        },
+    )
 }

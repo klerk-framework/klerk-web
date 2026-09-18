@@ -1,13 +1,21 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.web.attached.attachedDataRoutes
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateFlower
+import dev.klerkframework.web.config.CreateFlowerParams
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.flowerImageWidths
+import dev.klerkframework.web.config.testImagePlugin
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.Gravity
 import dev.klerkframework.web.image.ImageIoProcessor
@@ -23,7 +31,6 @@ import io.ktor.server.html.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
-import kotlinx.coroutines.delay
 import kotlinx.html.a
 import kotlinx.html.figure
 import kotlinx.html.h1
@@ -135,18 +142,20 @@ class ImageFlowTest {
                         views.flowers.all.asSequence().toList()
                             .map { it to attachedData.getMetadata(it.props.image.id) }
                     }
-                    call.respondHtml(block = layout.page("Flowers") {
-                        h1 { +"Flowers" }
-                        flowers.forEach { (flower, photo) ->
-                            figure {
-                                a(href = "#") {
-                                    with(support) {
-                                        photo?.let { image(thumbnail, it, alt = flower.props.name.value) }
+                    call.respondHtml(
+                        block = layout.page("Flowers") {
+                            h1 { +"Flowers" }
+                            flowers.forEach { (flower, photo) ->
+                                figure {
+                                    a(href = "#") {
+                                        with(support) {
+                                            photo?.let { image(thumbnail, it, alt = flower.props.name.value) }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    })
+                        },
+                    )
                 }
             }
         }
@@ -169,7 +178,6 @@ class ImageFlowTest {
             )
         }
     }
-
 
     @Test
     fun `a flower is uploaded, rendered responsively, and served at the size the page asked for`() = testApplication {

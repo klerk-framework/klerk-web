@@ -1,25 +1,32 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.AttachedDataID
 import dev.klerkframework.klerk.AttachedDataKind
 import dev.klerkframework.klerk.AttachedDataMetadata
 import dev.klerkframework.klerk.AttachedDataVisibility
+import dev.klerkframework.klerk.BlobRejectedException
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.web.config.*
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreatePhoto
+import dev.klerkframework.web.config.CreatePhotoParams
+import dev.klerkframework.web.config.DescribedImage
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.Photo
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testImagePlugin
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.FetchPriority
-import dev.klerkframework.klerk.BlobRejectedException
 import dev.klerkframework.web.image.ImageIoProcessor
 import dev.klerkframework.web.image.ImageLimits
-import dev.klerkframework.web.image.ImageProcessor
 import dev.klerkframework.web.image.ImageLoading
 import dev.klerkframework.web.image.ImagePlugin
+import dev.klerkframework.web.image.ImageProcessor
 import dev.klerkframework.web.image.ImageSidecar
 import dev.klerkframework.web.image.ImageTemplate
 import dev.klerkframework.web.image.image
@@ -31,13 +38,13 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import javax.imageio.ImageIO
-import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 /**
  * The HTML. What matters is that the browser is told enough to pick the right file and to reserve the right space
@@ -99,9 +106,7 @@ class ImageMarkupTest {
         val image = setup.described(ImageSidecar(4000, 3000))
 
         val html = createHTML().div {
-
             with(support) { image(setup.gallery, image, alt = "A photo") }
-
         }
 
         assertTrue(html.contains("srcset="), html)
@@ -142,7 +147,7 @@ class ImageMarkupTest {
         assertTrue(html.contains("""src="/_attached/42/ab12cd/gallery-640.png""""), html)
         assertTrue(html.contains("""sizes="50vw""""), html)
         assertTrue(html.contains("""width="640""""), html)
-        assertTrue(html.contains("""height="480""""), html)   // 4000x3000 at 640 wide
+        assertTrue(html.contains("""height="480""""), html) // 4000x3000 at 640 wide
         assertTrue(html.contains("""loading="lazy""""), html)
         assertTrue(html.contains("""alt="A photo""""), html)
     }
@@ -188,9 +193,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(bare, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         assertTrue(html.contains("""sizes="auto, 100vw""""), html)
@@ -204,9 +207,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(eager, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         assertTrue(html.contains("""sizes="100vw""""), html)
@@ -270,6 +271,7 @@ class ImageMarkupTest {
             testImagePlugin = null
         }
     }
+
     @Test
     fun `a cropped template reserves space before anything has measured the image`() {
         val setup = setup()
@@ -295,6 +297,7 @@ class ImageMarkupTest {
         assertFalse(html.contains("width="), html)
         assertFalse(html.contains("height="), html)
     }
+
     @Test
     fun `a template locked to one format is served in it, whatever the plugin offers`() {
         val setup = setup(formats = setOf("png", "jpeg"))
@@ -302,9 +305,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") }
-
         }
 
         // One format, so a plain <img> - and nothing offers the jpeg the plugin would otherwise have added.
@@ -320,9 +321,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(logo, setup.described(ImageSidecar(480, 240)), alt = "A logo") }
-
         }
 
         assertTrue(html.contains("/_attached/42/ab12cd/logo-120.png"), html)
@@ -365,9 +364,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         assertTrue(html.contains("""loading="eager""""), html)
@@ -382,9 +379,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(auto, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         assertTrue(html.contains("""sizes="auto, 320px""""), html)
@@ -445,9 +440,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(hero, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         val mobile = html.indexOf("hero-mobile-320.png")
@@ -468,9 +461,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(tall, setup.described(ImageSidecar(4000, 3000)), alt = "A photo") }
-
         }
 
         assertTrue(html.contains("tall-640.png 640w"), html)
@@ -485,9 +476,7 @@ class ImageMarkupTest {
         val support = WebSupport(setup.klerk, { _, _ -> actor })
 
         val html = createHTML().div {
-
             with(support) { image(square, setup.described(ImageSidecar(800, 400)), alt = "A photo") }
-
         }
 
         assertFalse(html.contains("<picture"), html)

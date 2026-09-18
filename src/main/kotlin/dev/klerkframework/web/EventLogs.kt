@@ -1,6 +1,8 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.ActorType
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.ModelID
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import kotlinx.datetime.TimeZone
@@ -28,35 +30,35 @@ internal suspend fun <C : KlerkContext, V> renderEventLog(
     val events = query.get()
 
     support.respondPage(call, "Event log") {
-            header {
-                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
+        header {
+            nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
+        }
+        h1 { +"Events" }
+        if (forModel != null) {
+            +modelSummary
+            br
+            +"ID: $forModel"
+        }
+        table {
+            thead {
+                tr {
+                    th { +"Time" }
+                    th { +"Actor" }
+                    th { +"Event" }
+                    if (forModel == null) th { +"Model" }
+                }
             }
-            h1 { +"Events" }
-            if (forModel != null) {
-                +modelSummary
-                br
-                +"ID: $forModel"
-            }
-            table {
-                thead {
+            tbody {
+                for (event in events) {
                     tr {
-                        th { +"Time" }
-                        th { +"Actor" }
-                        th { +"Event" }
-                        if (forModel == null) th { +"Model" }
-                    }
-                }
-                tbody {
-                    for (event in events) {
-                        tr {
-                            td { +formatTime(event.time) }
-                            td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
-                            td { a(href = "_eventlog/${event.sequenceNumber}") { +event.eventReference.eventName } }
-                            if (forModel == null) td { +event.model.toString() }
-                        }
+                        td { +formatTime(event.time) }
+                        td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
+                        td { a(href = "_eventlog/${event.sequenceNumber}") { +event.eventReference.eventName } }
+                        if (forModel == null) td { +event.model.toString() }
                     }
                 }
             }
+        }
     }
 }
 
@@ -70,41 +72,41 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
     val event = requireNotNull(klerk.read(context) { eventLogEntry(sequenceNumber) }.get())
 
     support.respondPage(call, "Event log entry") {
-            header {
-                nav {
-                    div {
-                        a(href = support.pathProvider.withPrefix()) { +"Home" }
-                        +" / "
-                        a(href = "${support.pathProvider.withPrefix()}_eventlog") { +"Event log" }
-                    }
+        header {
+            nav {
+                div {
+                    a(href = support.pathProvider.withPrefix()) { +"Home" }
+                    +" / "
+                    a(href = "${support.pathProvider.withPrefix()}_eventlog") { +"Event log" }
                 }
             }
-            h1 { +"Event details" }
-            table {
-                tr {
-                    td { +"Time" }
-                    td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
-                }
-                tr {
-                    td { +"Actor" }
-                    td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
-                }
-                tr {
-                    td { +"Event" }
-                    td { +event.eventReference.eventName }
-                }
-                tr {
-                    td { +"Model ID" }
-                    td { +"${event.model} (${event.model.value})" }
-                }
+        }
+        h1 { +"Event details" }
+        table {
+            tr {
+                td { +"Time" }
+                td { +dateTimeFormatter.format(event.time.toLocalDateTime(TimeZone.currentSystemDefault())) }
             }
-            h2 { +"Parameters" }
-            val jsonPretty = prettyJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(event.params))
-            textArea {
-                disabled = true
-                rows = jsonPretty.lines().size.toString()
-                +jsonPretty
+            tr {
+                td { +"Actor" }
+                td { +describeActor(event.actorType, event.actorReference, event.actorExternalId) }
             }
+            tr {
+                td { +"Event" }
+                td { +event.eventReference.eventName }
+            }
+            tr {
+                td { +"Model ID" }
+                td { +"${event.model} (${event.model.value})" }
+            }
+        }
+        h2 { +"Parameters" }
+        val jsonPretty = prettyJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(event.params))
+        textArea {
+            disabled = true
+            rows = jsonPretty.lines().size.toString()
+            +jsonPretty
+        }
     }
 }
 

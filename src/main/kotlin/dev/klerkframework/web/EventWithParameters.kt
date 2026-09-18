@@ -8,5 +8,5 @@ import kotlin.reflect.KClass
 public data class EventWithParameters<T : Any>(val eventReference: EventReference, val parameters: ObjectSchema<T>) {
     /** Creates it from the parameters class itself. */
     public constructor(eventReference: EventReference, parametersClass: KClass<T>) :
-            this(eventReference, ObjectSchema.of(parametersClass))
+        this(eventReference, ObjectSchema.of(parametersClass))
 }

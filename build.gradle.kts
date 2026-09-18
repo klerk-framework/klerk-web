@@ -1,7 +1,7 @@
 import org.gradle.kotlin.dsl.invoke
-import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.dokka.gradle.formats.DokkaFormatPlugin
 import org.jetbrains.dokka.gradle.internal.InternalDokkaGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 
 plugins {
     kotlin("jvm") version "2.4.10"
@@ -9,6 +9,7 @@ plugins {
     `java-library`
     `maven-publish`
     id("org.jetbrains.dokka") version "2.2.0"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
 val klerkVersion = "1.0.0-beta.7-SNAPSHOT"
@@ -23,7 +24,7 @@ version = "1.0.0-alpha.2-SNAPSHOT"
 
 dependencies {
     implementation("dev.klerkframework:klerk:$klerkVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:${datetimeVersion}")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
     implementation("io.ktor:ktor-server-html-builder:$ktorVersion")
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
@@ -31,24 +32,26 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.micrometer:micrometer-core:1.12.3") // TODO this should not be necessary? It seems to be required when copying a config (e.g. in a plugin). Do we really want all klerk-based application to require this?
-    implementation("io.ktor:ktor-server-compression:${ktorVersion}") // TODO: remove?
+    // TODO this should not be necessary? It seems to be required when copying a config (e.g. in a plugin).
+    // Do we really want all klerk-based application to require this?
+    implementation("io.micrometer:micrometer-core:1.12.3")
+    implementation("io.ktor:ktor-server-compression:$ktorVersion") // TODO: remove?
     implementation("io.github.microutils:kotlin-logging-jvm:$kotlinLoggingVersion")
     testImplementation(kotlin("test"))
     testImplementation("io.micrometer:micrometer-core:1.12.3")
     testImplementation("org.xerial:sqlite-jdbc:$sqliteJdbcVersion")
     testImplementation("org.slf4j:slf4j-simple:$slf4jVersion")
-    testImplementation("dev.klerkframework:klerk:${klerkVersion}")
-    testImplementation("io.ktor:ktor-server-html-builder:${ktorVersion}")
-    testImplementation("io.ktor:ktor-server-core-jvm:${ktorVersion}")
-    testImplementation("io.ktor:ktor-server-netty-jvm:${ktorVersion}")
-    testImplementation("io.ktor:ktor-server-auth:${ktorVersion}")
-    testImplementation("io.ktor:ktor-server-sessions-jvm:${ktorVersion}")
-    testImplementation("io.ktor:ktor-client-core:${ktorVersion}")
-    testImplementation("io.ktor:ktor-client-cio:${ktorVersion}")
-    testImplementation("io.ktor:ktor-server-test-host:${ktorVersion}")
-    //testImplementation("org.jetbrains.kotlin:kotlin-test")
-    //testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    testImplementation("dev.klerkframework:klerk:$klerkVersion")
+    testImplementation("io.ktor:ktor-server-html-builder:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-auth:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-core:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-cio:$ktorVersion")
+    testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
+    // testImplementation("org.jetbrains.kotlin:kotlin-test")
+    // testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
 }
 
 publishing {
@@ -62,6 +65,13 @@ publishing {
 
 java {
     withSourcesJar()
+}
+
+// ktlint's parser cannot yet handle Kotlin context parameters (context(reader: ...)).
+ktlint {
+    filter {
+        exclude { it.file.name == "AutoButtons.kt" || it.file.name == "ImageMarkup.kt" }
+    }
 }
 
 tasks.test {
@@ -78,7 +88,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     compilerOptions.optIn.add("dev.klerkframework.klerk.ExperimentalKlerkApi")
 }
 
-
 // Declares Markdown Gradle plugin
 @OptIn(InternalDokkaGradlePluginApi::class)
 abstract class DokkaMarkdownPlugin : DokkaFormatPlugin(formatName = "markdown") {
@@ -89,7 +98,7 @@ abstract class DokkaMarkdownPlugin : DokkaFormatPlugin(formatName = "markdown") 
 
             // Sets up multi-project generation
             formatDependencies.dokkaPublicationPluginClasspathApiOnly.dependencies.addLater(
-                dokka("gfm-template-processing-plugin")
+                dokka("gfm-template-processing-plugin"),
             )
         }
     }

@@ -1,26 +1,30 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.CommandResult
+import dev.klerkframework.klerk.Event
+import dev.klerkframework.klerk.EventReference
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.datatypes.*
 import dev.klerkframework.klerk.misc.PropertyType
 import dev.klerkframework.klerk.misc.SchemaField
-import dev.klerkframework.klerk.camelCaseToPretty
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
-import kotlinx.html.*
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
+import kotlinx.html.*
 import mu.KotlinLogging
 import kotlin.io.encoding.Base64
-import kotlin.time.Duration.Companion.seconds
 import kotlin.reflect.KClass
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -45,7 +49,7 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
         try {
             template = FormTemplate(
                 EventWithParameters(eventReference, parameters),
-                //eventWithParameters.parameters.raw,
+                // eventWithParameters.parameters.raw,
                 klerk,
                 getUrl(),
                 classProvider = support.classProvider,
@@ -58,16 +62,15 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
         } catch (e: NotImplementedError) {
             throw IllegalStateException(
                 "klerk-web cannot build a form for the event '$eventReference': ${e.message}. " +
-                        "Either add support for the data type, or exclude the event from the generated UI.", e,
+                    "Either add support for the data type, or exclude the event from the generated UI.",
+                e,
             )
         }
     }
 
     override fun toString(): String = eventReference.toString()
 
-    internal fun getUrl(): String {
-        return "$path?eventId=${eventReference.toString().encodeURLPathPart()}"
-    }
+    internal fun getUrl(): String = "$path?eventId=${eventReference.toString().encodeURLPathPart()}"
 
     internal companion object {
         internal suspend fun <C : KlerkContext, V> renderCreateEventPage(
@@ -277,7 +280,6 @@ internal class LowCodeCreateEvent<C : KlerkContext, V>(
             }
         }
     }
-
 }
 
 internal class AuthenticationException(message: String? = null) : RuntimeException(message)
@@ -336,7 +338,6 @@ internal fun valueWithCorrectType(value: String?, field: SchemaField): Any? {
         throw IllegalArgumentException("Could not parse '${field.name}'", e)
     }
 }
-
 
 /**
  * Check if the parameter class is the same as the model class. However, we don't really know for sure that it is

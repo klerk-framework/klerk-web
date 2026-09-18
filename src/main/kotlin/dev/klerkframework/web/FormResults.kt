@@ -1,20 +1,24 @@
 package dev.klerkframework.web
-
-import kotlinx.serialization.Serializable
-import dev.klerkframework.klerk.validation.Valid
-import kotlinx.serialization.json.Json
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.CommandResult
+import dev.klerkframework.klerk.InvalidPropertyCollectionProblem
+import dev.klerkframework.klerk.InvalidPropertyProblem
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.Problem
+import dev.klerkframework.klerk.VoidEvent
+import dev.klerkframework.klerk.VoidEventWithParameters
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.datatypes.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.html.*
-import kotlinx.html.InputType.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 @Serializable
 internal data class ValResponse(
@@ -32,10 +36,13 @@ public data class ValidationProblemResponse(public val field: String?, public va
 public sealed class ParseResult<T> {
     /** The request failed the CSRF check and must not be acted on. Respond with [FormTemplate.respondForbidden]. */
     public class Forbidden<T> : ParseResult<T>()
+
     /** The submitted data is not valid. Respond with [FormTemplate.respondInvalid]. */
     public data class Invalid<T>(val problems: Set<Problem>) : ParseResult<T>()
+
     /** The request was a dry run, so respond without issuing the command. */
     public data class DryRun<T>(val params: T, val key: CommandToken) : ParseResult<T>()
+
     /** Valid parameters. Pass [key] as the [dev.klerkframework.klerk.command.ProcessingOptions] token. */
     public data class Parsed<T>(val params: T, val key: CommandToken) : ParseResult<T>()
 }

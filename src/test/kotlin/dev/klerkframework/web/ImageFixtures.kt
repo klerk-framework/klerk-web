@@ -48,17 +48,17 @@ fun writePng(directory: Path, name: String, image: BufferedImage): Path {
 fun jpegWithOrientation(directory: Path, image: BufferedImage, orientation: Int): Path {
     val jpeg = ByteArrayOutputStream().also { ImageIO.write(image, "jpeg", it) }.toByteArray()
     val exif = byteArrayOf(
-        0xFF.toByte(), 0xE1.toByte(), 0x00, 0x22,             // APP1, 34 bytes
-        0x45, 0x78, 0x69, 0x66, 0x00, 0x00,                   // "Exif\0\0"
-        0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08,       // big-endian TIFF, IFD0 at offset 8
-        0x00, 0x01,                                           // one entry
-        0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01,       // tag 0x0112, SHORT, count 1
-        0x00, orientation.toByte(), 0x00, 0x00,               // the value, in the first two bytes
-        0x00, 0x00, 0x00, 0x00,                               // no next IFD
+        0xFF.toByte(), 0xE1.toByte(), 0x00, 0x22, // APP1, 34 bytes
+        0x45, 0x78, 0x69, 0x66, 0x00, 0x00, // "Exif\0\0"
+        0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08, // big-endian TIFF, IFD0 at offset 8
+        0x00, 0x01, // one entry
+        0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, // tag 0x0112, SHORT, count 1
+        0x00, orientation.toByte(), 0x00, 0x00, // the value, in the first two bytes
+        0x00, 0x00, 0x00, 0x00, // no next IFD
     )
     val file = directory.resolve("orientation-$orientation.jpeg")
     Files.newOutputStream(file).use { out ->
-        out.write(jpeg, 0, 2)                                 // SOI
+        out.write(jpeg, 0, 2) // SOI
         out.write(exif)
         out.write(jpeg, 2, jpeg.size - 2)
     }
@@ -78,14 +78,11 @@ fun transparentPng(directory: Path): Path {
     return file
 }
 
-fun isRed(rgb: Int): Boolean =
-    ((rgb shr 16) and 0xFF) > 150 && ((rgb shr 8) and 0xFF) < 100 && (rgb and 0xFF) < 100
+fun isRed(rgb: Int): Boolean = ((rgb shr 16) and 0xFF) > 150 && ((rgb shr 8) and 0xFF) < 100 && (rgb and 0xFF) < 100
 
-fun isBlue(rgb: Int): Boolean =
-    ((rgb shr 16) and 0xFF) < 100 && ((rgb shr 8) and 0xFF) < 100 && (rgb and 0xFF) > 150
+fun isBlue(rgb: Int): Boolean = ((rgb shr 16) and 0xFF) < 100 && ((rgb shr 8) and 0xFF) < 100 && (rgb and 0xFF) > 150
 
-fun isWhite(rgb: Int): Boolean =
-    ((rgb shr 16) and 0xFF) > 200 && ((rgb shr 8) and 0xFF) > 200 && (rgb and 0xFF) > 200
+fun isWhite(rgb: Int): Boolean = ((rgb shr 16) and 0xFF) > 200 && ((rgb shr 8) and 0xFF) > 200 && (rgb and 0xFF) > 200
 
 /**
  * Every file under [root], by name.

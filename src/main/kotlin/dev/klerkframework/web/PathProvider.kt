@@ -15,10 +15,13 @@ import kotlin.reflect.KClass
 public interface PathProvider {
     /** Base path for the application, typically "/". */
     public val base: String
+
     /** Prefix for the generated pages, e.g. "admin/". */
     public val prefix: String
+
     /** Where assets are served from. */
     public val assetsBase: String
+
     /** Where the generated event forms are served. */
     public val autoButtons: String
 
@@ -39,6 +42,7 @@ public interface PathProvider {
      * As [pathForItem], but takes the id as a string so that a route pattern (e.g. "{id}") can be built.
      */
     public fun pathForItem(kClass: KClass<out Any>, id: String): String?
+
     /** The URL of an asset. */
     public fun assetPath(resource: String): String = "$assetsBase/$resource"
 
@@ -74,22 +78,16 @@ public interface PathProvider {
 }
 
 /** Paths of the form `base + prefix + modelname` and `base + prefix + modelname/id`. */
-public data class DefaultPathProvider(
-    override val base: String = "/",
-    override val prefix: String = "",
-) : PathProvider {
+public data class DefaultPathProvider(override val base: String = "/", override val prefix: String = "") :
+    PathProvider {
 
     override val assetsBase: String = "${base}_assets"
 
     override val autoButtons: String = "${base}_autobuttons"
 
-    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String? {
-        return "${pathForList(kClass)}/${id.value}"
-    }
+    override fun pathForItem(kClass: KClass<out Any>, id: ModelID<*>): String? = "${pathForList(kClass)}/${id.value}"
 
-    override fun pathForItem(kClass: KClass<out Any>, id: String): String? {
-        return "${pathForList(kClass)}/$id"
-    }
+    override fun pathForItem(kClass: KClass<out Any>, id: String): String? = "${pathForList(kClass)}/$id"
 
     init {
         require(base.startsWith("/")) { "Base path must start with /" }

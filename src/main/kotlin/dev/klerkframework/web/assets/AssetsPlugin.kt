@@ -1,13 +1,17 @@
 package dev.klerkframework.web.assets
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.ManagedModel
+import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.Specification
+import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.view.asSequence
-import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.web.AdminUIPluginIntegration
-import dev.klerkframework.web.WebSupport
 import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.PluginPage
+import dev.klerkframework.web.WebSupport
 import dev.klerkframework.web.image.ASSET
 import dev.klerkframework.web.image.ImagePlugin
 import io.ktor.http.*
@@ -24,7 +28,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 
-private const val contentEncodingBrotli = "br"
+private const val CONTENT_ENCODING_BROTLI = "br"
 private val log = KotlinLogging.logger {}
 
 /**
@@ -44,7 +48,8 @@ public class AssetsPlugin<C : KlerkContext, V>(
         """Plugin that efficiently serves static assets. 
             |Handles cache-control and cache busting.
             |If the 'brotli' command line tool is installed, it will be used to serve Brotli-compressed text assets.
-            |It can work together with the Ktor Compression plugin.""".trimMargin()
+            |It can work together with the Ktor Compression plugin.
+        """.trimMargin()
 
     private val textAssetCollections = ModelViews<TextAsset, C>()
 
@@ -52,7 +57,9 @@ public class AssetsPlugin<C : KlerkContext, V>(
         val managedModels = previous.managedModels.toMutableSet()
         managedModels.add(
             ManagedModel(
-                TextAsset::class, createTextResourceStatemachine(), textAssetCollections,
+                TextAsset::class,
+                createTextResourceStatemachine(),
+                textAssetCollections,
             ),
         )
         return previous.copy(managedModels = managedModels)
@@ -92,7 +99,9 @@ public class AssetsPlugin<C : KlerkContext, V>(
                     val brotliId = if (brotliAvailable) {
                         val brotli = compressBrotli(resourceContent.byteInputStream())
                         _klerk.attachedData.prepare(brotli.inputStream(), CompressedAsset::class, context)
-                    } else null
+                    } else {
+                        null
+                    }
 
                     _klerk.handle(
                         Command(
@@ -103,7 +112,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
                                 base64hash,
                                 brotliId?.let { CompressedAsset(it) },
                             ),
-                        
+
                         ),
                         context,
                     )
@@ -165,7 +174,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
 
     private fun compressBrotli(input: ByteArrayInputStream): ByteArray {
         log.info { "Compressing text asset with brotli" }
-        val process = ProcessBuilder("brotli", "-Z", "--stdout")  // Compress to stdout
+        val process = ProcessBuilder("brotli", "-Z", "--stdout") // Compress to stdout
             .redirectError(ProcessBuilder.Redirect.INHERIT)
             .start()
 
@@ -222,7 +231,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
                 return@get
             }
 
-            if (call.request.headers[HttpHeaders.AcceptEncoding]?.contains(contentEncodingBrotli) ?: false &&
+            if (call.request.headers[HttpHeaders.AcceptEncoding]?.contains(CONTENT_ENCODING_BROTLI) ?: false &&
                 textAsset.props.brotli != null
             ) {
                 serveBrotli(call, textAsset.props.brotli!!.id, contentType)
@@ -241,7 +250,9 @@ public class AssetsPlugin<C : KlerkContext, V>(
     private suspend fun RoutingContext.serveImageVariant(path: String) {
         val plugin = images
         val slash = path.lastIndexOf('/')
-        val asset = if (slash <= 0 || plugin == null) null else {
+        val asset = if (slash <= 0 || plugin == null) {
+            null
+        } else {
             val head = path.substring(0, slash)
             assets.filterIsInstance<ImageAsset>().firstOrNull { it.getPathAndHash() == head }
         }
@@ -281,10 +292,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
     /**
      * Serve uncompressed (but if the Ktor Compression plugin is enabled, it may still be compressed)
      */
-    private suspend fun RoutingContext.serveUncompressed(
-        asset: KlerkAsset,
-        contentType: ContentType,
-    ) {
+    private suspend fun RoutingContext.serveUncompressed(asset: KlerkAsset, contentType: ContentType) {
         val resourcePath = if (asset.resourcePath.startsWith("/")) asset.resourcePath else "/${asset.resourcePath}"
         val inputString = this::class.java.getResourceAsStream("/assets$resourcePath")
         if (inputString != null) {
@@ -297,7 +305,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
     }
 
     private suspend fun serveBrotli(call: RoutingCall, id: AttachedBlobID, contentType: ContentType) {
-        call.response.headers.append(ContentEncoding, contentEncodingBrotli)
+        call.response.headers.append(ContentEncoding, CONTENT_ENCODING_BROTLI)
         val ctx = _klerk.specification.systemContextProvider()
         val inputStream = _klerk.attachedData.get(id, ctx)
         setCacheControl(call)
@@ -309,7 +317,6 @@ public class AssetsPlugin<C : KlerkContext, V>(
     private fun setCacheControl(call: RoutingCall) {
         call.response.headers.append(HttpHeaders.CacheControl, "max-age=31536000, public, immutable")
     }
-
 }
 
 /** Lists the served assets and their sizes in the Admin UI. */
@@ -317,11 +324,7 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
     PluginPage<C, V> {
     override val buttonText: String = "Assets"
 
-    override suspend fun respond(
-        call: ApplicationCall,
-        support: WebSupport<C, V>,
-        klerk: Klerk<C, V>,
-    ) {
+    override suspend fun respond(call: ApplicationCall, support: WebSupport<C, V>, klerk: Klerk<C, V>) {
         val context = support.contextProvider(call, klerk)
         val textAssets = klerk.read(context) {
             textAssetCollections.all.asSequence().toList()
@@ -331,7 +334,8 @@ public class Page<C : KlerkContext, V>(private val textAssetCollections: ModelVi
             AssetDetails(
                 asset.props.path.value,
                 ResourceReader.readResource(asset.props.path.value)?.length ?: 0,
-                asset.props.brotli?.let { blob -> klerk.attachedData.get(blob.id, context).readBytes().size })
+                asset.props.brotli?.let { blob -> klerk.attachedData.get(blob.id, context).readBytes().size },
+            )
         }
 
         support.respondPage(call, "Assets") {
@@ -369,4 +373,4 @@ private object ResourceReader {
     }
 }
 
-//internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js", pathProvider)
+// internal val klerkFormValidationJs = JsAsset("/assets/klerkFormValidation.js", pathProvider)

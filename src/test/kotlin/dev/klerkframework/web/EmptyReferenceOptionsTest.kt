@@ -1,7 +1,15 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateAuthor
+import dev.klerkframework.web.config.CreateAuthorParams
+import dev.klerkframework.web.config.CreateBook
+import dev.klerkframework.web.config.CreateBookParams
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import io.ktor.client.request.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
@@ -26,7 +34,8 @@ class EmptyReferenceOptionsTest {
         // No authors are created, so the non-nullable author field has no options
         val template = FormTemplate<CreateBookParams, Context, MyCollections>(
             EventWithParameters(CreateBook.id, CreateBookParams::class),
-            klerk, "/create-book",
+            klerk,
+            "/create-book",
             classProvider = null,
             pathProvider = DefaultPathProvider(),
         ) {
@@ -69,7 +78,8 @@ class EmptyReferenceOptionsTest {
         // No authors are created, but favouriteColleague is nullable so it should still render
         val template = FormTemplate<CreateAuthorParams, Context, MyCollections>(
             EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
-            klerk, "/create-author",
+            klerk,
+            "/create-author",
             classProvider = null,
             pathProvider = DefaultPathProvider(),
         ) {

@@ -1,30 +1,29 @@
 package dev.klerkframework.web.upload
 
 import dev.klerkframework.klerk.ActorIdentity
-import dev.klerkframework.klerk.Specification
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.CommandResult
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.KlerkPlugin
 import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.SystemIdentity
-import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.klerk.view.asSequence
+import dev.klerkframework.klerk.Problem
+import dev.klerkframework.klerk.Specification
+import dev.klerkframework.klerk.command.Command
+import dev.klerkframework.klerk.command.ProcessingOptions
 import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
-import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import mu.KotlinLogging
 import java.io.InputStream
 import java.nio.file.Path
-import dev.klerkframework.klerk.AttachedBlobID
-import dev.klerkframework.klerk.CommandResult
-import dev.klerkframework.klerk.Problem
 import java.util.Base64
 import kotlin.reflect.KClass
 import kotlin.time.Duration
@@ -71,7 +70,8 @@ public class UploadPlugin<C : KlerkContext, V>(
 
     override val description: String =
         """Resumable file upload. Partial uploads are staged on disk and tracked by an Upload model, which
-            |decides who may continue an upload and cleans itself up if the upload is abandoned.""".trimMargin()
+            |decides who may continue an upload and cleans itself up if the upload is abandoned.
+        """.trimMargin()
 
     internal val staging: UploadStaging = UploadStaging(stagingDirectory)
     internal val views: ModelViews<Upload, C> = ModelViews()
@@ -308,7 +308,7 @@ public class UploadPlugin<C : KlerkContext, V>(
     private fun requireComplete(upload: Model<Upload>, id: ModelID<Upload>) {
         check(upload.props.isComplete) {
             "The upload $id is not complete (${upload.props.receivedBytes.valueWithoutAuthorization} of " +
-                    "${upload.props.declaredSize.valueWithoutAuthorization} bytes)"
+                "${upload.props.declaredSize.valueWithoutAuthorization} bytes)"
         }
     }
 
@@ -383,5 +383,5 @@ public class UploadPlugin<C : KlerkContext, V>(
 /** Whether this upload was started by [actor]. */
 internal fun Upload.belongsTo(actor: ActorIdentity): Boolean =
     actorType.valueWithoutAuthorization == actor.type.storedValue &&
-            actorReference?.valueWithoutAuthorization == actor.id?.value &&
-            actorExternalId?.valueWithoutAuthorization == actor.externalId
+        actorReference?.valueWithoutAuthorization == actor.id?.value &&
+        actorExternalId?.valueWithoutAuthorization == actor.externalId

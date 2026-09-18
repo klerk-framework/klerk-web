@@ -46,7 +46,6 @@ public fun <M : Any> FlowContent.modelProperties(
     }
 }
 
-
 /**
  * Where in the generated HTML an element sits. Passed to [CssClassProvider] so that one provider can style
  * everything klerk-web renders.

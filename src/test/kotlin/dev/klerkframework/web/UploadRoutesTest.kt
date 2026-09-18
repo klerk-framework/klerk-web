@@ -1,12 +1,15 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
-import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -29,9 +32,10 @@ class UploadRoutesTest {
     private val csrfHeader = Csrf.TOKEN_NAME
     private val token = "test-csrf-token"
 
-    private fun ApplicationTestBuilder.setup():
-
-        Pair<Klerk<Context, MyCollections>, UploadPlugin<Context, MyCollections>> {
+    private fun ApplicationTestBuilder.setup(): Pair<
+        Klerk<Context, MyCollections>,
+        UploadPlugin<Context, MyCollections>,
+        > {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val dir = Files.createTempDirectory("klerk-upload-routes")
         val bc = BookCollections()
@@ -57,13 +61,13 @@ class UploadRoutesTest {
     private fun target(event: String, field: String): String {
         val encoder = Base64.getEncoder()
         return "event ${encoder.encodeToString(event.toByteArray())}," +
-                "field ${encoder.encodeToString(field.toByteArray())}"
+            "field ${encoder.encodeToString(field.toByteArray())}"
     }
 
     private fun metadata(filename: String, contentType: String): String {
         val encoder = Base64.getEncoder()
         return "filename ${encoder.encodeToString(filename.toByteArray())}," +
-                "contentType ${encoder.encodeToString(contentType.toByteArray())}"
+            "contentType ${encoder.encodeToString(contentType.toByteArray())}"
     }
 
     @Test
@@ -123,10 +127,12 @@ class UploadRoutesTest {
         val (klerk, _) = setup()
         klerk.meta.start(installShutdownHook = false)
 
-        val location = assertNotNull(client.post("/uploads") {
-            withCsrf()
-            header("Upload-Length", "20")
-        }.headers[HttpHeaders.Location])
+        val location = assertNotNull(
+            client.post("/uploads") {
+                withCsrf()
+                header("Upload-Length", "20")
+            }.headers[HttpHeaders.Location],
+        )
 
         client.patch(location) {
             withCsrf()
@@ -151,10 +157,12 @@ class UploadRoutesTest {
         val (klerk, _) = setup()
         klerk.meta.start(installShutdownHook = false)
 
-        val location = assertNotNull(client.post("/uploads") {
-            withCsrf()
-            header("Upload-Length", "10")
-        }.headers[HttpHeaders.Location])
+        val location = assertNotNull(
+            client.post("/uploads") {
+                withCsrf()
+                header("Upload-Length", "10")
+            }.headers[HttpHeaders.Location],
+        )
 
         val corrupted = client.patch(location) {
             withCsrf()
@@ -185,10 +193,12 @@ class UploadRoutesTest {
         val withoutToken = client.post("/uploads") { header("Upload-Length", "5") }
         assertEquals(HttpStatusCode.Forbidden, withoutToken.status)
 
-        val location = assertNotNull(client.post("/uploads") {
-            withCsrf()
-            header("Upload-Length", "5")
-        }.headers[HttpHeaders.Location])
+        val location = assertNotNull(
+            client.post("/uploads") {
+                withCsrf()
+                header("Upload-Length", "5")
+            }.headers[HttpHeaders.Location],
+        )
 
         val patchWithoutToken = client.patch(location) {
             header("Upload-Offset", "0")
@@ -257,6 +267,5 @@ class UploadRoutesTest {
         klerk.meta.stop()
     }
 
-    private fun sha256(value: String): ByteArray =
-        MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+    private fun sha256(value: String): ByteArray = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
 }

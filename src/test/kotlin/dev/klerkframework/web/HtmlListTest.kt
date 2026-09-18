@@ -1,7 +1,14 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.Author
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createAuthorJKRowling
+import dev.klerkframework.web.config.createBookHarryPotter1
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
@@ -10,9 +17,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.html.*
 
 fun main() {
-
     runBlocking {
-
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all))
@@ -26,7 +31,6 @@ fun main() {
         embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
             routing {
                 get("/") {
-
                     val table = klerk.read(Context.system()) {
                         TableTemplate<Author, Context, MyCollections>(
                             klerk,
@@ -51,7 +55,6 @@ fun main() {
                         }
                     }
                 }
-
             }
         }.start(wait = true)
     }

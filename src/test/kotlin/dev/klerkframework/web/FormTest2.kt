@@ -1,10 +1,27 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.ActorIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.datatypes.DataContainer
-import dev.klerkframework.web.ParseResult.*
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.ParseResult.DryRun
+import dev.klerkframework.web.ParseResult.Forbidden
+import dev.klerkframework.web.ParseResult.Invalid
+import dev.klerkframework.web.ParseResult.Parsed
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateAuthor
+import dev.klerkframework.web.config.CreateAuthorParams
+import dev.klerkframework.web.config.FirstName
+import dev.klerkframework.web.config.IsLikedByMyDaughter
+import dev.klerkframework.web.config.LastName
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.PhoneNumber
+import dev.klerkframework.web.config.PrimeNumber
+import dev.klerkframework.web.config.SecretPasscode
+import dev.klerkframework.web.config.createAuthorJKRowling
+import dev.klerkframework.web.config.createBookHarryPotter1
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
@@ -15,7 +32,6 @@ import kotlinx.html.*
 import kotlin.reflect.full.memberProperties
 
 fun main() {
-
     System.setProperty("DEVELOPMENT_MODE", "true")
     val bc = BookCollections()
     val collections = MyCollections(bc, AuthorCollections(bc.all))
@@ -39,7 +55,7 @@ fun main() {
         number(CreateAuthorParams::age)
         number(CreateAuthorParams::favouritePrimeNumber)
         populatedAfterSubmit(CreateAuthorParams::secretToken)
-        //populatedAfterSubmit(CreateAuthorParams::favouriteColleague)
+        // populatedAfterSubmit(CreateAuthorParams::favouriteColleague)
         hidden(CreateAuthorParams::favouriteColleague)
         remaining()
     }
@@ -49,29 +65,30 @@ fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         routing {
             get("/") {
-
-               val p = CreateAuthorParams(
+                val p = CreateAuthorParams(
                     firstName = FirstName(""),
                     lastName = LastName(""),
                     phone = PhoneNumber("+46123456"),
                     secretToken = SecretPasscode(99999),
-                    //address = Address(Street("Storgatan"))
+                    // address = Address(Street("Storgatan"))
                     favouritePrimeNumber = PrimeNumber(31),
                     isLikedByMyDaughter = IsLikedByMyDaughter(false),
                     nullableFirstName = null,
-               )
+                )
 
-                //authorizeAllDatatypes(p)
+                // authorizeAllDatatypes(p)
 
                 renderForm(call, klerk, template, null)
             }
 
             post("/") {
-                when (val result = template.parse(
-                    call,
-                    Context.swedishUnauthenticated(),
-                    mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
-                )) {
+                when (
+                    val result = template.parse(
+                        call,
+                        Context.swedishUnauthenticated(),
+                        mapOf(CreateAuthorParams::secretToken to SecretPasscode(1)),
+                    )
+                ) {
                     is Forbidden -> FormTemplate.respondForbidden(call)
                     is Invalid -> FormTemplate.respondInvalid(result, call)
                     is DryRun -> respondDryRun(
@@ -84,14 +101,12 @@ fun main() {
                     )
                     is Parsed -> renderForm(call, klerk, template, result.params, result)
                 }
-
             }
         }
         //        configureSecurity()
         //      configureHTTP()
     }.start(wait = true)
 }
-
 
 /*suspend fun <T : Any> respondDryRun(
     params: CreateAuthorParams,
@@ -134,10 +149,7 @@ fun main() {
 
  */
 
-
-private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean {
-    return true
-}
+private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean = true
 
 val myClassProvider: CssClassProvider = CssClassProvider { part, element, property, _ ->
     if (part == UiPart.Form && element == "input" && property == "firstName") setOf("testing") else emptySet()
@@ -151,7 +163,7 @@ fun FlowOrMetaDataOrPhrasingContent.myFaviocn() {
     )
 }
 
-suspend fun <T:Any> renderForm(
+suspend fun <T : Any> renderForm(
     call: ApplicationCall,
     klerk: Klerk<Context, MyCollections>,
     template: FormTemplate<T, Context, MyCollections>,
@@ -186,7 +198,7 @@ suspend fun <T:Any> renderForm(
                             span.errormessages {
                                 color: red;
                             }
-                            """.trimIndent()
+                """.trimIndent()
             }
             h1 { +"With server validation" }
             +"Language: ${context.translation}"

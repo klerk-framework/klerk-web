@@ -1,22 +1,27 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.statemachine.VoidState
-import dev.klerkframework.klerk.view.*
+import dev.klerkframework.klerk.view.ModelView
+import dev.klerkframework.klerk.view.QueryListCursor
+import dev.klerkframework.klerk.view.QueryOptions
+import dev.klerkframework.klerk.view.QueryResponse
+import dev.klerkframework.klerk.view.query
 import io.ktor.client.request.request
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import kotlin.reflect.KClass
-import kotlin.time.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
+import kotlin.reflect.KClass
+import kotlin.time.Instant
 
 /**
  * One column of a [TableTemplate]. A column is a value, so adding one is `columns + Column(...)` rather than a
@@ -67,18 +72,13 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
 ) {
 
     /** Builds one page of [source] for a request. Render it with `modelTable`. */
-    public fun build(
-        source: ModelView<T, C>,
-        reader: ModelReader<C, V>,
-        call: ApplicationCall,
-    ): Table<T, C, V> {
+    public fun build(source: ModelView<T, C>, reader: ModelReader<C, V>, call: ApplicationCall): Table<T, C, V> {
         val queryOptions = createQueryOptions(call.request.queryParameters, pageSize)
         val metaFilter = createMetaFilter<T>(call.request.queryParameters)
         // query() skips a row the actor may not read instead of turning the page into a 500.
         val queryResponse = with(reader) { (metaFilter?.let { source.filter(it) } ?: source).query(queryOptions) }
         return Table(queryResponse, support, call, klerk, kClass, columns)
     }
-
 }
 
 /** A built table, ready to be rendered. Produced by [TableTemplate.build]. */
@@ -114,32 +114,30 @@ private fun <C : KlerkContext, V> renderFilter(
     call: ApplicationCall,
     klerk: Klerk<C, V>,
     kClass: KClass<out Any>,
-): FlowContent.() -> Unit =
-    {
-        val stateNames = klerk.specification.managedModels
-            .single { it.kClass == kClass }
-            .stateMachine.states.filter { it !is VoidState }
-            .map { it.name }
+): FlowContent.() -> Unit = {
+    val stateNames = klerk.specification.managedModels
+        .single { it.kClass == kClass }
+        .stateMachine.states.filter { it !is VoidState }
+        .map { it.name }
 
-        details {
-            summary { +"Filters" }
-            fieldSet {
-                legend { +"Filters" }
-                form(action = call.request.uri, method = FormMethod.get) {
-
-                    p {
-                        label {
-                            htmlFor = "viewselect"
-                            +"View"
-                        }
-                        br()
-                        select {
-                            id = "viewselect"
-                            name = "view"
-                            klerk.specification.registeredViews
-                                .filter { it.modelClass == kClass }
-                                .map { it.view }
-                                .forEach {
+    details {
+        summary { +"Filters" }
+        fieldSet {
+            legend { +"Filters" }
+            form(action = call.request.uri, method = FormMethod.get) {
+                p {
+                    label {
+                        htmlFor = "viewselect"
+                        +"View"
+                    }
+                    br()
+                    select {
+                        id = "viewselect"
+                        name = "view"
+                        klerk.specification.registeredViews
+                            .filter { it.modelClass == kClass }
+                            .map { it.view }
+                            .forEach {
                                 option {
                                     value = it.id.toString()
                                     if (call.request.queryParameters["view"]?.equals(
@@ -151,43 +149,43 @@ private fun <C : KlerkContext, V> renderFilter(
                                     +camelCaseToPretty(it.id.shortId)
                                 }
                             }
-                        }
                     }
+                }
 
-                    p {
-                        label {
-                            htmlFor = "filterselect"
-                            +"State"
+                p {
+                    label {
+                        htmlFor = "filterselect"
+                        +"State"
+                    }
+                    br()
+                    select {
+                        id = "filterselect"
+                        name = "filterState"
+                        option {
+                            value = "All"
+                            if (call.request.queryParameters["filterState"]?.equals("All") == true) {
+                                selected = true
+                            }
+                            +"All"
                         }
-                        br()
-                        select() {
-                            id = "filterselect"
-                            name = "filterState"
+
+                        for (stateName in stateNames) {
                             option {
-                                value = "All"
-                                if (call.request.queryParameters["filterState"]?.equals("All") == true) {
+                                value = stateName
+                                if (call.request.queryParameters["filterState"]?.equals(stateName) == true) {
                                     selected = true
                                 }
-                                +"All"
-                            }
-
-                            for (stateName in stateNames) {
-                                option {
-                                    value = stateName
-                                    if (call.request.queryParameters["filterState"]?.equals(stateName) == true) {
-                                        selected = true
-                                    }
-                                    +stateName
-                                }
+                                +stateName
                             }
                         }
                     }
+                }
 
-                    p {
-                        label {
-                            htmlFor = "filterstring"
-                            title = additionalFiltersExplanationText
-                            +"Additional filters"
+                p {
+                    label {
+                        htmlFor = "filterstring"
+                        title = additionalFiltersExplanationText
+                        +"Additional filters"
 
                             /*                    details {
                                             summary { +"Filter" }
@@ -200,27 +198,25 @@ private fun <C : KlerkContext, V> renderFilter(
                                             }
                                         }
 
-                     */
-                        }
-                        br()
-                        textInput {
-                            id = "filterstring"
-                            name = "filterString"
-                            size = "40"
-                            title = additionalFiltersExplanationText
-                            value = call.request.queryParameters["filterString"] ?: ""
-                        }
+                             */
                     }
-
-                    p {
-                        button(type = ButtonType.submit) { +"Apply filter" }
+                    br()
+                    textInput {
+                        id = "filterstring"
+                        name = "filterString"
+                        size = "40"
+                        title = additionalFiltersExplanationText
+                        value = call.request.queryParameters["filterString"] ?: ""
                     }
+                }
 
+                p {
+                    button(type = ButtonType.submit) { +"Apply filter" }
                 }
             }
         }
-
     }
+}
 
 private fun <T : Any, C : KlerkContext, V> renderTable(
     models: List<Model<T>>,
@@ -261,8 +257,10 @@ internal fun DisplayProperty.renderValueNonBreakingHtml(): HTMLTag.() -> Unit = 
         unsafe { +temporal.replace("-", NON_BREAKING_HYPHEN) }
     } else if (value is Instant) {
         unsafe {
-            +(dateFormatter.format((value as Instant).toLocalDateTime(TimeZone.currentSystemDefault()))
-                .replace("-", NON_BREAKING_HYPHEN))
+            +(
+                dateFormatter.format((value as Instant).toLocalDateTime(TimeZone.currentSystemDefault()))
+                    .replace("-", NON_BREAKING_HYPHEN)
+                )
         }
     } else {
         +value.toString()
@@ -328,7 +326,8 @@ private fun <T : Any> createMetaFilter(queryParameters: Parameters): ((Model<T>)
                 val textToFind = filter.split("=").last()
                 if (ObjectSchema.of(model.props::class).fields.none { field ->
                         field.get(model.props).toString().contains(textToFind)
-                    }) {
+                    }
+                ) {
                     return false
                 }
             }
@@ -343,7 +342,6 @@ private fun <T : Any> renderPagination(
     call: ApplicationCall,
 ): FlowContent.() -> Unit = {
     div {
-
         // Each cursor is null when there is no such page, so no button here is ever a dead link.
         listOf(
             "First" to queryResponse.cursorFirstPage,
@@ -380,6 +378,6 @@ private val additionalFiltersExplanationText: String = """This field understands
                         |updated<2023-03-10T20:23:13Z
                         |contains=Bertil
                         |updated<2023-03-10T20:23:13Z contains=Anna
-                    """.trimMargin()
+""".trimMargin()
 
 private const val BUTTON_STYLE = "margin: 1rem;"

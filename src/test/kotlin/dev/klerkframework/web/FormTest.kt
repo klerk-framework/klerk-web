@@ -1,5 +1,4 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.ActorIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
@@ -13,7 +12,29 @@ import dev.klerkframework.klerk.validation.Valid
 import dev.klerkframework.web.ParseResult.DryRun
 import dev.klerkframework.web.ParseResult.Invalid
 import dev.klerkframework.web.ParseResult.Parsed
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.Author
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.Book
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateAuthor
+import dev.klerkframework.web.config.CreateAuthorParams
+import dev.klerkframework.web.config.EvenIntContainer
+import dev.klerkframework.web.config.FirstName
+import dev.klerkframework.web.config.ImproveAuthor
+import dev.klerkframework.web.config.IsActive
+import dev.klerkframework.web.config.IsLikedByMyDaughter
+import dev.klerkframework.web.config.LastName
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.PhoneNumber
+import dev.klerkframework.web.config.PrimeNumber
+import dev.klerkframework.web.config.SecretPasscode
+import dev.klerkframework.web.config.createAuthorJKRowling
+import dev.klerkframework.web.config.createBookHarryPotter1
+import dev.klerkframework.web.config.createBookHarryPotter2
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.generateSampleData
+import dev.klerkframework.web.config.testSettings
 import io.ktor.http.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
@@ -28,7 +49,6 @@ import kotlin.reflect.full.starProjectedType
 import kotlin.reflect.full.withNullability
 
 fun main() {
-
     runBlocking {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
@@ -41,7 +61,9 @@ fun main() {
             val harryPotter2 = createBookHarryPotter2(klerk, rowling, listOf(), setOf())
 
             val improveResult = klerk.handle(
-                Command(ImproveAuthor, rowling), Context.system(), ProcessingOptions(
+                Command(ImproveAuthor, rowling),
+                Context.system(),
+                ProcessingOptions(
                     CommandToken.simple(),
                 ),
             )
@@ -49,38 +71,39 @@ fun main() {
 
             generateSampleData(50, 3, klerk)
         }
-            val template = FormTemplate(
-                defaultValues = EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
-                klerk, "/noklerkvalidation",
-                classProvider = null,
-                pathProvider = DefaultPathProvider(),
-            ) {
-                text(CreateAuthorParams::phone)
-                remaining(inHtmlDetails = "Remaining stuff")
-            }
+        val template = FormTemplate(
+            defaultValues = EventWithParameters(CreateAuthor.id, CreateAuthorParams::class),
+            klerk,
+            "/noklerkvalidation",
+            classProvider = null,
+            pathProvider = DefaultPathProvider(),
+        ) {
+            text(CreateAuthorParams::phone)
+            remaining(inHtmlDetails = "Remaining stuff")
+        }
 
-            template.validate()
+        template.validate()
 
-            embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-                routing {
-                    get("/") {
+        embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+            routing {
+                get("/") {
+                    val params = CreateAuthorParams(
+                        firstName = FirstName("Janne"),
+                        lastName = LastName("Svensson"),
+                        phone = PhoneNumber("0987654321"),
+                        age = EvenIntContainer(22),
+                        secretToken = SecretPasscode(234),
+                        favouritePrimeNumber = PrimeNumber(31),
+                        isLikedByMyDaughter = IsLikedByMyDaughter(false),
+                        nullableFirstName = null,
+                    )
 
-                        val params = CreateAuthorParams(
-                            firstName = FirstName("Janne"),
-                            lastName = LastName("Svensson"),
-                            phone = PhoneNumber("0987654321"),
-                            age = EvenIntContainer(22),
-                            secretToken = SecretPasscode(234),
-                            favouritePrimeNumber = PrimeNumber(31),
-                            isLikedByMyDaughter = IsLikedByMyDaughter(false),
-                            nullableFirstName = null,
-                        )
+                    authorizeAllDatatypes(params)
 
-                        authorizeAllDatatypes(params)
+                    val context = Context.swedishUnauthenticated()
 
-                        val context = Context.swedishUnauthenticated()
-
-                        call.respond(klerk.read(context) {
+                    call.respond(
+                        klerk.read(context) {
                             val form1 =
                                 template.build(
                                     call,
@@ -89,7 +112,7 @@ fun main() {
                                     translator = context.translation,
                                     // referenceSelects = mapOf(TestParams::book to collections.books.all,
                                     // TestParams::author to collections.authors.all),
-                                    //enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
+                                    // enumSelects = mapOf(TestParams::anEnum to MyEnum.values())
                                     context = context,
                                 )
 
@@ -102,66 +125,67 @@ fun main() {
                                     eventForm(form1)
                                 }
                             }
-                        })
-                    }
+                        },
+                    )
+                }
 
-                    post("/noklerkvalidation") {
-
-                        when (val result = template.parse(
+                post("/noklerkvalidation") {
+                    when (
+                        val result = template.parse(
                             call,
                             Context.swedishUnauthenticated(),
                             mapOf(TestParams::populatedLater to PhoneNumber("After post")),
-                        )) {
-                            is ParseResult.Forbidden -> FormTemplate.respondForbidden(call)
-                            is Invalid -> FormTemplate.respondInvalid(result, call)
-                            is DryRun -> call.respond(HttpStatusCode.OK)
-                            is Parsed -> {
-                                call.respondHtml {
-                                    body {
-                                        h1 { +"Success" }
-                                        p { +result.params::class.qualifiedName.toString() }
-                                        result.params::class.memberProperties.forEach {
-                                            if (it.returnType.isSubtypeOf(
-                                                    DataContainer::class.starProjectedType.withNullability(
-                                                        false,
-                                                    ),
-                                                ) ||
-                                                it.returnType.isSubtypeOf(
-                                                    DataContainer::class.starProjectedType.withNullability(
-                                                        true,
-                                                    ),
-                                                )
-                                            ) {
-                                                val value = it.getter.call(result.params) as DataContainer<*>?
-                                                +"${it.name}: ${value?.valueWithoutAuthorization}"
-                                                br
-                                            } else if (it.returnType.isSubtypeOf(
-                                                    ModelID::class.starProjectedType.withNullability(
-                                                        false,
-                                                    ),
-                                                ) ||
-                                                it.returnType.isSubtypeOf(
-                                                    ModelID::class.starProjectedType.withNullability(
-                                                        true,
-                                                    ),
-                                                )
-                                            ) {
-                                                +"${it.name}: ?"
-                                                br
-                                            } else if (it.returnType.isSubtypeOf(
-                                                    Enum::class.starProjectedType.withNullability(
-                                                        false,
-                                                    ),
-                                                ) ||
-                                                it.returnType.isSubtypeOf(
-                                                    Enum::class.starProjectedType.withNullability(
-                                                        true,
-                                                    ),
-                                                )
-                                            ) {
-                                                +"${it.name}: ${it.getter.call(result.params)}"
-                                                br
-                                            }
+                        )
+                    ) {
+                        is ParseResult.Forbidden -> FormTemplate.respondForbidden(call)
+                        is Invalid -> FormTemplate.respondInvalid(result, call)
+                        is DryRun -> call.respond(HttpStatusCode.OK)
+                        is Parsed -> {
+                            call.respondHtml {
+                                body {
+                                    h1 { +"Success" }
+                                    p { +result.params::class.qualifiedName.toString() }
+                                    result.params::class.memberProperties.forEach {
+                                        if (it.returnType.isSubtypeOf(
+                                                DataContainer::class.starProjectedType.withNullability(
+                                                    false,
+                                                ),
+                                            ) ||
+                                            it.returnType.isSubtypeOf(
+                                                DataContainer::class.starProjectedType.withNullability(
+                                                    true,
+                                                ),
+                                            )
+                                        ) {
+                                            val value = it.getter.call(result.params) as DataContainer<*>?
+                                            +"${it.name}: ${value?.valueWithoutAuthorization}"
+                                            br
+                                        } else if (it.returnType.isSubtypeOf(
+                                                ModelID::class.starProjectedType.withNullability(
+                                                    false,
+                                                ),
+                                            ) ||
+                                            it.returnType.isSubtypeOf(
+                                                ModelID::class.starProjectedType.withNullability(
+                                                    true,
+                                                ),
+                                            )
+                                        ) {
+                                            +"${it.name}: ?"
+                                            br
+                                        } else if (it.returnType.isSubtypeOf(
+                                                Enum::class.starProjectedType.withNullability(
+                                                    false,
+                                                ),
+                                            ) ||
+                                            it.returnType.isSubtypeOf(
+                                                Enum::class.starProjectedType.withNullability(
+                                                    true,
+                                                ),
+                                            )
+                                        ) {
+                                            +"${it.name}: ${it.getter.call(result.params)}"
+                                            br
                                         }
                                     }
                                 }
@@ -169,13 +193,13 @@ fun main() {
                         }
                     }
                 }
-            }.start(wait = true)
-        }
+            }
+        }.start(wait = true)
+    }
 }
 
-fun myLabelProvider(elementData: UIElementData): String? {
-    return if (elementData.propertyName == "aLong") "this is my label: ${elementData.propertyName}" else null
-}
+fun myLabelProvider(elementData: UIElementData): String? =
+    if (elementData.propertyName == "aLong") "this is my label: ${elementData.propertyName}" else null
 
 data class TestParams(
     val aString: FirstName,
@@ -191,16 +215,10 @@ data class TestParams(
     val aRemainingString: FirstName,
 ) {
 
-    fun phoneMustEndWith7(): PropertyValidity {
-        return if (aPhone.value.endsWith("7")) Valid else PropertyValidity.Invalid()
-    }
-
-
+    fun phoneMustEndWith7(): PropertyValidity = if (aPhone.value.endsWith("7")) Valid else PropertyValidity.Invalid()
 }
 
-private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean {
-    return true
-}
+private fun allowAll(dataContainer: DataContainer<*>, actorIdentity: ActorIdentity): Boolean = true
 
 class Email(value: String) : StringContainer(value) {
     override val regexPattern = emailRegexRFC5322

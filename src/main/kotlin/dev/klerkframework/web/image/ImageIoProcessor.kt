@@ -1,9 +1,9 @@
 package dev.klerkframework.web.image
 
-import mu.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import mu.KotlinLogging
 import java.awt.Color
 import java.awt.Image
 import java.awt.geom.AffineTransform
@@ -35,18 +35,16 @@ private val log = KotlinLogging.logger {}
  *
  * [quality] is the JPEG quality, 0..1.
  */
-public class ImageIoProcessor(
-    override val limits: ImageLimits = ImageLimits(),
-    private val quality: Float = 0.82f,
-) : ImageProcessor {
+public class ImageIoProcessor(override val limits: ImageLimits = ImageLimits(), private val quality: Float = 0.82f) :
+    ImageProcessor {
 
     override val outputFormats: Set<String> = setOf("jpeg", "png")
 
     init {
         log.warn {
             "ImageIoProcessor is meant for development: it decodes uploaded images inside this JVM, writes neither " +
-                    "WebP nor AVIF, and cannot interrupt a decode that has started. Implement ImageProcessor " +
-                    "against an image transformer running beside the application before this is worth attacking."
+                "WebP nor AVIF, and cannot interrupt a decode that has started. Implement ImageProcessor " +
+                "against an image transformer running beside the application before this is worth attacking."
         }
     }
 
@@ -81,11 +79,10 @@ public class ImageIoProcessor(
     }
 
     /** What ImageIO calls this file's format, lowercased to match [outputFormats], or null if it cannot read it. */
-    private fun formatOf(source: Path): String? =
-        readerFor(source)?.use { (reader, _) ->
-            val name = reader.formatName.lowercase()
-            if (name == "jpg") "jpeg" else name
-        }
+    private fun formatOf(source: Path): String? = readerFor(source)?.use { (reader, _) ->
+        val name = reader.formatName.lowercase()
+        if (name == "jpg") "jpeg" else name
+    }
 
     override suspend fun render(source: Path, target: Path, width: Int, format: String, crop: Crop?): ImageInfo {
         require(outputFormats.contains(format)) { "$format is not one of $outputFormats" }
@@ -114,7 +111,7 @@ public class ImageIoProcessor(
             if (pixels > limits.maxPixels) {
                 throw ImageRefused(
                     "the image is ${sourceWidth}x$sourceHeight ($pixels pixels), and at most ${limits.maxPixels} " +
-                            "are allowed",
+                        "are allowed",
                 )
             }
             val displayedSize = if (swapsDimensions(orientation)) {
@@ -189,13 +186,13 @@ public class ImageIoProcessor(
         val h = image.height.toDouble()
         // AffineTransform(m00, m10, m01, m11, m02, m12) maps (x, y) to (m00x + m01y + m02, m10x + m11y + m12).
         val transform = when (orientation) {
-            2 -> AffineTransform(-1.0, 0.0, 0.0, 1.0, w, 0.0)    // mirrored
-            3 -> AffineTransform(-1.0, 0.0, 0.0, -1.0, w, h)     // upside down
-            4 -> AffineTransform(1.0, 0.0, 0.0, -1.0, 0.0, h)    // mirrored, upside down
-            5 -> AffineTransform(0.0, 1.0, 1.0, 0.0, 0.0, 0.0)   // mirrored along the main diagonal
-            6 -> AffineTransform(0.0, 1.0, -1.0, 0.0, h, 0.0)    // a quarter turn clockwise
-            7 -> AffineTransform(0.0, -1.0, -1.0, 0.0, h, w)     // mirrored along the other diagonal
-            8 -> AffineTransform(0.0, -1.0, 1.0, 0.0, 0.0, w)    // a quarter turn anticlockwise
+            2 -> AffineTransform(-1.0, 0.0, 0.0, 1.0, w, 0.0) // mirrored
+            3 -> AffineTransform(-1.0, 0.0, 0.0, -1.0, w, h) // upside down
+            4 -> AffineTransform(1.0, 0.0, 0.0, -1.0, 0.0, h) // mirrored, upside down
+            5 -> AffineTransform(0.0, 1.0, 1.0, 0.0, 0.0, 0.0) // mirrored along the main diagonal
+            6 -> AffineTransform(0.0, 1.0, -1.0, 0.0, h, 0.0) // a quarter turn clockwise
+            7 -> AffineTransform(0.0, -1.0, -1.0, 0.0, h, w) // mirrored along the other diagonal
+            8 -> AffineTransform(0.0, -1.0, 1.0, 0.0, 0.0, w) // a quarter turn anticlockwise
             else -> AffineTransform()
         }
         result.createGraphics().apply {
@@ -275,12 +272,11 @@ public class ImageIoProcessor(
  *
  * Only the APP1 segment is parsed, and only far enough to find tag 0x0112. Anything unexpected means 1.
  */
-private fun jpegOrientation(source: Path): Int =
-    try {
-        Files.newInputStream(source).buffered().use { readOrientation(it) }
-    } catch (e: Exception) {
-        1
-    }
+private fun jpegOrientation(source: Path): Int = try {
+    Files.newInputStream(source).buffered().use { readOrientation(it) }
+} catch (e: Exception) {
+    1
+}
 
 /** Whether an orientation exchanges the image's width and height. */
 private fun swapsDimensions(orientation: Int): Boolean = orientation in 5..8
@@ -290,8 +286,7 @@ private const val ORIENTATION_TAG = 0x0112
 /** The APP1 segment that holds EXIF starts with "Exif", two NULs, and then a TIFF header. */
 private val EXIF_IDENTIFIER = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0, 0)
 
-private fun isExif(payload: ByteArray): Boolean =
-    EXIF_IDENTIFIER.indices.all { payload[it] == EXIF_IDENTIFIER[it] }
+private fun isExif(payload: ByteArray): Boolean = EXIF_IDENTIFIER.indices.all { payload[it] == EXIF_IDENTIFIER[it] }
 
 private fun readOrientation(stream: InputStream): Int {
     val input = DataInputStream(stream)

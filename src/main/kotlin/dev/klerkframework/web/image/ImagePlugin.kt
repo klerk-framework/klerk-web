@@ -2,10 +2,9 @@ package dev.klerkframework.web.image
 
 import dev.klerkframework.klerk.AttachedDataID
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.KlerkPlugin
 import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.KlerkPlugin
 import dev.klerkframework.klerk.Specification
-import dev.klerkframework.klerk.SystemIdentity
 import dev.klerkframework.klerk.datatypes.BlobPreAttachStepArgs
 import dev.klerkframework.klerk.datatypes.BlobPreAttachStepResult
 import dev.klerkframework.klerk.job.JobAgent
@@ -142,7 +141,8 @@ public class ImagePlugin<C : KlerkContext, V>(
 
     override val description: String =
         """Serves attached images in declared sizes. A size that has not been generated yet is produced by a job,
-            |which the request waits for.""".trimMargin()
+            |which the request waits for.
+        """.trimMargin()
 
     init {
         val unsupported = this.formats.minus(processor.outputFormats)
@@ -236,7 +236,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         )
         check(info.pixels <= processor.limits.maxPixels) {
             "The image asset '$name' is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
-                    "${processor.limits.maxPixels} are allowed"
+                "${processor.limits.maxPixels} are allowed"
         }
         assets[hash] = source
         store.writeSidecar(ASSET, hash, ImageSidecar(info.width, info.height))
@@ -256,7 +256,8 @@ public class ImagePlugin<C : KlerkContext, V>(
     private val refused: MutableSet<String> = Collections.newSetFromMap(
         Collections.synchronizedMap(object : LinkedHashMap<String, Boolean>(128, 0.75f, true) {
             override fun removeEldestEntry(eldest: Map.Entry<String, Boolean>): Boolean = size > 1000
-        }))
+        }),
+    )
 
     /**
      * What [prepareImageKeepExif] learned, keyed by the file's hash because the attached-data id is not known to a
@@ -300,12 +301,11 @@ public class ImagePlugin<C : KlerkContext, V>(
     private val generateJob = GenerateVariant()
     private val sweepJob = SweepVariants()
 
-    override fun mergeSpecification(previous: Specification<C, V>): Specification<C, V> =
-        previous.withJobs {
-            register(generateJob)
-            register(sweepJob)
-            cron(sweepJob, sweepExpression) { cursor = "" }
-        }
+    override fun mergeSpecification(previous: Specification<C, V>): Specification<C, V> = previous.withJobs {
+        register(generateJob)
+        register(sweepJob)
+        cron(sweepJob, sweepExpression) { cursor = "" }
+    }
 
     override suspend fun start(klerk: Klerk<C, V>) {
         this.klerk = klerk
@@ -322,9 +322,8 @@ public class ImagePlugin<C : KlerkContext, V>(
     }
 
     /** Whether [contentType] is something this plugin will scale. */
-    internal fun handles(
-        contentType: String?,
-    ): Boolean = contentType != null && sourceContentTypes.contains(contentType)
+    internal fun handles(contentType: String?): Boolean =
+        contentType != null && sourceContentTypes.contains(contentType)
 
     /**
      * Whether a URL's last segment names a registered template or alternative at all, as opposed to naming a
@@ -456,7 +455,7 @@ public class ImagePlugin<C : KlerkContext, V>(
         if (info.pixels > processor.limits.maxPixels) {
             return BlobPreAttachStepResult.Reject(
                 "The image is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
-                        "${processor.limits.maxPixels} are allowed",
+                    "${processor.limits.maxPixels} are allowed",
             )
         }
         described[args.metadata.hash] = ImageSidecar(info.width, info.height)
@@ -504,7 +503,7 @@ public class ImagePlugin<C : KlerkContext, V>(
             if (info.pixels > processor.limits.maxPixels) {
                 return BlobPreAttachStepResult.Reject(
                     "The image is ${info.width}x${info.height} (${info.pixels} pixels), and at most " +
-                            "${processor.limits.maxPixels} are allowed",
+                        "${processor.limits.maxPixels} are allowed",
                 )
             }
             val bytes = withContext(Dispatchers.IO) { Files.readAllBytes(stripped) }
@@ -570,10 +569,14 @@ public class ImagePlugin<C : KlerkContext, V>(
                 continue
             }
             val numeric = id.toIntOrNull()
-            val metadata = if (numeric == null) null else try {
-                klerk.attachedData.getMetadata(AttachedDataID(numeric), context)
-            } catch (e: NoSuchElementException) {
+            val metadata = if (numeric == null) {
                 null
+            } else {
+                try {
+                    klerk.attachedData.getMetadata(AttachedDataID(numeric), context)
+                } catch (e: NoSuchElementException) {
+                    null
+                }
             }
             if (metadata == null || metadata.hash != hash) {
                 log.info { "Deleting the variants of attached data $id, which no longer has the hash $hash" }
@@ -676,22 +679,15 @@ public class ImagePlugin<C : KlerkContext, V>(
         }
     }
 
-    private data class Parsed(
-        val id: String,
-        val hash: String,
-        val width: Int,
-        val format: String,
-        val crop: Crop?,
-    )
+    private data class Parsed(val id: String, val hash: String, val width: Int, val format: String, val crop: Crop?)
 
     /** An empty file in [stagingDirectory], which is where a processor outside this JVM is able to read it. */
-    private fun newStagingFile(prefix: String): Path =
-        if (stagingDirectory == null) {
-            Files.createTempFile(prefix, ".original")
-        } else {
-            Files.createDirectories(stagingDirectory)
-            Files.createTempFile(stagingDirectory, prefix, ".original")
-        }
+    private fun newStagingFile(prefix: String): Path = if (stagingDirectory == null) {
+        Files.createTempFile(prefix, ".original")
+    } else {
+        Files.createDirectories(stagingDirectory)
+        Files.createTempFile(stagingDirectory, prefix, ".original")
+    }
 
     /**
      * A file the processor can seek around in: the original copied out of Klerk, or the asset already extracted.

@@ -1,7 +1,5 @@
 package dev.klerkframework.web.assets
 
-import dev.klerkframework.klerk.*
-import dev.klerkframework.web.PathProvider
 import dev.klerkframework.web.image.ImagePlugin
 import io.ktor.http.*
 import io.ktor.server.application.*

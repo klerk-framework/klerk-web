@@ -7,7 +7,6 @@ import dev.klerkframework.klerk.misc.PropertyType
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.request.*
-import kotlinx.html.body
 
 internal const val FUNCTION_KIND = "function-kind"
 internal const val DATA_CONTAINER_VALIDATION = "data-container-validation"
@@ -44,5 +43,4 @@ internal suspend fun <C : KlerkContext, V> renderFunctionInvocation(
         return
     }
     support.respondPage(call, "Function") { +"Not implemented" }
-
 }

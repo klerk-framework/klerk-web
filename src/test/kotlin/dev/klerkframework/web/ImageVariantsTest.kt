@@ -1,19 +1,27 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.attached.attachedDataRoutes
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreatePublication
+import dev.klerkframework.web.config.CreatePublicationParams
+import dev.klerkframework.web.config.DeletePublication
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.PublicBody
+import dev.klerkframework.web.config.PublicCover
+import dev.klerkframework.web.config.Publication
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
+import dev.klerkframework.web.image.ImageIoProcessor
 import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImagePlugin
 import dev.klerkframework.web.image.ImageRefused
-import dev.klerkframework.web.image.ImageIoProcessor
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -351,6 +359,7 @@ class ImageVariantsTest {
         assertTrue(listing().any { it == "320.png" }, "nothing should be evicted without a budget")
         klerk.meta.stop()
     }
+
     @Test
     fun `the sweep deletes what belongs to data that is gone`() = testApplication {
         setup()

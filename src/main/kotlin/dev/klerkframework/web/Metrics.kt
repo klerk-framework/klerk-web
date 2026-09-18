@@ -14,33 +14,32 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
 ) {
     val actor = support.contextProvider(call, klerk)
     support.respondPage(call, "Metrics") {
-            header {
-                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
-            }
-            main {
-                h1 { +"Runtime" }
-                val runtime = Runtime.getRuntime()
-                table {
-                    tr {
-                        td { +"Available processors" }
-                        td { +runtime.availableProcessors().toString() }
-                    }
-                    tr {
-                        td { +"Max memory (MB)" }
-                        td { +(runtime.maxMemory() / 1000000).toString() }
-                    }
-                    tr {
-                        td { +"Total memory (MB)" }
-                        td { +(runtime.totalMemory() / 1000000).toString() }
-                    }
-                    tr {
-                        td { +"Free memory (MB)" }
-                        td { +(runtime.freeMemory() / 1000000).toString() }
-                    }
-
+        header {
+            nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
+        }
+        main {
+            h1 { +"Runtime" }
+            val runtime = Runtime.getRuntime()
+            table {
+                tr {
+                    td { +"Available processors" }
+                    td { +runtime.availableProcessors().toString() }
                 }
-                h1 { +"Metrics" }
-                +"Not implemented"  // TODO
+                tr {
+                    td { +"Max memory (MB)" }
+                    td { +(runtime.maxMemory() / 1000000).toString() }
+                }
+                tr {
+                    td { +"Total memory (MB)" }
+                    td { +(runtime.totalMemory() / 1000000).toString() }
+                }
+                tr {
+                    td { +"Free memory (MB)" }
+                    td { +(runtime.freeMemory() / 1000000).toString() }
+                }
+            }
+            h1 { +"Metrics" }
+            +"Not implemented" // TODO
                 /*                table {
                                     thead {
                                         tr {
@@ -72,7 +71,6 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                                     }
                                 }
                  */
-            }
+        }
     }
-
 }

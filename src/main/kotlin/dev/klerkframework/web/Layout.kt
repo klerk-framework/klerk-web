@@ -37,11 +37,7 @@ public open class Layout(
      * A complete document titled [title]. [pageHead] is rendered after the layout's own head content, for what only
      * this page needs.
      */
-    public open fun page(
-        title: String,
-        pageHead: (HEAD.() -> Unit)? = null,
-        body: BODY.() -> Unit,
-    ): HTML.() -> Unit = {
+    public open fun page(title: String, pageHead: (HEAD.() -> Unit)? = null, body: BODY.() -> Unit): HTML.() -> Unit = {
         lang = this@Layout.lang
         head {
             meta(charset = "utf-8")

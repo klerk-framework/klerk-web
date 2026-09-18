@@ -80,7 +80,10 @@ public class KlerkWeb<C : KlerkContext, V>(
             log.info { "Registering route: ${pathProvider.pathForList(model.kClass)}" }
             route.modelListRoutes(
                 ModelListPage<Any, C, V>(
-                    model.kClass, support, pathProvider.pathForList(model.kClass), humanName,
+                    model.kClass,
+                    support,
+                    pathProvider.pathForList(model.kClass),
+                    humanName,
                 ),
             )
             pathProvider.pathForItem(model.kClass, "{id}")?.let {
@@ -105,10 +108,7 @@ public class KlerkWeb<C : KlerkContext, V>(
  * }
  * ```
  */
-public fun <C : KlerkContext, V> Route.klerkWebRoutes(
-    klerkWeb: KlerkWeb<C, V>,
-    models: Set<KClass<*>> = emptySet(),
-) {
+public fun <C : KlerkContext, V> Route.klerkWebRoutes(klerkWeb: KlerkWeb<C, V>, models: Set<KClass<*>> = emptySet()) {
     klerkWeb.registerInto(this, models)
 }
 

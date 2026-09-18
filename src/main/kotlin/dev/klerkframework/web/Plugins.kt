@@ -12,33 +12,32 @@ internal suspend fun <C : KlerkContext, V> renderPlugins(
     klerk: Klerk<C, V>,
 ) {
     support.respondPage(call, "Plugins") {
-            header {
-                nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
-            }
-            h1 { +"Plugins" }
-            main {
-                val plugins = klerk.specification.plugins
-                if (plugins.isEmpty()) {
-                    p { +"No plugins" }
-                } else {
-                    ul {
-                        for (plugin in plugins) {
-                            li {
-                                if (plugin is AdminUIPluginIntegration<C, V>) {
-                                    a(href = "${support.pathProvider.withPrefix()}plugin?name=${plugin.name}") {
-                                        +plugin.name
-                                    }
-                                } else {
+        header {
+            nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
+        }
+        h1 { +"Plugins" }
+        main {
+            val plugins = klerk.specification.plugins
+            if (plugins.isEmpty()) {
+                p { +"No plugins" }
+            } else {
+                ul {
+                    for (plugin in plugins) {
+                        li {
+                            if (plugin is AdminUIPluginIntegration<C, V>) {
+                                a(href = "${support.pathProvider.withPrefix()}plugin?name=${plugin.name}") {
                                     +plugin.name
                                 }
-                                br()
-                                i { +plugin.description }
-                                br()
+                            } else {
+                                +plugin.name
                             }
+                            br()
+                            i { +plugin.description }
+                            br()
                         }
                     }
-
                 }
             }
+        }
     }
 }

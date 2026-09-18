@@ -1,12 +1,14 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.EventReference
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.routing.*
 import kotlinx.html.*
-import java.util.*
+import java.util.Locale
 import kotlin.reflect.KClass
 
 /**
@@ -27,7 +29,7 @@ public class AdminUI<C : KlerkContext, V>(
     internal val support: WebSupport<C, V>,
     internal val canSeeAdminUI: suspend (C) -> Boolean,
     internal val customAfterEventButtonsOnDetailView: ((KClass<out Any>, Model<Any>) -> DIV.() -> Unit)? = null,
-    internal val showOptionalParameters: (EventReference) -> Boolean = {(eventReference) -> true},
+    internal val showOptionalParameters: (EventReference) -> Boolean = { (eventReference) -> true },
     internal val knownAlgorithms: Set<FlowChartAlgorithm<*, *>> = emptySet(),
     internal val createCommandPath: String = "/_createevent",
 ) {
@@ -61,13 +63,16 @@ public class AdminUI<C : KlerkContext, V>(
 
             val listView = ModelListPage<Any, C, V>(managedClass, support, pathToList, humanName)
             val detailView = ModelDetailPage<Any, C, V>(
-                managedClass, support, humanName, eventLogPath, customAfterEventButtonsOnDetailView,
+                managedClass,
+                support,
+                humanName,
+                eventLogPath,
+                customAfterEventButtonsOnDetailView,
             )
             Pair(listView, detailView)
         }
         listViews = pairs.map { it.first }
         detailViews = pairs.map { it.second }
-
     }
 
     internal fun registerInto(route: Route) {
@@ -184,75 +189,73 @@ public class AdminUI<C : KlerkContext, V>(
                     renderLog(call, support, klerk)
                 }
             }
-
         }
     }
 
     private suspend fun renderMain(call: ApplicationCall) {
         support.respondPage(call, "Klerk Admin") {
-                header {
-                    h1 { +"Klerk Admin" }
+            header {
+                h1 { +"Klerk Admin" }
 
-                    nav {
-                        span {
-                            style = "margin: 10px;"
-                            a(href = logPath) { button { +"Activity log" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = jobsPath) { button { +"Jobs" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = documentationPath) { button { +"Documentation" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = eventLogPath) { button { +"Event log" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = metricsPath) { button { +"Metrics" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = pluginsPath) { button { +"Plugins" } }
-                        }
-
-                        span {
-                            style = "margin: 10px;"
-                            a(href = settingsPath) { button { +"Settings" } }
-                        }
-
-                        for (plugin in klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>()) {
-                            span {
-                                style = "margin: 10px;"
-                                a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") {
-                                    button { +plugin.page.buttonText }
-                                }
-                            }
-
-                        }
+                nav {
+                    span {
+                        style = "margin: 10px;"
+                        a(href = logPath) { button { +"Activity log" } }
                     }
-                }
 
-                h2 { +"Data" }
-                table {
-                    for (view in listViews) {
-                        tr {
-                            td {
-                                a(href = view.pathToList) {
-                                    +view.humanName
-                                }
+                    span {
+                        style = "margin: 10px;"
+                        a(href = jobsPath) { button { +"Jobs" } }
+                    }
+
+                    span {
+                        style = "margin: 10px;"
+                        a(href = documentationPath) { button { +"Documentation" } }
+                    }
+
+                    span {
+                        style = "margin: 10px;"
+                        a(href = eventLogPath) { button { +"Event log" } }
+                    }
+
+                    span {
+                        style = "margin: 10px;"
+                        a(href = metricsPath) { button { +"Metrics" } }
+                    }
+
+                    span {
+                        style = "margin: 10px;"
+                        a(href = pluginsPath) { button { +"Plugins" } }
+                    }
+
+                    span {
+                        style = "margin: 10px;"
+                        a(href = settingsPath) { button { +"Settings" } }
+                    }
+
+                    for (plugin in klerk.specification.plugins.filterIsInstance<AdminUIPluginIntegration<C, V>>()) {
+                        span {
+                            style = "margin: 10px;"
+                            a(href = "${pathProvider.withPrefix()}plugin?name=${plugin.name}") {
+                                button { +plugin.page.buttonText }
                             }
                         }
                     }
                 }
+            }
+
+            h2 { +"Data" }
+            table {
+                for (view in listViews) {
+                    tr {
+                        td {
+                            a(href = view.pathToList) {
+                                +view.humanName
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -267,7 +270,6 @@ public class AdminUI<C : KlerkContext, V>(
         }
         block()
     }
-
 }
 
 /** The Admin UI's routes. It is an internal tool - see [AdminUI]. */

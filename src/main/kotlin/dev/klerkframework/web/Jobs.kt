@@ -37,68 +37,68 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
     }
 
     support.respondPage(call, "Jobs", pageHead = if (autoRefresh) autoRefresh(15) else null) {
-            header {
-                nav {
-                    div {
-                        a(href = support.pathProvider.base) { +"Home" }
-                        +" / "
-                        a(href = "$jobsPath/types") { +"Job types" }
-                    }
+        header {
+            nav {
+                div {
+                    a(href = support.pathProvider.base) { +"Home" }
+                    +" / "
+                    a(href = "$jobsPath/types") { +"Job types" }
                 }
             }
-            main {
-                h1 { +"Jobs" }
-                p {
-                    label {
-                        input(type = InputType.checkBox) {
-                            checked = autoRefresh
-                            onChange = "window.location = '${jobsUrl(statusFilter, !autoRefresh)}'"
-                        }
-                        +" Auto-refresh (15s)"
+        }
+        main {
+            h1 { +"Jobs" }
+            p {
+                label {
+                    input(type = InputType.checkBox) {
+                        checked = autoRefresh
+                        onChange = "window.location = '${jobsUrl(statusFilter, !autoRefresh)}'"
+                    }
+                    +" Auto-refresh (15s)"
+                }
+            }
+            p {
+                +"Filter: "
+                a(href = jobsUrl(null, autoRefresh)) { +"All" }
+                for (status in JobStatus.entries) {
+                    +" | "
+                    a(href = jobsUrl(status, autoRefresh)) { +status.name }
+                }
+            }
+            table {
+                thead {
+                    tr {
+                        th { +"Id" }
+                        th { +"Name" }
+                        th { +"Status" }
+                        th { +"Priority" }
+                        th { +"Parent" }
+                        th { +"Progress" }
+                        th { +"Created" }
                     }
                 }
-                p {
-                    +"Filter: "
-                    a(href = jobsUrl(null, autoRefresh)) { +"All" }
-                    for (status in JobStatus.entries) {
-                        +" | "
-                        a(href = jobsUrl(status, autoRefresh)) { +status.name }
-                    }
-                }
-                table {
-                    thead {
+                tbody {
+                    for (job in jobs) {
                         tr {
-                            th { +"Id" }
-                            th { +"Name" }
-                            th { +"Status" }
-                            th { +"Priority" }
-                            th { +"Parent" }
-                            th { +"Progress" }
-                            th { +"Created" }
-                        }
-                    }
-                    tbody {
-                        for (job in jobs) {
-                            tr {
-                                onClick = """window.location = '$jobsPath/${job.id}';"""
-                                td { +job.id.toString() }
-                                td { +job.name.value }
-                                td { apply(jobStatusBadge(job.status)) }
-                                td { +job.priority.name }
-                                td {
-                                    job.parent?.let { parentId ->
-                                        a(href = "$jobsPath/$parentId") { +parentId.toString() }
-                                    }
+                            onClick = """window.location = '$jobsPath/${job.id}';"""
+                            td { +job.id.toString() }
+                            td { +job.name.value }
+                            td { apply(jobStatusBadge(job.status)) }
+                            td { +job.priority.name }
+                            td {
+                                job.parent?.let { parentId ->
+                                    a(href = "$jobsPath/$parentId") { +parentId.toString() }
                                 }
-                                td { apply(jobProgressBar(job)) }
-                                td { +formatTime(job.createdAt) }
                             }
+                            td { apply(jobProgressBar(job)) }
+                            td { +formatTime(job.createdAt) }
                         }
                     }
                 }
-
-                apply(cronSchedulesTable(klerk.specification.jobs))
             }
+
+            apply(cronSchedulesTable(klerk.specification.jobs))
+        }
     }
 }
 
@@ -118,98 +118,134 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
         "Job ${job.id}",
         pageHead = if (!job.status.isTerminal) autoRefresh(3) else null,
     ) {
-            nav {
-                div {
-                    a(href = support.pathProvider.withPrefix()) { +"Home" }
-                    +" / "
-                    a(href = jobsPath) { +"Jobs" }
-                }
+        nav {
+            div {
+                a(href = support.pathProvider.withPrefix()) { +"Home" }
+                +" / "
+                a(href = jobsPath) { +"Jobs" }
             }
-            h1 { +"Job details" }
-            table {
-                tbody {
-                    tr { td { +"Id" }; td { +job.id.toString() } }
-                    tr { td { +"Name" }; td { +job.name.value } }
-                    tr { td { +"Status" }; td { apply(jobStatusBadge(job.status)) } }
-                    tr { td { +"Priority" }; td { +job.priority.name } }
-                    tr { td { +"Step / attempt" }; td { +"${job.step} / ${job.attempt}" } }
+        }
+        h1 { +"Job details" }
+        table {
+            tbody {
+                tr {
+                    td { +"Id" }
+                    td { +job.id.toString() }
+                }
+                tr {
+                    td { +"Name" }
+                    td { +job.name.value }
+                }
+                tr {
+                    td { +"Status" }
+                    td { apply(jobStatusBadge(job.status)) }
+                }
+                tr {
+                    td { +"Priority" }
+                    td { +job.priority.name }
+                }
+                tr {
+                    td { +"Step / attempt" }
+                    td { +"${job.step} / ${job.attempt}" }
+                }
+                tr {
+                    td { +"Created" }
+                    td { +formatTime(job.createdAt) }
+                }
+                job.parent?.let { parentId ->
                     tr {
-                        td { +"Created" }
-                        td { +formatTime(job.createdAt) }
+                        td { +"Parent" }
+                        td { a(href = "$jobsPath/$parentId") { +parentId.toString() } }
                     }
-                    job.parent?.let { parentId ->
-                        tr { td { +"Parent" }; td { a(href = "$jobsPath/$parentId") { +parentId.toString() } } }
+                }
+                if (job.depth > 0) {
+                    tr {
+                        td { +"Root" }
+                        td { a(href = "$jobsPath/${job.root}") { +job.root.toString() } }
                     }
-                    if (job.depth > 0) {
-                        tr { td { +"Root" }; td { a(href = "$jobsPath/${job.root}") { +job.root.toString() } } }
-                        tr { td { +"Depth" }; td { +job.depth.toString() } }
+                    tr {
+                        td { +"Depth" }
+                        td { +job.depth.toString() }
                     }
-                    job.progress?.let { progress ->
-                        tr {
-                            td { +"Progress" }
-                            td {
-                                if (progress.total != null) {
-                                    progress {
-                                        attributes["value"] = progress.completed.toString()
-                                        attributes["max"] = progress.total.toString()
-                                    }
-                                    +" "
+                }
+                job.progress?.let { progress ->
+                    tr {
+                        td { +"Progress" }
+                        td {
+                            if (progress.total != null) {
+                                progress {
+                                    attributes["value"] = progress.completed.toString()
+                                    attributes["max"] = progress.total.toString()
                                 }
-                                +formatProgress(job)
+                                +" "
                             }
+                            +formatProgress(job)
                         }
                     }
-                    if (job.cancellationRequested) {
-                        tr { td { +"Cancellation requested" }; td { +"Yes" } }
+                }
+                if (job.cancellationRequested) {
+                    tr {
+                        td { +"Cancellation requested" }
+                        td { +"Yes" }
                     }
-                    job.hook?.let { hook ->
-                        tr { td { +"Unwinding through" }; td { +hook.name } }
+                }
+                job.hook?.let { hook ->
+                    tr {
+                        td { +"Unwinding through" }
+                        td { +hook.name }
                     }
-                    job.reason?.let { reason ->
-                        tr { td { +"Reason" }; td { +reason } }
+                }
+                job.reason?.let { reason ->
+                    tr {
+                        td { +"Reason" }
+                        td { +reason }
                     }
-                    tr { td { +"Owner" }; td { +job.owner.toString() } }
+                }
+                tr {
+                    td { +"Owner" }
+                    td { +job.owner.toString() }
                 }
             }
+        }
 
-            div {
-                if (!job.status.isTerminal) {
-                    form(action = "$jobsPath/${job.id}/cancel", method = FormMethod.post) {
-                        with(Csrf) { tokenInput(csrfToken) }
-                        button { +"Cancel" }
-                    }
-                }
-                if (job.status == JobStatus.DeadLettered) {
-                    form(action = "$jobsPath/${job.id}/resume", method = FormMethod.post) {
-                        with(Csrf) { tokenInput(csrfToken) }
-                        button { +"Resume" }
-                    }
-                }
-                if (job.status.isTerminal) {
-                    form(action = "$jobsPath/${job.id}/delete", method = FormMethod.post) {
-                        with(Csrf) { tokenInput(csrfToken) }
-                        button { +"Delete" }
-                    }
+        div {
+            if (!job.status.isTerminal) {
+                form(action = "$jobsPath/${job.id}/cancel", method = FormMethod.post) {
+                    with(Csrf) { tokenInput(csrfToken) }
+                    button { +"Cancel" }
                 }
             }
+            if (job.status == JobStatus.DeadLettered) {
+                form(action = "$jobsPath/${job.id}/resume", method = FormMethod.post) {
+                    with(Csrf) { tokenInput(csrfToken) }
+                    button { +"Resume" }
+                }
+            }
+            if (job.status.isTerminal) {
+                form(action = "$jobsPath/${job.id}/delete", method = FormMethod.post) {
+                    with(Csrf) { tokenInput(csrfToken) }
+                    button { +"Delete" }
+                }
+            }
+        }
 
-            div {
-                h3 { +"Log" }
-                table {
-                    thead {
-                        tr {
-                            th { +"Time" }
-                            th { +"Level" }
-                            th { +"Message" }
-                        }
+        div {
+            h3 { +"Log" }
+            table {
+                thead {
+                    tr {
+                        th { +"Time" }
+                        th { +"Level" }
+                        th { +"Message" }
                     }
-                    tbody {
-                        for (entry in job.log) {
-                            apply(jobLogRow(entry))
-                        }
+                }
+                tbody {
+                    for (entry in job.log) {
+                        apply(jobLogRow(entry))
                     }
                 }
             }
+        }
     }
 }
 
@@ -222,46 +258,46 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     val jobsConfig = klerk.specification.jobs
 
     support.respondPage(call, "Job types") {
-            nav {
-                div {
-                    a(href = support.pathProvider.withPrefix()) { +"Home" }
-                    +" / "
-                    a(href = jobsPath) { +"Jobs" }
+        nav {
+            div {
+                a(href = support.pathProvider.withPrefix()) { +"Home" }
+                +" / "
+                a(href = jobsPath) { +"Jobs" }
+            }
+        }
+        h1 { +"Job types" }
+        table {
+            thead {
+                tr {
+                    th { +"Name" }
+                    th { +"Agent" }
+                    th { +"Priority" }
+                    th { +"Max retries" }
+                    th { +"Max concurrent" }
+                    th { +"Max steps" }
+                    th { +"Max duration" }
+                    th { +"Max descendants" }
+                    th { +"Max depth" }
                 }
             }
-            h1 { +"Job types" }
-            table {
-                thead {
+            tbody {
+                jobsConfig.types.values.sortedBy { it.name.value }.forEach { type ->
                     tr {
-                        th { +"Name" }
-                        th { +"Agent" }
-                        th { +"Priority" }
-                        th { +"Max retries" }
-                        th { +"Max concurrent" }
-                        th { +"Max steps" }
-                        th { +"Max duration" }
-                        th { +"Max descendants" }
-                        th { +"Max depth" }
-                    }
-                }
-                tbody {
-                    jobsConfig.types.values.sortedBy { it.name.value }.forEach { type ->
-                        tr {
-                            td { +type.name.value }
-                            td { +type.agent.name }
-                            td { +(type.priority?.name ?: "(inherited)") }
-                            td { +type.maxRetries.toString() }
-                            td { +(type.maxConcurrent?.toString() ?: "(unlimited)") }
-                            td { +(type.maxSteps?.toString() ?: "(unlimited)") }
-                            td { +(type.maxDuration?.toString() ?: "(unlimited)") }
-                            td { +type.maxDescendants.toString() }
-                            td { +type.maxDepth.toString() }
-                        }
+                        td { +type.name.value }
+                        td { +type.agent.name }
+                        td { +(type.priority?.name ?: "(inherited)") }
+                        td { +type.maxRetries.toString() }
+                        td { +(type.maxConcurrent?.toString() ?: "(unlimited)") }
+                        td { +(type.maxSteps?.toString() ?: "(unlimited)") }
+                        td { +(type.maxDuration?.toString() ?: "(unlimited)") }
+                        td { +type.maxDescendants.toString() }
+                        td { +type.maxDepth.toString() }
                     }
                 }
             }
+        }
 
-            apply(cronSchedulesTable(jobsConfig))
+        apply(cronSchedulesTable(jobsConfig))
     }
 }
 

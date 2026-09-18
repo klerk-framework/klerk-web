@@ -17,7 +17,8 @@ import io.ktor.http.HttpStatusCode
 public val Problem.httpStatus: HttpStatusCode
     get() = when (this) {
         is InvalidPropertyProblem, is InvalidPropertyCollectionProblem, is PreventedByRuleProblem,
-        is BadRequestProblem, is IdempotenceProblem -> HttpStatusCode.BadRequest
+        is BadRequestProblem, is IdempotenceProblem,
+        -> HttpStatusCode.BadRequest
         is AuthorizationProblem -> HttpStatusCode.Forbidden
         is NotFoundProblem -> HttpStatusCode.NotFound
         is StateProblem -> HttpStatusCode.Conflict

@@ -1,9 +1,14 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.DocumentContent
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.upload.NoSuchUploadException
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.UploadStates

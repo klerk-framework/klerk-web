@@ -1,49 +1,63 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CommandResult
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.Model
-import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.klerk.view.asSequence
+import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.klerk.camelCaseToPretty
+import dev.klerkframework.klerk.command.Command
+import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.job.JobAgent
 import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobProgress
 import dev.klerkframework.klerk.job.JobResult
 import dev.klerkframework.klerk.job.JobStepArgs
 import dev.klerkframework.klerk.job.JobType
-import dev.klerkframework.klerk.camelCaseToPretty
-import dev.klerkframework.klerk.read.ModelModification.*
+import dev.klerkframework.klerk.read.ModelModification.Created
+import dev.klerkframework.klerk.read.ModelModification.Deleted
+import dev.klerkframework.klerk.read.ModelModification.PropsUpdated
+import dev.klerkframework.klerk.read.ModelModification.Transitioned
 import dev.klerkframework.klerk.storage.RamStorage
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.web.assets.CssAsset
 import dev.klerkframework.web.assets.JsAsset
 import dev.klerkframework.web.attached.attachedDataRoutes
-import dev.klerkframework.web.config.*
-import dev.klerkframework.web.image.ImageIoProcessor
-import dev.klerkframework.web.image.ImagePlugin
-import dev.klerkframework.web.image.ImageProcessor
+import dev.klerkframework.web.config.Author
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.Book
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateFlower
+import dev.klerkframework.web.config.CreateFlowerParams
+import dev.klerkframework.web.config.Document
+import dev.klerkframework.web.config.Flower
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.Note
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.flowerImageWidths
+import dev.klerkframework.web.config.generateSampleData
+import dev.klerkframework.web.config.testImagePlugin
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.FetchPriority
 import dev.klerkframework.web.image.Gravity
+import dev.klerkframework.web.image.ImageIoProcessor
 import dev.klerkframework.web.image.ImageLoading
+import dev.klerkframework.web.image.ImagePlugin
+import dev.klerkframework.web.image.ImageProcessor
 import dev.klerkframework.web.image.ImageTemplate
 import dev.klerkframework.web.image.image
 import dev.klerkframework.web.models.City
 import dev.klerkframework.web.models.Publisher
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
-import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.klerk.job.JobAgent
 import io.ktor.http.*
-import io.ktor.server.response.*
-import java.nio.file.Path
 import io.ktor.server.application.*
-import io.ktor.server.config.configLoaders
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.compression.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -51,6 +65,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
 import org.sqlite.SQLiteDataSource
+import java.nio.file.Path
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 
@@ -126,7 +141,7 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
             )
         }
 
-        return when (Random.nextInt(4)) {   // set to 5 if you want to test throwing an uncaught exception
+        return when (Random.nextInt(4)) { // set to 5 if you want to test throwing an uncaught exception
             0 -> {
                 log += args.info("Succeeding")
                 JobResult.Success(log = log)
@@ -169,10 +184,10 @@ fun main() {
     val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
 
     val dbFilePath = "/tmp/klerktest.sqlite"
-    //File(dbFilePath).delete()
+    // File(dbFilePath).delete()
     val ds = SQLiteDataSource()
     ds.url = "jdbc:sqlite:$dbFilePath"
-    //val persistence = SqlPersistence(ds)
+    // val persistence = SqlPersistence(ds)
     val persistence = RamStorage()
     // A fixed directory rather than a temporary one, so that an upload interrupted by a restart can be resumed.
     val uploads = UploadPlugin<Context, MyCollections>(Path.of("/tmp/klerk-webtest-uploads"))
@@ -190,16 +205,15 @@ fun main() {
         testSettings(persistence),
     )
     runBlocking {
-
         klerk.meta.start()
-        //klerk.jobs.schedule(PeriodicPingJob.schedule(""), Context.system())
+        // klerk.jobs.schedule(PeriodicPingJob.schedule(""), Context.system())
 
         if (klerk.meta.modelsCount < 10) {
             //   val rowling = createAuthorJKRowling(klerk)
             //    val book = createBookHarryPotter1(klerk, rowling)
 
             generateSampleData(5, 2, klerk)
-            //data.makeSnapshot()
+            // data.makeSnapshot()
         }
 
         val embeddedServer = embeddedServer(Netty, port = 8081, host = "0.0.0.0") {
@@ -209,12 +223,14 @@ fun main() {
             install(Compression)
         }
 
-        Runtime.getRuntime().addShutdownHook(Thread {
-            println("Shutting down")
-            embeddedServer.stop()
-            runBlocking { klerk.meta.stop() }
-            println("Shutdown complete")
-        })
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                println("Shutting down")
+                embeddedServer.stop()
+                runBlocking { klerk.meta.stop() }
+                println("Shutdown complete")
+            },
+        )
 
         embeddedServer.start(wait = false)
 
@@ -226,9 +242,7 @@ fun main() {
                 is Deleted -> println("${it.id} was deleted")
             }
         }
-
     }
-
 }
 
 /** The demo has to start on any machine, so it uses the processor that needs nothing installed. */
@@ -238,9 +252,7 @@ private fun demoFormats(): Set<String> = setOf("jpeg")
 
 suspend fun ApplicationCall.ctx(klerk: Klerk<Context, MyCollections>): Context = Context.swedishUnauthenticated()
 
-suspend fun canSeeAdminUI(context: Context): Boolean {
-    return true
-}
+suspend fun canSeeAdminUI(context: Context): Boolean = true
 
 val css = CssAsset("water.css")
 
@@ -250,8 +262,8 @@ val layout = Layout(css = css, assetsBase = pathProvider.assetsBase)
 /** Models that get generated list/detail pages here. Flower is left out - it keeps its custom `/flowers` routes. */
 val webModels = setOf(Book::class, Author::class, Publisher::class, City::class, Document::class, Note::class)
 
-//val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
-//val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
+// val css = CssAsset("/assets/matcha.css") // CssAsset("/assets/my-styles.css")
+// val css = CssAsset("assets/water.css") // CssAsset("/assets/my-styles.css")
 val myScript = JsAsset("other/my-script.js")
 
 fun Application.configureRouting(
@@ -267,7 +279,7 @@ fun Application.configureRouting(
         layout = layout,
         classProvider = MyClassProvider,
         useTableForDetails = false,
-        )
+    )
     val support = WebSupport(klerk, ApplicationCall::ctx, pathProvider, layout, MyClassProvider)
     // The two roles a flower image plays here: a thumbnail in the gallery, and the image the detail page is about.
     val thumbnail = images.template("thumbnail", widths = flowerImageWidths, sizes = "320px")
@@ -303,13 +315,12 @@ fun Application.configureRouting(
             post("/flowers", createFlower(klerk, flowerForm))
             get("/flowers/{id}", renderFlower(klerk, support, hero))
 
-
             /*        get("/authors", renderAuthors(klerk))
         get("/authors/{id}", renderAuthorDetails(klerk))
         get("/books", renderBooks(klerk))
         get("/books/{id}", renderBookDetails(klerk))
 
- */
+             */
 
             get("/testassets") {
                 call.respondHtml {
@@ -325,7 +336,6 @@ fun Application.configureRouting(
                 }
             }
         }
-
     }
 }
 
@@ -336,7 +346,7 @@ fun HEAD.favicon() {
         sizes = "any"
         href =
             "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22>" +
-                "<text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
+            "<text y=%22.9em%22 font-size=%2290%22>\uD83E\uDDEA</text></svg>"
     }
 }
 
@@ -375,20 +385,18 @@ private fun renderIndex(klerkWeb: KlerkWeb<Context, MyCollections>): suspend Rou
  * `file()` is what makes the image field an upload: the browser sends the bytes to the Uploads plugin while the user
  * is still typing the name, and the form itself carries only the id of that upload.
  */
-private fun flowerFormTemplate(
-    klerk: Klerk<Context, MyCollections>,
-    uploads: UploadPlugin<Context, MyCollections>,
-) = FormTemplate(
-    EventWithParameters(CreateFlower.id, CreateFlowerParams::class),
-    klerk,
-    postPath = "${pathProvider.base}flowers",
-    pathProvider = pathProvider,
-    layout = layout,
-    uploads = uploads,
-) {
-    text(CreateFlowerParams::name)
-    file(CreateFlowerParams::image)
-}
+private fun flowerFormTemplate(klerk: Klerk<Context, MyCollections>, uploads: UploadPlugin<Context, MyCollections>) =
+    FormTemplate(
+        EventWithParameters(CreateFlower.id, CreateFlowerParams::class),
+        klerk,
+        postPath = "${pathProvider.base}flowers",
+        pathProvider = pathProvider,
+        layout = layout,
+        uploads = uploads,
+    ) {
+        text(CreateFlowerParams::name)
+        file(CreateFlowerParams::image)
+    }
 
 private fun renderNewFlower(
     klerk: Klerk<Context, MyCollections>,
@@ -398,11 +406,13 @@ private fun renderNewFlower(
     val form = klerk.read(context) {
         template.build(call, null, this, translator = context.translation, context = context)
     }
-    call.respondHtml(block = layout.page("New flower") {
-        h1 { +"Plant a flower" }
-        p { +"Pick an image and it starts uploading straight away." }
-        eventForm(form)
-    })
+    call.respondHtml(
+        block = layout.page("New flower") {
+            h1 { +"Plant a flower" }
+            p { +"Pick an image and it starts uploading straight away." }
+            eventForm(form)
+        },
+    )
 }
 
 private fun createFlower(
@@ -426,11 +436,14 @@ private fun createFlower(
                 // problem carries a message for the user and the status code to answer with.
                 is CommandResult.Failure -> {
                     val problem = result.problems.first()
-                    call.respondHtml(problem.httpStatus, layout.page("Not planted") {
-                        h1 { +"That did not work" }
-                        p { +problem.endUserTranslatedMessage }
-                        p { a(href = "${pathProvider.base}flowers/new") { +"Try again" } }
-                    })
+                    call.respondHtml(
+                        problem.httpStatus,
+                        layout.page("Not planted") {
+                            h1 { +"That did not work" }
+                            p { +problem.endUserTranslatedMessage }
+                            p { a(href = "${pathProvider.base}flowers/new") { +"Try again" } }
+                        },
+                    )
                 }
             }
         }
@@ -453,7 +466,7 @@ private fun renderFlowers(
     val flowers = klerk.read(context) {
         views.flowers.all.asSequence().toList().map { it to attachedData.getMetadata(it.props.image.id) }
     }
-  //  call.respondHtml(block = layout.page("Flowers") {
+    //  call.respondHtml(block = layout.page("Flowers") {
     call.respondHtml {
         body {
             h1 { +"Flowers" }
@@ -505,35 +518,41 @@ private fun renderFlower(
     val (flower, photo) = found
     val measured = hero.images.sidecar(photo.id, photo.hash)
 
-    call.respondHtml(block = layout.page(flower.props.name.value) {
-        h1 { +flower.props.name.value }
+    call.respondHtml(
+        block = layout.page(flower.props.name.value) {
+            h1 { +flower.props.name.value }
 
-        p {
-            +"Measured as ${measured?.let { "${it.width}x${it.height}" } ?: "not yet measured"}"
-        }
+            p {
+                +"Measured as ${measured?.let { "${it.width}x${it.height}" } ?: "not yet measured"}"
+            }
 
-        h2 { +"As the page would use it" }
-        with(support) { image(hero, photo, alt = flower.props.name.value) }
+            h2 { +"As the page would use it" }
+            with(support) { image(hero, photo, alt = flower.props.name.value) }
 
-        h2 { +"Every variant, one by one" }
-        p { +"A size that has not been generated yet is answered with a larger one; reload to get the real thing." }
-        table {
-            tr { th { +"Variant" }; th { +"URL" }; th { +"Image" } }
-            (listOf(hero.default) + hero.alternatives).forEach { rendition ->
-                rendition.widths.sorted().forEach { variantWidth ->
-                    demoFormats().forEach { format ->
-                        val segment = "${rendition.name}-$variantWidth.$format"
-                        val url = pathProvider.attachedDataPath(photo.id, photo.hash, segment)
-                        tr {
-                            td { +"${rendition.name} $variantWidth $format" }
-                            td { a(href = url) { code { +url } } }
-                            td { img(alt = segment, src = url) { attributes["width"] = "160" } }
+            h2 { +"Every variant, one by one" }
+            p { +"A size that has not been generated yet is answered with a larger one; reload to get the real thing." }
+            table {
+                tr {
+                    th { +"Variant" }
+                    th { +"URL" }
+                    th { +"Image" }
+                }
+                (listOf(hero.default) + hero.alternatives).forEach { rendition ->
+                    rendition.widths.sorted().forEach { variantWidth ->
+                        demoFormats().forEach { format ->
+                            val segment = "${rendition.name}-$variantWidth.$format"
+                            val url = pathProvider.attachedDataPath(photo.id, photo.hash, segment)
+                            tr {
+                                td { +"${rendition.name} $variantWidth $format" }
+                                td { a(href = url) { code { +url } } }
+                                td { img(alt = segment, src = url) { attributes["width"] = "160" } }
+                            }
                         }
                     }
                 }
             }
-        }
-    })
+        },
+    )
 }
 
 private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingContext.() -> Unit = {
@@ -542,13 +561,13 @@ private fun renderBooks(klerk: Klerk<Context, MyCollections>): suspend RoutingCo
     val table = klerk.read(context) {
         TableTemplate(klerk, Book::class, support, booksColumns).build(views.books.all, this, call)
     }
-    call.respondHtml(block = layout.page("Klerk Web Test") {
-        h1 { +"Here are the books" }
-        modelTable(table)
-    })
+    call.respondHtml(
+        block = layout.page("Klerk Web Test") {
+            h1 { +"Here are the books" }
+            modelTable(table)
+        },
+    )
 }
-
-
 
 fun authorizeAllDatatypes(instance: Any) {
     TODO()
@@ -561,15 +580,14 @@ fun authorizeAllDatatypes(instance: Any) {
      */
 }
 
-//class MyInstant(value: Instant) : InstantContainer(value)
+// class MyInstant(value: Instant) : InstantContainer(value)
 
 object MyCssClassProvider : CssClassProvider {
-    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> {
-        return when (element) {
+    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> =
+        when (element) {
             "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
             else -> setOf()
         }
-    }
 }
 
 val authorsColumns: List<Column<Author>> = listOf(
@@ -586,10 +604,9 @@ val booksColumns: List<Column<Book>> = listOf(
 )
 
 object MyClassProvider : CssClassProvider {
-    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> {
-        return when (element) {
+    override fun classes(part: UiPart, element: String, property: String?, model: Model<*>?): Set<String> =
+        when (element) {
             "td" -> if ((model?.props as? Author)?.lastName?.value == "4") setOf("bg-accent") else setOf()
             else -> setOf()
         }
-    }
 }

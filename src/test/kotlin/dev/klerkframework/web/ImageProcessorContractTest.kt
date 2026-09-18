@@ -1,14 +1,21 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
-import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.klerk.command.Command
-import dev.klerkframework.klerk.command.CommandToken
-import dev.klerkframework.klerk.command.ProcessingOptions
+import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.attached.attachedDataRoutes
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreatePublication
+import dev.klerkframework.web.config.CreatePublicationParams
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.PublicBody
+import dev.klerkframework.web.config.PublicCover
+import dev.klerkframework.web.config.Publication
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.ImageInfo
 import dev.klerkframework.web.image.ImageIoProcessor
@@ -16,14 +23,14 @@ import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImagePlugin
 import dev.klerkframework.web.image.ImageProcessor
 import dev.klerkframework.web.image.ImageRefused
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.ktor.client.request.*
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.delay
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -34,14 +41,14 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The contract [ImageProcessor] implementations are written against, exercised through a fake one: how many times a
@@ -262,6 +269,7 @@ class ImageProcessorContractTest {
         assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
         klerk.meta.stop()
     }
+
     @Test
     fun `renders, refusals and waits are published to the meter registry`() = testApplication {
         val registry = SimpleMeterRegistry()
@@ -298,6 +306,7 @@ class ImageProcessorContractTest {
         assertEquals(0.0, registry.counter("klerk.web.image.unavailable").count())
         klerk.meta.stop()
     }
+
     @Test
     fun `a processor that refuses to start stops the application`() = testApplication {
         setup(Fake(reported, onVerify = { throw IllegalStateException("the transformer did not answer") }))

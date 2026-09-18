@@ -1,13 +1,23 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
-import dev.klerkframework.klerk.view.ModelViews
-import dev.klerkframework.klerk.view.asSequence
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.command.ProcessingOptions
-import dev.klerkframework.web.config.*
+import dev.klerkframework.klerk.view.ModelViews
+import dev.klerkframework.klerk.view.asSequence
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.CreateDocument
+import dev.klerkframework.web.config.CreateDocumentParams
+import dev.klerkframework.web.config.CreateFlower
+import dev.klerkframework.web.config.CreateFlowerParams
+import dev.klerkframework.web.config.CreateNote
+import dev.klerkframework.web.config.CreateNoteParams
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.upload.UploadPlugin
 import dev.klerkframework.web.upload.uploadRoutes
 import io.ktor.client.request.*
@@ -39,14 +49,12 @@ class UploadFormTest {
     private fun context() = Context(actor)
 
     private fun ApplicationTestBuilder.setup(): Triple<
-
         Klerk<Context, MyCollections>,
 
         UploadPlugin<Context, MyCollections>,
 
         FormTemplate<CreateDocumentParams, Context, MyCollections>,
-
-    > {
+        > {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
@@ -212,10 +220,14 @@ class UploadFormTest {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "No script here")
-                append("content", "posted directly".toByteArray(), Headers.build {
-                    append(HttpHeaders.ContentType, "text/plain")
-                    append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
-                })
+                append(
+                    "content",
+                    "posted directly".toByteArray(),
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "text/plain")
+                        append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
+                    },
+                )
             },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
@@ -293,10 +305,14 @@ class UploadFormTest {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "Still uploading")
-                append("content", "posted directly".toByteArray(), Headers.build {
-                    append(HttpHeaders.ContentType, "text/plain")
-                    append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
-                })
+                append(
+                    "content",
+                    "posted directly".toByteArray(),
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "text/plain")
+                        append(HttpHeaders.ContentDisposition, "filename=\"direct.txt\"")
+                    },
+                )
             },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
@@ -352,10 +368,14 @@ class UploadFormTest {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "Too much")
-                append("content", ByteArray(5000) { 'a'.code.toByte() }, Headers.build {
-                    append(HttpHeaders.ContentType, "text/plain")
-                    append(HttpHeaders.ContentDisposition, "filename=\"big.txt\"")
-                })
+                append(
+                    "content",
+                    ByteArray(5000) { 'a'.code.toByte() },
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "text/plain")
+                        append(HttpHeaders.ContentDisposition, "filename=\"big.txt\"")
+                    },
+                )
             },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
@@ -382,11 +402,15 @@ class UploadFormTest {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "Over the quota")
-                append("content", ByteArray(10_100_000), Headers.build {
-                    append(HttpHeaders.ContentType, "application/octet-stream")
-                    append(HttpHeaders.ContentDisposition, "filename=\"big.bin\"")
-                })
-            }
+                append(
+                    "content",
+                    ByteArray(10_100_000),
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "application/octet-stream")
+                        append(HttpHeaders.ContentDisposition, "filename=\"big.bin\"")
+                    },
+                )
+            },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
         }
@@ -440,10 +464,14 @@ class UploadFormTest {
                 append(Csrf.TOKEN_NAME, csrfToken)
                 append(IDEMPOTENCE_KEY, CommandToken.simple().toString())
                 append("title", "Infected")
-                append("content", "has a virus!".toByteArray(), Headers.build {
-                    append(HttpHeaders.ContentType, "text/plain")
-                    append(HttpHeaders.ContentDisposition, "filename=\"notes.txt\"")
-                })
+                append(
+                    "content",
+                    "has a virus!".toByteArray(),
+                    Headers.build {
+                        append(HttpHeaders.ContentType, "text/plain")
+                        append(HttpHeaders.ContentDisposition, "filename=\"notes.txt\"")
+                    },
+                )
             },
         ) {
             header(HttpHeaders.Cookie, "${Csrf.TOKEN_NAME}=$csrfToken")
@@ -520,5 +548,4 @@ class UploadFormTest {
         assertContains(body, """data-klerk-max-size="10000000"""")
         klerk.meta.stop()
     }
-
 }

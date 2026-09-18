@@ -1,42 +1,50 @@
 package dev.klerkframework.web
-
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.view.ModelViews
 import dev.klerkframework.web.attached.attachedDataRoutes
-import dev.klerkframework.web.config.*
+import dev.klerkframework.web.config.Author
+import dev.klerkframework.web.config.AuthorCollections
+import dev.klerkframework.web.config.Book
+import dev.klerkframework.web.config.BookCollections
+import dev.klerkframework.web.config.Context
+import dev.klerkframework.web.config.Flower
+import dev.klerkframework.web.config.MyCollections
+import dev.klerkframework.web.config.createAuthorJKRowling
+import dev.klerkframework.web.config.createConfig
+import dev.klerkframework.web.config.testSettings
 import dev.klerkframework.web.image.Crop
 import dev.klerkframework.web.image.FetchPriority
+import dev.klerkframework.web.image.ImageInfo
 import dev.klerkframework.web.image.ImageIoProcessor
+import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImageLoading
 import dev.klerkframework.web.image.ImagePlugin
-import dev.klerkframework.web.image.image
-import io.ktor.http.HttpStatusCode
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import dev.klerkframework.web.image.ImageInfo
-import dev.klerkframework.web.image.ImageLimits
 import dev.klerkframework.web.image.ImageProcessor
 import dev.klerkframework.web.image.ImageRefused
+import dev.klerkframework.web.image.image
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.toInputStream
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.nio.file.Files
-import io.ktor.client.request.get
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import kotlinx.html.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -87,7 +95,10 @@ class DocExamplesTest {
 
         // docs/model-pages.md
         val authors = ModelListPage<Author, Context, MyCollections>(
-            Author::class, support, pathToList = "/author", humanName = "Authors",
+            Author::class,
+            support,
+            pathToList = "/author",
+            humanName = "Authors",
         )
         val authorPage = ModelDetailPage<Author, Context, MyCollections>(
             Author::class,
@@ -119,11 +130,13 @@ class DocExamplesTest {
                     val built = klerk.read(context) {
                         table.build(klerk.specification.views.authors.all, this, call)
                     }
-                    call.respond(klerk.read(context) {
-                        html {
-                            body { modelTable(built) }
-                        }
-                    })
+                    call.respond(
+                        klerk.read(context) {
+                            html {
+                                body { modelTable(built) }
+                            }
+                        },
+                    )
                 }
 
                 // docs/introduction.md - Ask Klerk, rendered as a whole page
@@ -140,23 +153,27 @@ class DocExamplesTest {
                 get("/fragment") {
                     val context = call.docCtx(klerk)
                     val events = klerk.read(context) { possibleEvents(author) }
-                    call.respond(klerk.read(context) {
-                        html {
-                            body {
-                                with(support) {
-                                    events.forEach { event -> eventButton(event, author, context) }
+                    call.respond(
+                        klerk.read(context) {
+                            html {
+                                body {
+                                    with(support) {
+                                        events.forEach { event -> eventButton(event, author, context) }
+                                    }
                                 }
                             }
-                        }
-                    })
+                        },
+                    )
                 }
 
                 // docs/appearance.md - Layout.page for your own page
                 get("/own") {
-                    call.respondHtml(block = layout.page("My page") {
-                        h1 { +"Hello" }
-                        script(pathProvider.assetPath("my-script.js")) { defer = true }
-                    })
+                    call.respondHtml(
+                        block = layout.page("My page") {
+                            h1 { +"Hello" }
+                            script(pathProvider.assetPath("my-script.js")) { defer = true }
+                        },
+                    )
                 }
             }
         }
@@ -247,10 +264,8 @@ class DocExamplesTest {
  * the docs tell people to copy still compiles against [ImageProcessor].
  */
 @Suppress("unused")
-private class TransformerProcessor(
-    private val baseUrl: String,
-    override val limits: ImageLimits = ImageLimits(),
-) : ImageProcessor {
+private class TransformerProcessor(private val baseUrl: String, override val limits: ImageLimits = ImageLimits()) :
+    ImageProcessor {
 
     override val outputFormats: Set<String> = setOf("jpeg", "png", "webp", "avif")
 

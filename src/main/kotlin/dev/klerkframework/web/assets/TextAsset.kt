@@ -1,15 +1,19 @@
 package dev.klerkframework.web.assets
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.AttachedBlobID
+import dev.klerkframework.klerk.EventVisibility
+import dev.klerkframework.klerk.InstanceEventNoParameters
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.VoidEventArgs
+import dev.klerkframework.klerk.VoidEventWithParameters
 import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
-import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.datatypes.BlobPreAttachStep
+import dev.klerkframework.klerk.datatypes.StringContainer
 import dev.klerkframework.klerk.datatypes.noPreAttachProcessing
 import dev.klerkframework.klerk.statemachine.StateMachine
 import dev.klerkframework.klerk.statemachine.stateMachine
 import dev.klerkframework.web.assets.TextAssetStates.Updatable
 import java.security.MessageDigest
-import java.util.*
+import java.util.Base64
 
 /** An asset served by [AssetsPlugin]. Managed by the plugin; you do not create these yourself. */
 public data class TextAsset(
@@ -42,7 +46,6 @@ internal fun <C : KlerkContext, V> createTextResourceStatemachine(): StateMachin
                 delete()
             }
         }
-
     }
 
 /** Issued by [AssetsPlugin] at startup for each asset. Not meant to be rendered by klerk-web. */
@@ -78,7 +81,6 @@ public class AssetContentType(value: String) : StringContainer(value) {
     override val maxLines: Int = 1
 }
 
-
 /**
  * A shortened hash of an asset's content, encoded in Base64.
  */
@@ -89,6 +91,7 @@ public class Base64hash(value: String) : StringContainer(value) {
 
     public companion object {
         private val md = MessageDigest.getInstance("SHA-256")
+
         /** The hash of the UTF-8 bytes of [string]. */
         public fun from(string: String): Base64hash = from(string.toByteArray())
 

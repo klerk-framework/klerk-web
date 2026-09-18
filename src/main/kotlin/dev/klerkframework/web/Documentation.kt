@@ -1,6 +1,10 @@
 package dev.klerkframework.web
-
-import dev.klerkframework.klerk.*
+import dev.klerkframework.klerk.AuthorizationConfig
+import dev.klerkframework.klerk.Klerk
+import dev.klerkframework.klerk.KlerkContext
+import dev.klerkframework.klerk.KlerkPlugin
+import dev.klerkframework.klerk.KlerkTranslation
+import dev.klerkframework.klerk.ManagedModel
 import dev.klerkframework.klerk.misc.FlowChartAlgorithm
 import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.misc.PropertyType
@@ -28,47 +32,45 @@ internal suspend fun <C : KlerkContext, V> renderDocumentation(
     val csrfToken = Csrf.issue(call)
 
     support.respondPage(call, "Documentation") {
-            header {
-                nav { div { a(href = support.pathProvider.base) { +"Home" } } }
-            }
-            val forModel = call.request.queryParameters["model"]
-            if (forModel == null) {
-                h1 { +"Documentation" }
-                val translation = context.translation.klerk
-                apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, translation, csrfToken))
-                apply(renderAuthorizationRules(klerk.specification.authorization, context.translation.klerk))
-                apply(renderViews(klerk.specification.views))
-                apply(renderPluginsDocumentation(klerk.specification.plugins))
-                hr()
-                ul {
-                    for (managedModel in klerk.specification.managedModels) {
-                        li {
-                            a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") {
-                                +managedModel.kClass.simpleName.toString()
-                            }
+        header {
+            nav { div { a(href = support.pathProvider.base) { +"Home" } } }
+        }
+        val forModel = call.request.queryParameters["model"]
+        if (forModel == null) {
+            h1 { +"Documentation" }
+            val translation = context.translation.klerk
+            apply(renderModels(klerk.specification.managedModels, klerk, documentationPath, translation, csrfToken))
+            apply(renderAuthorizationRules(klerk.specification.authorization, context.translation.klerk))
+            apply(renderViews(klerk.specification.views))
+            apply(renderPluginsDocumentation(klerk.specification.plugins))
+            hr()
+            ul {
+                for (managedModel in klerk.specification.managedModels) {
+                    li {
+                        a(href = "$documentationPath?model=${managedModel.kClass.qualifiedName}") {
+                            +managedModel.kClass.simpleName.toString()
                         }
                     }
                 }
-
-            } else {
-                val model = klerk.specification.managedModels.single { it.kClass.qualifiedName == forModel }
-                h1 { +"Documentation for ${model.kClass.simpleName}" }
-                pre(classes = "mermaid") {
-                    unsafe {
-                        +generateStateDiagram(model.stateMachine, showUpdateNotes, context.translation.klerk)
-                    }
-                }
-                if (!showUpdateNotes) {
-                    a(href = call.request.uri.plus("&showUpdateNotes=true")) { +"Show updates" }
-                } else {
-                    a(href = call.request.uri.replace("&showUpdateNotes=true", "")) { +"Hide updates" }
-                }
-                apply(addMermaidScript())
-                apply(renderEvents(model.stateMachine, klerk, context.translation.klerk))
-                // apply(renderStates(model.stateMachine, klerk, documentationPath))
-
             }
-            apply(renderAlgorithms(documentationPath, algorithms))
+        } else {
+            val model = klerk.specification.managedModels.single { it.kClass.qualifiedName == forModel }
+            h1 { +"Documentation for ${model.kClass.simpleName}" }
+            pre(classes = "mermaid") {
+                unsafe {
+                    +generateStateDiagram(model.stateMachine, showUpdateNotes, context.translation.klerk)
+                }
+            }
+            if (!showUpdateNotes) {
+                a(href = call.request.uri.plus("&showUpdateNotes=true")) { +"Show updates" }
+            } else {
+                a(href = call.request.uri.replace("&showUpdateNotes=true", "")) { +"Hide updates" }
+            }
+            apply(addMermaidScript())
+            apply(renderEvents(model.stateMachine, klerk, context.translation.klerk))
+            // apply(renderStates(model.stateMachine, klerk, documentationPath))
+        }
+        apply(renderAlgorithms(documentationPath, algorithms))
     }
 }
 
@@ -111,7 +113,6 @@ private fun <C : KlerkContext, V> renderStatemachine(
         }
     }
     apply(renderEvents(stateMachine, klerk, translation))
-
 }
 
 private fun renderModelProperties(
@@ -160,14 +161,12 @@ private fun renderModelProperties(
                     submitInput(classes = "button") { value = "Test validation" }
                 }
             }
-
         }
     }
 }
 
 private fun <V> renderViews(views: V): FlowContent.() -> Unit = {
     h2 { +"Views" }
-
 }
 
 internal fun renderAlgorithms(
@@ -181,65 +180,63 @@ internal fun renderAlgorithms(
     }
 }
 
-private const val noBullets = "list-style-type: none;"
+private const val NO_BULLETS = "list-style-type: none;"
 
 private fun <C : KlerkContext, V> renderEvents(
     stateMachine: StateMachine<out Any, out Enum<*>, C, V>,
     klerk: Klerk<C, V>,
     translation: KlerkTranslation,
-): FlowContent.() -> Unit =
-    {
-        h5 { +"Events" }
-        for (externalEvent in stateMachine.eventReferences) {
-            val parameters = klerk.specification.parametersSchema(externalEvent)
-            h6 { +externalEvent.toString() }
-            ul {
-                style = noBullets
-                li {
-                    if (parameters == null) {
-                        +"No parameters"
-                    } else {
-                        details {
-                            summary { +"Parameters" }
-                            ul {
-                                style = noBullets
-                                for (parameter in parameters.fields) {
-                                    details {
-                                        summary { +parameter.name }
-                                        table {
-                                            tr {
-                                                td { +"Required" }
-                                                td { +if (parameter.isRequired) "yes" else "no" }
-                                            }
-                                            tr {
-                                                td { +"Nullable" }
-                                                td { +if (parameter.isNullable) "yes" else "no" }
-                                            }
-                                            tr {
-                                                td { +"Base type" }
-                                                td { +parameter.type.toString() }
-                                            }
-                                            tr {
-                                                td { +"Container" }
-                                                td {
-                                                    span {
-                                                        title = parameter.valueClass.qualifiedName.orEmpty()
-                                                        +parameter.name
-                                                    }
+): FlowContent.() -> Unit = {
+    h5 { +"Events" }
+    for (externalEvent in stateMachine.eventReferences) {
+        val parameters = klerk.specification.parametersSchema(externalEvent)
+        h6 { +externalEvent.toString() }
+        ul {
+            style = NO_BULLETS
+            li {
+                if (parameters == null) {
+                    +"No parameters"
+                } else {
+                    details {
+                        summary { +"Parameters" }
+                        ul {
+                            style = NO_BULLETS
+                            for (parameter in parameters.fields) {
+                                details {
+                                    summary { +parameter.name }
+                                    table {
+                                        tr {
+                                            td { +"Required" }
+                                            td { +if (parameter.isRequired) "yes" else "no" }
+                                        }
+                                        tr {
+                                            td { +"Nullable" }
+                                            td { +if (parameter.isNullable) "yes" else "no" }
+                                        }
+                                        tr {
+                                            td { +"Base type" }
+                                            td { +parameter.type.toString() }
+                                        }
+                                        tr {
+                                            td { +"Container" }
+                                            td {
+                                                span {
+                                                    title = parameter.valueClass.qualifiedName.orEmpty()
+                                                    +parameter.name
                                                 }
                                             }
-                                            parameter.defaultContainer?.let {
-                                                tr {
-                                                    td { +"Default value" }
-                                                    td { +it.toString() }
-                                                }
+                                        }
+                                        parameter.defaultContainer?.let {
+                                            tr {
+                                                td { +"Default value" }
+                                                td { +it.toString() }
                                             }
+                                        }
 
-                                            for (entry in parameter.validationRulesDescriptions) {
-                                                tr {
-                                                    td { +entry.key }
-                                                    td { +entry.value }
-                                                }
+                                        for (entry in parameter.validationRulesDescriptions) {
+                                            tr {
+                                                td { +entry.key }
+                                                td { +entry.value }
                                             }
                                         }
                                     }
@@ -248,14 +245,14 @@ private fun <C : KlerkContext, V> renderEvents(
                         }
                     }
                 }
-                li {
-                    details {
-                        summary { +"Validation rules" }
-                        ul {
-                            for (rule in klerk.specification.contextRulesFor(externalEvent)) {
-                                li {
-                                    +"Context: ${translation.function(rule)}"
-                                }
+            }
+            li {
+                details {
+                    summary { +"Validation rules" }
+                    ul {
+                        for (rule in klerk.specification.contextRulesFor(externalEvent)) {
+                            li {
+                                +"Context: ${translation.function(rule)}"
                             }
                         }
                     }
@@ -263,7 +260,7 @@ private fun <C : KlerkContext, V> renderEvents(
             }
         }
     }
-
+}
 
 internal fun <V> renderAuthorizationRules(
     specification: AuthorizationConfig<*, V>,
@@ -326,7 +323,6 @@ internal fun <V> renderAuthorizationRules(
         }
     }
 }
-
 
 internal suspend fun <C : KlerkContext, V> renderAlgorithm(
     call: ApplicationCall,
