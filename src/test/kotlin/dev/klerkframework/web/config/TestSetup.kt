@@ -397,8 +397,8 @@ fun authorStateMachine(collections: MyCollections): StateMachine<Author, AuthorS
             onEnter {
                 unmanagedJob(::onEnterImprovingStateAction)
                 transitionWhen {
-                    on(::isAnImpostor, Amateur)
-                    on(::hasTalent, Established)
+                    ::isAnImpostor toState Amateur
+                    ::hasTalent toState Established
                 }
                 jobs(::aJob)
             }
