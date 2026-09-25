@@ -154,7 +154,7 @@ fun createConfig(
         eventLog {
             positive(::`Everybody can read event log`)
         }
-        jobs {
+        readJobs {
             positive(::`Everybody can read jobs`)
         }
         readAttachedData {

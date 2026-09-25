@@ -44,6 +44,7 @@ It is not a second permission system. Klerk's own rules still apply to everythin
 * which events a user may execute (`possibleEvents`),
 * which models a user may read,
 * the event log (`eventLogPositiveRules`),
+* the activity log (the `activityLog` rules),
 * which jobs a user may see or control.
 
 So `canSeeAdminUI` decides whether the console is shown at all - not what may be done in it.
@@ -59,8 +60,8 @@ or in full at `_eventlog`.
 ## Jobs
 
 Lists jobs with status, priority, parent and progress, and refreshes itself while a job is running. A job's detail
-page can cancel it, resume a dead-lettered one, or delete a terminal one. Each of those is authorized by Klerk's
-jobs rules.
+page can cancel it, resume a dead-lettered one, or delete a terminal one. Seeing jobs is authorized by Klerk's
+`readJobs` rules; a button is only shown when Klerk's `controlJobs` rules allow the operation.
 
 ## Documentation
 
@@ -70,7 +71,8 @@ try a value against its validators.
 
 ## Log
 
-Klerk's own log: what was read and written, by whom, with the facts behind each entry.
+Klerk's activity log: what was read and written, by whom, with the facts behind each entry. Shown only to actors
+that Klerk's `activityLog` rules allow.
 
 ## Settings
 

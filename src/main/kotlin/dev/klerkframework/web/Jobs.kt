@@ -5,6 +5,7 @@ import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.job.JobID
 import dev.klerkframework.klerk.job.JobInfo
 import dev.klerkframework.klerk.job.JobLogEntry
+import dev.klerkframework.klerk.job.JobOperation
 import dev.klerkframework.klerk.job.JobStatus
 import dev.klerkframework.klerk.job.JobsSpecification
 import io.ktor.server.application.*
@@ -111,6 +112,7 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
     val context = support.contextProvider(call, klerk)
     val id = JobID(requireNotNull(call.parameters["id"]).toLong())
     val job = klerk.jobs.get(id, context)
+    val allowed = JobOperation.entries.filter { klerk.jobs.isAllowed(id, it, context) }.toSet()
     val csrfToken = Csrf.issue(call)
 
     support.respondPage(
@@ -209,19 +211,19 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
         }
 
         div {
-            if (!job.status.isTerminal) {
+            if (!job.status.isTerminal && JobOperation.Cancel in allowed) {
                 form(action = "$jobsPath/${job.id}/cancel", method = FormMethod.post) {
                     with(Csrf) { tokenInput(csrfToken) }
                     button { +"Cancel" }
                 }
             }
-            if (job.status == JobStatus.DeadLettered) {
+            if (job.status == JobStatus.DeadLettered && JobOperation.Resume in allowed) {
                 form(action = "$jobsPath/${job.id}/resume", method = FormMethod.post) {
                     with(Csrf) { tokenInput(csrfToken) }
                     button { +"Resume" }
                 }
             }
-            if (job.status.isTerminal) {
+            if (job.status.isTerminal && JobOperation.Delete in allowed) {
                 form(action = "$jobsPath/${job.id}/delete", method = FormMethod.post) {
                     with(Csrf) { tokenInput(csrfToken) }
                     button { +"Delete" }

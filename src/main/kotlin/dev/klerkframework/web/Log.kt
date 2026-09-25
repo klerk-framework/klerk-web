@@ -1,7 +1,9 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.AuthorizationException
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.html.*
 import kotlinx.html.*
@@ -12,13 +14,19 @@ internal suspend fun <C : KlerkContext, V> renderLog(
     klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider.invoke(call, klerk)
+    val entries = try {
+        klerk.activityLog.entries(context)
+    } catch (e: AuthorizationException) {
+        support.respondPage(call, "Forbidden", HttpStatusCode.Forbidden) { +"Forbidden" }
+        return
+    }
     support.respondPage(call, "Activity log") {
         header {
             nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
         }
         main {
             h1 { +"Activity log" }
-            for (entry in klerk.activityLog.entries(context)) {
+            for (entry in entries) {
                 // the LogEntry is currently always a fat object (i.e. it contains lots of interesting stuff). But
                 // soon we will persist the log, which means that after a restart, the entries will not be fat
                 // anymore. So we can only use the template and facts here. (but for now we have to use

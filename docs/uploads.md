@@ -100,6 +100,9 @@ body. What is prevented there is storing the bytes, not receiving them.
 - **If possible, only allow uploads from authenticated and trusted users.**
 - **An upload may only be continued by the actor that started it.** One that does not exist and one that belongs to
   somebody else give the same `404`, so the endpoints cannot be used to find out which uploads exist.
+- **The uploaded file can only be attached by the actor that uploaded it.** An `Unauthenticated` actor is never the same
+  as another, so an anonymous visitor needs an identity of their own, e.g. a `CustomIdentity` derived from their
+  session.
 - **Every mutating request carries a CSRF token**, as a header rather than a form field.
 - **The filename and content type are the client's claims**, kept as metadata and never used as fact. The filename is
   never used as a path — staging files are named after the model id. Serving the file back out is

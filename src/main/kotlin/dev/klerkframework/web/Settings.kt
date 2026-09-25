@@ -29,9 +29,9 @@ internal suspend fun <C : KlerkContext, V> renderSettings(
         ),
         SettingRow("Clock", "clock", settings.clock::class.simpleName ?: "?"),
         SettingRow("Meter registry", "meterRegistry", settings.meterRegistry::class.simpleName ?: "?"),
-        SettingRow("Allow unsafe operations", "allowUnsafeOperations", settings.allowUnsafeOperations.toString()),
         SettingRow("Default attached data lease", "defaultAttachedDataLease", "${settings.defaultAttachedDataLease}"),
         SettingRow("Max attached data lease", "maxAttachedDataLease", settings.maxAttachedDataLease.toString()),
+        SettingRow("Command token validity", "commandTokenValidity", settings.commandTokenValidity.toString()),
         SettingRow(
             "Content type detector",
             "contentTypeDetector",

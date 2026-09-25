@@ -22,7 +22,8 @@ import kotlinx.html.stream.appendHTML
 import java.security.SecureRandom
 import kotlin.reflect.KClass
 
-internal val secureRandom = SecureRandom.getInstanceStrong()
+// Not getInstanceStrong(): that one may block on a machine short of entropy, and is no more secure for this.
+internal val secureRandom = SecureRandom()
 
 /** Refreshes the page every [seconds] seconds. */
 internal fun autoRefresh(seconds: Int): HEAD.() -> Unit = {

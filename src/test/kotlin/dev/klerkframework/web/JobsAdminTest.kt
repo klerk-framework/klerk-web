@@ -97,6 +97,23 @@ class JobsAdminTest {
     }
 
     @Test
+    fun `control buttons are hidden when the actor may see but not control the job`() = testApplication {
+        System.setProperty("DEVELOPMENT_MODE", "true")
+        val bc = BookCollections()
+        val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
+        val klerk = Klerk.create(createConfig(collections), testSettings(jobExecution = JobExecution.Manual))
+        val klerkWeb = KlerkWeb(klerk, { _, _ -> Context.authenticationIdentity() }, canSeeAdminUI = { true })
+        klerk.meta.start()
+        val jobId = klerk.jobs.schedule(MyJob.declare(""), Context.system())
+
+        application { routing { klerkWebRoutes(klerkWeb) } }
+
+        val detail = client.get("/admin/_jobs/$jobId").bodyAsText()
+        assertTrue(detail.contains("my-job"))
+        assertFalse(detail.contains("/admin/_jobs/$jobId/cancel"))
+    }
+
+    @Test
     fun `terminal job can be deleted`() = testApplication {
         System.setProperty("DEVELOPMENT_MODE", "true")
         val (klerk, klerkWeb) = setup()

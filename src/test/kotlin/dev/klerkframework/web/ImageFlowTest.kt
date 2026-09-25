@@ -1,4 +1,5 @@
 package dev.klerkframework.web
+import dev.klerkframework.klerk.CustomIdentity
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.command.Command
 import dev.klerkframework.klerk.command.CommandToken
@@ -53,7 +54,9 @@ import kotlin.test.assertTrue
  */
 class ImageFlowTest {
 
-    private val actor = Context.swedishUnauthenticated()
+    // A visitor identified by their session: Klerk cannot tell two unauthenticated visitors apart, so an upload made as
+    // Unauthenticated could not be claimed by the command that follows it.
+    private val actor = Context(CustomIdentity(null, 4711))
     private val csrfToken = "flow-test-token"
 
     private lateinit var klerk: Klerk<Context, MyCollections>
