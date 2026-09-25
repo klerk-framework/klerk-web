@@ -281,7 +281,7 @@ class ImageProcessorContractTest {
         client.get(coverPath(id, "cover-320.png"))
         awaitFile("320.png")
 
-        assertEquals(1L, registry.timer("klerk.web.image.render").count())
+        assertEquals(1L, registry.timer("klerk.web.image.render", "format", "png").count())
         assertEquals(1L, registry.timer("klerk.web.image.wait").count())
         assertEquals(0.0, registry.counter("klerk.web.image.refused").count())
         assertEquals(0.0, registry.counter("klerk.web.image.unavailable").count())

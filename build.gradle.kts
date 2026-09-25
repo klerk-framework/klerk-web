@@ -23,6 +23,7 @@ group = "dev.klerkframework"
 version = "1.0.0-alpha.2-SNAPSHOT"
 
 dependencies {
+    // Also provides micrometer-core (an api dependency of klerk), so klerk-web uses the Micrometer version Klerk has.
     implementation("dev.klerkframework:klerk:$klerkVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
     implementation("io.ktor:ktor-server-html-builder:$ktorVersion")
@@ -32,13 +33,9 @@ dependencies {
     implementation("io.ktor:ktor-server-sessions-jvm:$ktorVersion")
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    // TODO this should not be necessary? It seems to be required when copying a config (e.g. in a plugin).
-    // Do we really want all klerk-based application to require this?
-    implementation("io.micrometer:micrometer-core:1.12.3")
     implementation("io.ktor:ktor-server-compression:$ktorVersion") // TODO: remove?
     implementation("io.github.microutils:kotlin-logging-jvm:$kotlinLoggingVersion")
     testImplementation(kotlin("test"))
-    testImplementation("io.micrometer:micrometer-core:1.12.3")
     testImplementation("org.xerial:sqlite-jdbc:$sqliteJdbcVersion")
     testImplementation("org.slf4j:slf4j-simple:$slf4jVersion")
     testImplementation("dev.klerkframework:klerk:$klerkVersion")

@@ -278,9 +278,9 @@ public class ImagePlugin<C : KlerkContext, V>(
      * [wait] and [unavailable] together are what say whether [renderWait] and [maxConcurrentRenders] are set for the
      * load this application actually has.
      */
-    private class Meters(registry: MeterRegistry, store: VariantStore) {
-        /** How long one variant takes to produce. */
-        val render: Timer = registry.timer("klerk.web.image.render")
+    private class Meters(private val registry: MeterRegistry, store: VariantStore) {
+        /** How long one variant in [format] takes to produce. */
+        fun render(format: String): Timer = registry.timer("klerk.web.image.render", "format", format)
 
         /** Images the processor would not decode. Each is answered `404` from then on. */
         val refused: Counter = registry.counter("klerk.web.image.refused")
@@ -643,7 +643,7 @@ public class ImagePlugin<C : KlerkContext, V>(
                         // makes one roundtrip per variant rather than a probe and then a render.
                         val startedRender = Clock.System.now()
                         val info = processor.render(original, partial, width, format, crop)
-                        meters?.render?.record(
+                        meters?.render(format)?.record(
                             (Clock.System.now() - startedRender).inWholeMilliseconds,
                             TimeUnit.MILLISECONDS,
                         )

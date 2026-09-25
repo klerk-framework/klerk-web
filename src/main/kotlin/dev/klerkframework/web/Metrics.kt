@@ -4,15 +4,18 @@ import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import io.ktor.server.application.*
 import io.ktor.server.html.*
+import io.micrometer.core.instrument.Measurement
+import io.micrometer.core.instrument.Meter
 import kotlinx.html.*
+import java.util.Locale
 
 internal suspend fun <C : KlerkContext, V> renderMetrics(
     call: ApplicationCall,
     support: WebSupport<C, V>,
-    jobsPath: String,
     klerk: Klerk<C, V>,
 ) {
-    val actor = support.contextProvider(call, klerk)
+    val meters = klerk.settings.meterRegistry.meters
+        .sortedWith(compareBy<Meter>({ it.id.name }, { it.id.tags.joinToString() }))
     support.respondPage(call, "Metrics") {
         header {
             nav { div { a(href = support.pathProvider.withPrefix()) { +"Home" } } }
@@ -39,38 +42,47 @@ internal suspend fun <C : KlerkContext, V> renderMetrics(
                 }
             }
             h1 { +"Metrics" }
-            +"Not implemented" // TODO
-                /*                table {
-                                    thead {
-                                        tr {
-                                            th { +"Name" }
-                                            th { +"Value" }
-                                            th { +"Base unit" }
-                                            th { +"Description" }
-                                            // th { +"Tags" }
-                                        }
-                                    }
-                                    tbody {
-                                        data.specification.meterRegistry.meters.sortedBy { it.id.name }.forEach {
-                                            tr {
-                                                td { +it.id.name }
-                                                td {
-                                                    unsafe {
-                                                        for (measurement in it.measure()) {
-                                                            +"${measurement.statistic.name}:"
-                                                            +"$NON_BREAKING_SPACE${measurement.value}"
-                                                            +"<br>"
-                                                        }
-                                                    }
-                                                }
-                                                td { +(it.id.baseUnit ?: "") }
-                                                td { +(it.id.description ?: "") }
-                                                //td { +it.id.tags.joinToString(", ") }
-                                            }
-                                        }
-                                    }
+            if (meters.isEmpty()) {
+                p { +"No metrics have been registered." }
+                return@main
+            }
+            table {
+                thead {
+                    tr {
+                        th { +"Name" }
+                        th { +"Tags" }
+                        th { +"Value" }
+                        th { +"Base unit" }
+                        th { +"Description" }
+                    }
+                }
+                tbody {
+                    for (meter in meters) {
+                        tr {
+                            td { +meter.id.name }
+                            td { +meter.id.tags.joinToString(", ") { "${it.key}=${it.value}" } }
+                            td {
+                                meter.measure().forEachIndexed { i, measurement ->
+                                    if (i > 0) br()
+                                    +format(measurement)
                                 }
-                 */
+                            }
+                            td { +(meter.id.baseUnit ?: "") }
+                            td { +(meter.id.description ?: "") }
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+private fun format(measurement: Measurement): String {
+    val value = measurement.value
+    val formatted = if (value.isFinite() && value == Math.rint(value)) {
+        value.toLong().toString()
+    } else {
+        "%.3f".format(Locale.ROOT, value)
+    }
+    return "${measurement.statistic.name.lowercase()}: $formatted"
 }

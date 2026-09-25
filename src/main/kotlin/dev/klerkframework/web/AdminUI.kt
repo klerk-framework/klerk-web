@@ -140,7 +140,7 @@ public class AdminUI<C : KlerkContext, V>(
 
             get(metricsPath) {
                 requireAdmin(call) {
-                    renderMetrics(call, support, metricsPath, klerk)
+                    renderMetrics(call, support, klerk)
                 }
             }
 

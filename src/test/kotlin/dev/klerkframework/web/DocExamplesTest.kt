@@ -257,6 +257,20 @@ class DocExamplesTest {
 
         assertTrue(client.get("/admin/").status.value < 400)
     }
+
+    @Test
+    fun `the admin ui lists the registered metrics`() = testApplication {
+        val klerk = klerk()
+        klerk.meta.start()
+        val support = WebSupport(klerk, ApplicationCall::docCtx)
+        val adminUI =
+            AdminUI(support.withPathProvider(DefaultPathProvider(prefix = "admin/")), canSeeAdminUI = { true })
+        application { routing { adminUiRoutes(adminUI) } }
+
+        val page = client.get("/admin/_metrics").bodyAsText()
+        assertTrue("klerk.models.count" in page)
+        assertTrue("klerk.models.load" in page)
+    }
 }
 
 /**

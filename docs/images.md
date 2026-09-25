@@ -381,7 +381,7 @@ for, the render queue sits on the critical path of a page load, and these are wh
 
 | | |
 |---|---|
-| `klerk.web.image.render` | timer: how long one variant takes to produce, and how many there have been |
+| `klerk.web.image.render` | timer, tagged `format`: how long one variant takes to produce, and how many there have been |
 | `klerk.web.image.wait` | timer: how long a request waited for a variant that did not exist yet |
 | `klerk.web.image.unavailable` | counter: requests that gave up waiting and were answered `503` |
 | `klerk.web.image.refused` | counter: images the processor would not decode |

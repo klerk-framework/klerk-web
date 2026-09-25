@@ -28,6 +28,7 @@ internal suspend fun <C : KlerkContext, V> renderSettings(
             settings.attachedBlobStore?.let { it::class.simpleName } ?: "none",
         ),
         SettingRow("Clock", "clock", settings.clock::class.simpleName ?: "?"),
+        SettingRow("Meter registry", "meterRegistry", settings.meterRegistry::class.simpleName ?: "?"),
         SettingRow("Allow unsafe operations", "allowUnsafeOperations", settings.allowUnsafeOperations.toString()),
         SettingRow("Default attached data lease", "defaultAttachedDataLease", "${settings.defaultAttachedDataLease}"),
         SettingRow("Max attached data lease", "maxAttachedDataLease", settings.maxAttachedDataLease.toString()),

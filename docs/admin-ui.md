@@ -12,7 +12,7 @@ grown into your product. Build that from the [building blocks](introduction.md) 
 * [Jobs](#jobs) - what is scheduled, running or dead-lettered, and cancel/resume/delete.
 * [Documentation](#documentation) - your specification: models, state diagrams, authorization rules, plugins.
 * [Log](#log) - Klerk's own log.
-* Metrics - JVM memory and processors.
+* Metrics - JVM memory and processors, and every meter in `KlerkSettings.meterRegistry` with its current values.
 * [Settings](#settings) - the running instance's `KlerkSettings`, and which env var each was resolved from.
 * [Plugins](plugins.md) - a page per plugin that provides one.
 
