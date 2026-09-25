@@ -117,6 +117,7 @@ fun createConfig(
     extraJobs: JobsBlock<Context, MyCollections>.() -> Unit = {},
     assets: AssetsPlugin<Context, MyCollections> = AssetsPlugin(setOf(css, myScript)),
 ): Specification<Context, MyCollections> = SpecificationBuilder<Context, MyCollections>(collections).build {
+    eventLogRetention(afterModelDeletion = null, paramsAndExtra = null)
     managedModels {
         model(Book::class, bookStateMachine(collections.authors.all, collections), collections.books)
         model(Author::class, authorStateMachine(collections), collections.authors)

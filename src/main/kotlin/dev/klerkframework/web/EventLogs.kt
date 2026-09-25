@@ -101,11 +101,16 @@ internal suspend fun <C : KlerkContext, V> renderEventLogDetails(
             }
         }
         h2 { +"Parameters" }
-        val jsonPretty = prettyJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(event.params))
-        textArea {
-            disabled = true
-            rows = jsonPretty.lines().size.toString()
-            +jsonPretty
+        val params = event.params
+        if (params == null) {
+            p { +"Erased" }
+        } else {
+            val jsonPretty = prettyJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(params))
+            textArea {
+                disabled = true
+                rows = jsonPretty.lines().size.toString()
+                +jsonPretty
+            }
         }
     }
 }
