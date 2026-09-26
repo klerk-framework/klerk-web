@@ -32,6 +32,9 @@ import kotlinx.html.InputType.password
 import kotlinx.html.InputType.text
 import mu.KotlinLogging
 
+/** The most rows a multi-line text field is drawn with. */
+private const val MULTILINE_ROWS = 8
+
 /** A form built from a [FormTemplate], ready to be rendered. Several may be rendered on the same page. */
 public class EventForm<T : Any, C : KlerkContext, V>(
     private val csrfToken: String,
@@ -428,22 +431,35 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     ): FlowContent.() -> Unit = {
         apply(createLabel(propertyName))
         theValue as StringContainer
-        input(type, classes = classes) {
-            id = elementId(propertyName)
-            name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized ?: ""
-            attributes["aria-invalid"] = "false"
-            attributes["aria-errormessage"] = errorId(propertyName)
-            //
-            // disabled = theValue == null
-            theValue.minLength?.let {
-                minLength = it.toString()
-                required = it > 0
+        if (type == text && theValue.maxLines > 1) {
+            textArea(rows = minOf(theValue.maxLines, MULTILINE_ROWS).toString(), classes = classes) {
+                id = elementId(propertyName)
+                name = propertyName
+                attributes["aria-invalid"] = "false"
+                attributes["aria-errormessage"] = errorId(propertyName)
+                minLength = theValue.minLength.toString()
+                required = theValue.minLength > 0
+                maxLength = theValue.maxLength.toString()
+                +(theValue.valueOrNullIfNotAuthorized ?: "")
             }
-            theValue.maxLength?.let { maxLength = it.toString() }
-            if (theValue.regexPattern != null) {
-                pattern = theValue.regexPattern!!.toString()
-            } // for some reason, the apply didn't work
+        } else {
+            input(type, classes = classes) {
+                id = elementId(propertyName)
+                name = propertyName
+                value = theValue.valueOrNullIfNotAuthorized ?: ""
+                attributes["aria-invalid"] = "false"
+                attributes["aria-errormessage"] = errorId(propertyName)
+                //
+                // disabled = theValue == null
+                theValue.minLength?.let {
+                    minLength = it.toString()
+                    required = it > 0
+                }
+                theValue.maxLength?.let { maxLength = it.toString() }
+                if (theValue.regexPattern != null) {
+                    pattern = theValue.regexPattern!!.toString()
+                } // for some reason, the apply didn't work
+            }
         }
         apply(createErrorPlaceholder(propertyName))
     }
