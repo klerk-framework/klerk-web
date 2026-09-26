@@ -90,6 +90,7 @@ at all.
 * [AutoButtons](auto-buttons.md): a button for an event; clicking it renders the form and issues the command.
 * [Admin UI](admin-ui.md): an operations console. An **internal tool** - not a foundation for your users' UI.
 * [Assets](assets.md): serve CSS and JavaScript with cache busting and compression.
+* [Caching of pages](caching.md): the `Cache-Control` to send with pages for logged-in users.
 * [Plugins](plugins.md): give a Klerk plugin its own page in the Admin UI.
 
 It is recommended to use [HTML DSL](https://ktor.io/docs/server-html-dsl.html) to produce the HTML. Klerk-web comes

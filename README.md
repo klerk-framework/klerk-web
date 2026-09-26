@@ -30,4 +30,5 @@ Start with the [introduction](docs/introduction.md).
 * [Admin UI](docs/admin-ui.md) - an operations console; an internal tool
 * [Appearance](docs/appearance.md) - layout, semantic HTML and CSS classes
 * [Assets](docs/assets.md) - serving CSS and JavaScript
+* [Caching of pages](docs/caching.md) - `Cache-Control` for pages shown to logged-in users
 * [Plugins](docs/plugins.md) - giving a Klerk plugin its own admin page
