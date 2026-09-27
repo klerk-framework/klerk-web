@@ -5,6 +5,9 @@ import dev.klerkframework.klerk.EventReference
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.ModelID
+import dev.klerkframework.web.assets.TextAsset
+import dev.klerkframework.web.upload.Upload
+import java.util.concurrent.ConcurrentHashMap
 
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -17,6 +20,12 @@ import kotlinx.html.form
 import kotlin.reflect.KClass
 
 private val log = mu.KotlinLogging.logger {}
+
+/** klerk-web's own plugin models. Their events are issued by klerk-web itself, never through a generated form. */
+private val klerkWebModels: Set<KClass<*>> = setOf(TextAsset::class, Upload::class)
+
+/** The events already reported as unsupported, so that each is reported once, not once per caller. */
+private val reportedEvents: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
 /**
  * Builds a [LowCodeCreateEvent] for every event with parameters that [eventFilter] admits.
@@ -31,22 +40,26 @@ internal fun <C : KlerkContext, V> buildCreateEvents(
     path: String,
     eventFilter: (EventReference) -> Boolean,
     create: (EventReference, KClass<out Any>) -> LowCodeCreateEvent<C, V>,
-): List<LowCodeCreateEvent<C, V>> = klerk.specification.managedModels.flatMap { managed ->
-    managed.stateMachine.eventReferences
-        .filter { klerk.specification.parametersSchema(it) != null }
-        .filter(eventFilter)
-        .mapNotNull { event ->
-            try {
-                create(event, managed.kClass)
-            } catch (e: IllegalStateException) {
-                log.error {
-                    "klerk-web will not generate a form for the event '$event': ${e.message} " +
-                            "No button will be rendered for it - render it yourself if you need it."
+): List<LowCodeCreateEvent<C, V>> = klerk.specification.managedModels
+    .filter { it.kClass !in klerkWebModels }
+    .flatMap { managed ->
+        managed.stateMachine.eventReferences
+            .filter { klerk.specification.parametersSchema(it) != null }
+            .filter(eventFilter)
+            .mapNotNull { event ->
+                try {
+                    create(event, managed.kClass)
+                } catch (e: IllegalStateException) {
+                    if (reportedEvents.add(event.toString())) {
+                        log.error {
+                            "klerk-web will not generate a form for the event '$event': ${e.message} " +
+                                "No button will be rendered for it - render it yourself if you need it."
+                        }
+                    }
+                    null
                 }
-                null
             }
-        }
-}
+    }
 
 /**
  * Generates a form for every event, and the buttons that lead to them.

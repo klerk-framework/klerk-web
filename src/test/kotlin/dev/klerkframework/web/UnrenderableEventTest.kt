@@ -33,7 +33,7 @@ class UnrenderableEventTest {
         val bc = BookCollections()
         val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
         val klerk = Klerk.create(createConfig(collections), testSettings())
-        // CreateBook takes a Set<ModelID<Author>>, UpdateAuthor a nested Address, CreateTextAsset an AttachedDataRef.
+        // CreateBook takes a Set<ModelID<Author>> and UpdateAuthor a nested Address.
         return Pair(klerk, KlerkWeb(klerk, ApplicationCall::sysCtx, canSeeAdminUI = { true }))
     }
 
@@ -54,6 +54,19 @@ class UnrenderableEventTest {
             authorPage.contains(UpdateAuthor.id.urlEncode()),
             "UpdateAuthor cannot be rendered, so it must not get a button",
         )
+    }
+
+    @Test
+    fun `klerk-web's own plugin models get no generated forms`() {
+        val (klerk, _) = setup()
+        val considered = mutableListOf<String>()
+        buildCreateEvents(klerk, "/x", { true }) { event, _ ->
+            considered.add(event.modelName)
+            throw IllegalStateException("not needed")
+        }
+        assertTrue("Author" in considered)
+        assertFalse("TextAsset" in considered)
+        assertFalse("Upload" in considered)
     }
 
     @Test
