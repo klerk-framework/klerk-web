@@ -55,7 +55,7 @@ fun main() {
         val collections = MyCollections(bc, AuthorCollections(bc.all))
         val klerk = Klerk.create(createConfig(collections), testSettings())
         klerk.meta.start()
-        if (klerk.meta.modelsCount == 0) {
+        if (klerk.meta.modelsCount() == 0) {
             val rowling = createAuthorJKRowling(klerk)
             createBookHarryPotter1(klerk, rowling)
             val harryPotter2 = createBookHarryPotter2(klerk, rowling, listOf(), setOf())

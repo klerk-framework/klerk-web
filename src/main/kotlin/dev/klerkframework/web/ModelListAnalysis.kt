@@ -27,6 +27,7 @@ internal suspend fun <T : Any, V, C : KlerkContext> renderListAnalysis(
                         h2 { +"Views" }
                         for (collection in modelView.views) {
                             h6 { +(collection.id.toString()) }
+                            collection.description?.let { p { +it } }
                             val groupedByState = with(this@read) { collection.asSequenceOrThrow() }.groupBy { it.state }
                             val countPerState = groupedByState.mapValues { (k, v) -> groupedByState[k]?.count() ?: 0 }
                             +"Total count: ${countPerState.values.sum()}"

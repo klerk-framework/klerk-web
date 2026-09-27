@@ -208,7 +208,7 @@ fun main() {
         klerk.meta.start()
         // klerk.jobs.schedule(PeriodicPingJob.schedule(""), Context.system())
 
-        if (klerk.meta.modelsCount < 10) {
+        if (klerk.meta.modelsCount() < 10) {
             //   val rowling = createAuthorJKRowling(klerk)
             //    val book = createBookHarryPotter1(klerk, rowling)
 

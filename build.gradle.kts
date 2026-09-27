@@ -13,7 +13,7 @@ plugins {
 }
 
 val klerkVersion = "1.0.0-beta.7-SNAPSHOT"
-val ktorVersion = "3.2.3"
+val ktorVersion = "3.5.0" // Keep in sync with ktor-bom in klerk-bom.
 val kotlinLoggingVersion = "2.1.21"
 val sqliteJdbcVersion = "3.44.1.0"
 val slf4jVersion = "2.0.3"
