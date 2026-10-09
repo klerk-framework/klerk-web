@@ -333,6 +333,10 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
         val result = mutableSetOf<ReferencePropertyWithOptions>()
         parameters.fields
             .filter { it.type == PropertyType.Ref }
+            // A Ref already rendered as hidden() or left to populatedAfterSubmit() must not also get a select - the
+            // caller already decided how its value is supplied.
+            .filterNot { p -> inputs.any { input -> input.first == p.name } }
+            .filterNot { p -> propsPopulatedAfterSubmit.contains(p.name) }
             .map { eventParameter ->
                 val ls = klerk.specification.validReferencesFor(defaultValues.eventReference, eventParameter)
                     ?: return@map

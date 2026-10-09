@@ -187,77 +187,78 @@ public class EventForm<T : Any, C : KlerkContext, V>(
         params: T?,
         classProvider: CssClassProvider?,
     ): FlowContent.() -> Unit = {
-        val prop = parameters.fields.single { it.name == propertyName }
-        val isNullable = prop.isNullable
-        // A prefilled value can legitimately be null (a nullable param that isn't set); fall back to a default so
-        // there is still a container to derive the input type and constraints from.
-        val prefilled: DataContainer<*>? = if (params == null) null else getParamDatatype(propertyName, params)
-        val hasValue = params == null || prefilled != null
-        val value: DataContainer<*> = prefilled
-            ?: prop.defaultContainer
-            ?: prop.dummyContainer()
+        if (type == InputType.hidden) {
+            requireNotNull(params) { "Params cannot be null when there are hidden inputs" }
+            val modelId = getModelId(propertyName, params)
+            val valueAsString: String? =
+                modelId?.toString() ?: getParamDatatype(propertyName, params)?.toString()
+            this.apply(renderHiddenInput(propertyName, valueAsString))
+        } else {
+            val prop = parameters.fields.single { it.name == propertyName }
+            val isNullable = prop.isNullable
+            // A prefilled value can legitimately be null (a nullable param that isn't set); fall back to a default
+            // so there is still a container to derive the input type and constraints from. A hidden input (handled
+            // above) never reaches here, so this is always a genuine DataContainer field, not a Ref.
+            val prefilled: DataContainer<*>? = if (params == null) null else getParamDatatype(propertyName, params)
+            val hasValue = params == null || prefilled != null
+            val value: DataContainer<*> = prefilled
+                ?: prop.defaultContainer
+                ?: prop.dummyContainer()
 
-        if (isNullable && type != InputType.hidden) {
-            apply(renderNullableToggle(propertyName, hasValue))
-        }
-        when (type) {
-            text -> this.apply(
-                renderTextInput(
-                    propertyName,
-                    value,
-                    text,
-                    classProvider.attr(UiPart.Form, "input", propertyName),
-                ),
-            )
+            if (isNullable) {
+                apply(renderNullableToggle(propertyName, hasValue))
+            }
+            when (type) {
+                text -> this.apply(
+                    renderTextInput(
+                        propertyName,
+                        value,
+                        text,
+                        classProvider.attr(UiPart.Form, "input", propertyName),
+                    ),
+                )
 
-            email -> this.apply(
-                renderTextInput(
-                    propertyName,
-                    value,
-                    email,
-                    classProvider.attr(UiPart.Form, "input", propertyName),
-                ),
-            )
+                email -> this.apply(
+                    renderTextInput(
+                        propertyName,
+                        value,
+                        email,
+                        classProvider.attr(UiPart.Form, "input", propertyName),
+                    ),
+                )
 
-            password -> this.apply(
-                renderTextInput(
-                    propertyName,
-                    value,
-                    password,
-                    classProvider.attr(UiPart.Form, "input", propertyName),
-                ),
-            )
+                password -> this.apply(
+                    renderTextInput(
+                        propertyName,
+                        value,
+                        password,
+                        classProvider.attr(UiPart.Form, "input", propertyName),
+                    ),
+                )
 
-            number -> {
-                when (value) {
-                    is NumberContainer<*> -> this.apply(renderNumberInput(propertyName, value))
-                    is DurationContainer -> this.apply(renderDurationInput(propertyName, value))
-                    else -> throw IllegalStateException(
-                        "Cannot render '$propertyName' as a number: it is a ${value::class.simpleName}",
-                    )
+                number -> {
+                    when (value) {
+                        is NumberContainer<*> -> this.apply(renderNumberInput(propertyName, value))
+                        is DurationContainer -> this.apply(renderDurationInput(propertyName, value))
+                        else -> throw IllegalStateException(
+                            "Cannot render '$propertyName' as a number: it is a ${value::class.simpleName}",
+                        )
+                    }
                 }
+
+                dateTimeLocal -> this.apply(renderInstantInput(propertyName, value as InstantContainer))
+
+                InputType.date -> this.apply(renderDateInput(propertyName, value as DateContainer))
+
+                checkBox -> this.apply(
+                    renderCheckboxInput(
+                        propertyName,
+                        value,
+                    ),
+                )
+
+                else -> TODO(type.name)
             }
-
-            dateTimeLocal -> this.apply(renderInstantInput(propertyName, value as InstantContainer))
-
-            InputType.date -> this.apply(renderDateInput(propertyName, value as DateContainer))
-
-            checkBox -> this.apply(
-                renderCheckboxInput(
-                    propertyName,
-                    value,
-                ),
-            )
-
-            InputType.hidden -> {
-                requireNotNull(params) { "Params cannot be null when there are hidden inputs" }
-                val modelId = getModelId(propertyName, params)
-                val valueAsString: String? =
-                    modelId?.toString() ?: getParamDatatype(propertyName, params)?.toString()
-                this.apply(renderHiddenInput(propertyName, valueAsString))
-            }
-
-            else -> TODO(type.name)
         }
     }
 
@@ -465,7 +466,7 @@ public class EventForm<T : Any, C : KlerkContext, V>(
     }
 
     private fun getParamDatatype(propertyName: String, params: T): DataContainer<*>? =
-        paramValue(propertyName, params) as DataContainer<*>?
+        paramValue(propertyName, params) as? DataContainer<*>
 
     private fun getModelIdValue(propertyName: String, params: T): Int? = getModelId(propertyName, params)?.value
 
