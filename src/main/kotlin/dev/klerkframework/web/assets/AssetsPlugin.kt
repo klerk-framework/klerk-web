@@ -76,7 +76,7 @@ public class AssetsPlugin<C : KlerkContext, V>(
 
         val brotliAvailable = isBrotliAvailable()
 
-        assets = userAssetResources.plus(formJs).plus(uploadJs)
+        assets = userAssetResources.plus(formJs).plus(uploadJs).plus(listJs)
         assets.filterIsInstance<ImageAsset>().forEach { prepareImageAsset(it) }
         assets.filter { it !is ImageAsset }.forEach { asset ->
             val resourceContent = ResourceReader.readResource(asset.resourcePath)

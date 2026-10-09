@@ -21,7 +21,7 @@ implementation("dev.klerkframework:klerk-web")
 Start with the [introduction](docs/introduction.md).
 
 * [Model pages](docs/model-pages.md) - a generated list and detail page for a model
-* [Tables](docs/tables.md) - a paginated, filterable table; columns are values
+* [Tables](docs/tables.md) - a paginated, filterable table with keyboard navigation; columns are values
 * [Forms](docs/forms.md) - generate a form for an event and parse what is submitted
 * [Auto buttons](docs/auto-buttons.md) - a button that renders the form and issues the command
 * [Uploads](docs/uploads.md) - resumable file upload, ending in attached data

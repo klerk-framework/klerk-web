@@ -139,14 +139,39 @@ table then shows the problem and a link to the same page without the invalid par
 A sorted or filtered table reads every model in the view on every request. So does the page count in the pagination,
 which every table shows.
 
+## Keyboard
+
+The rows can be navigated with the keyboard:
+
+| Key                | Action                         |
+|--------------------|--------------------------------|
+| `j`, `↓`           | Next row                       |
+| `k`, `↑`           | Previous row                   |
+| `Home`, `End`      | First and last row             |
+| `Enter`            | Open the row's detail page     |
+
+The arrow keys only move between rows when a row or nothing is focused. With several tables on a page, the keys act on
+the one holding the focus, or else the first one. Tab moves into the table once and then on past it.
+
+The keys are ignored while the user types in a field or a dialog or popover is open. A page that uses one of the keys
+itself can claim it by calling `preventDefault()` in a `keydown` listener on `document`.
+
+Only rows whose model has a detail page (see `PathProvider.pathForItem`) can be reached. The focused row's link is
+marked `data-klerk-row-link`.
+
 ## Highlighting the row under the pointer
 
-klerk-web does not add CSS of its own. Add the hover style to your stylesheet:
+klerk-web does not add CSS of its own. Add the hover and focus styles to your stylesheet:
 
 ```css
 tbody tr:hover {
     background: rgba(0, 0, 0, 0.05);
     cursor: pointer;
+}
+
+tbody tr:focus-within {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
 }
 ```
 

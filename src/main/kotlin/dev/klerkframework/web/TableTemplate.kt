@@ -9,6 +9,7 @@ import dev.klerkframework.klerk.view.ModelView
 import dev.klerkframework.klerk.view.QueryOptions
 import dev.klerkframework.klerk.view.QueryResponse
 import dev.klerkframework.klerk.view.query
+import dev.klerkframework.web.assets.listJs
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -414,6 +415,7 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
     val filtered = request.filters.map { it.column }.toSet()
 
     table(classes = classesFor("table")) {
+        attributes["data-klerk-list"] = ""
         thead(classesFor("thead")) {
             tr(classesFor("tr")) {
                 for (column in columns) {
@@ -448,11 +450,21 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
                     if (path != null) {
                         onClick = """window.location = '$path';"""
                     }
+                    var rowLinkRendered = false
                     for (column in columns) {
                         td(classesFor("td", model, column.key)) {
                             val text = column.text
                             if (text != null && path != null) {
-                                a(path) { +text(model) }
+                                a(path) {
+                                    // One Tab stop per row: the other cells link to the same page.
+                                    if (rowLinkRendered) {
+                                        attributes["tabindex"] = "-1"
+                                    } else {
+                                        attributes["data-klerk-row-link"] = ""
+                                        rowLinkRendered = true
+                                    }
+                                    +text(model)
+                                }
                             } else {
                                 column.cell(this, model)
                             }
@@ -461,6 +473,10 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
                 }
             }
         }
+    }
+    script {
+        src = support.pathProvider.assetPath(listJs.getPathAndHash())
+        defer = true
     }
 }
 

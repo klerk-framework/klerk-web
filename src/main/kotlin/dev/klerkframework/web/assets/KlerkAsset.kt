@@ -75,6 +75,9 @@ internal val klerkFormValidationJsFile = "klerkFormValidation.js"
 
 internal val formJs = JsAsset(klerkFormValidationJsFile)
 
+/** Keyboard navigation in the tables `modelTable` renders. */
+internal val listJs = JsAsset("klerkList.js")
+
 internal val klerkUploadJsFile = "klerkUpload.js"
 
 /** The uploader used by `FormTemplate.file()`. Always served, like the form validation script. */
