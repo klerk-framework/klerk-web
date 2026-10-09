@@ -145,17 +145,18 @@ class PaginationTest {
     }
 
     @Test
-    fun `a cursor that is not a cursor does not blow the page up`() = testApplication {
+    fun `a cursor that is not a cursor is a 400 with a link to the page without it`() = testApplication {
         val klerk = klerk()
         klerk.meta.start()
         generateSampleData(numberOfAuthors = 20, booksPerAuthor = 0, klerk = klerk)
         val klerkWeb = KlerkWeb(klerk, ApplicationCall::blockCtx, canSeeAdminUI = { true })
         application { routing { klerkWebRoutes(klerkWeb, setOf(Author::class)) } }
 
-        listOf("", "hello", "!!!", "YToxLGY6Q1JFQVRFRF9BVA").forEach { cursor ->
-            val response = client.get("/author?cursor=$cursor")
-            assertEquals(HttpStatusCode.OK, response.status, "'$cursor' should not break the page")
-            assertFalse(rowIds(response.bodyAsText()).isEmpty(), "'$cursor' should fall back to the first page")
+        assertFalse(rowIds(client.get("/author?cursor=").bodyAsText()).isEmpty(), "an empty cursor is no cursor")
+        listOf("hello", "!!!", "YToxLGY6Q1JFQVRFRF9BVA").forEach { cursor ->
+            val response = client.get("/author?view=v.Author.all&cursor=$cursor")
+            assertEquals(HttpStatusCode.BadRequest, response.status, "'$cursor'")
+            assertTrue(response.bodyAsText().contains("""<a href="/author?view=v.Author.all">"""), "'$cursor'")
         }
     }
 

@@ -85,7 +85,8 @@ at all.
 # Building blocks
 
 * [ModelListPage and ModelDetailPage](model-pages.md): a generated list and detail page for one model.
-* [TableTemplate](tables.md): a paginated, filterable table of a collection. Columns are values you can replace.
+* [TableTemplate](tables.md): a paginated table of a collection that the reader can sort and filter. Columns are values
+  you can replace.
 * [FormTemplate](forms.md): generate a form for an event and parse what is submitted.
 * [AutoButtons](auto-buttons.md): a button for an event; clicking it renders the form and issues the command.
 * [Admin UI](admin-ui.md): an operations console. An **internal tool** - not a foundation for your users' UI.

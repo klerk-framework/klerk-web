@@ -1,9 +1,9 @@
 package dev.klerkframework.web
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.ViewID
 import dev.klerkframework.klerk.VoidEvent
+import dev.klerkframework.klerk.misc.ObjectSchema
 import dev.klerkframework.klerk.view.ModelView
 import dev.klerkframework.klerk.view.ModelViews
 import io.ktor.client.request.request
@@ -13,8 +13,6 @@ import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import kotlinx.html.*
-import java.net.URLDecoder
-import java.nio.charset.Charset
 import kotlin.reflect.KClass
 
 internal const val NON_BREAKING_SPACE = "&nbsp;"
@@ -36,7 +34,18 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
 ) {
     private val klerk: Klerk<C, V> = support.klerk
     private val pathProvider: PathProvider = support.pathProvider
-    private val tableTemplate = TableTemplate<T, C, V>(klerk, kClass, support = support)
+    private val tableTemplate = TableTemplate<T, C, V>(klerk, kClass, support = support, columns = columns())
+
+    /** ID, every property, then State, Created and Updated. */
+    private fun columns(): List<Column<T>> {
+        val meta = listOf(Column.state<T>(), Column.created(), Column.updated())
+        val taken = (meta.map { it.key } + "id").toSet()
+        val properties = ObjectSchema.of(kClass).fields.map { field ->
+            val column = Column.propertyColumn<T>(kClass, field.name, null, null, sortable = true, filterable = true)
+            if (field.name in taken) column.withKey("property-${field.name}") else column
+        }
+        return listOf(Column.id<T>()) + properties + meta
+    }
 
     // The page is always constructed as ModelListPage<Any, ...> from a KClass<out Any> the specification handed us,
     // so T is Any here and the cast holds. Kept on this side rather than in Specification, which cannot know it.
@@ -65,6 +74,16 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         val context = support.contextProvider(call, klerk)
         val modelView = modelViews
         val view = selectedView(call.request.queryParameters, modelView)
+        if (view == null) {
+            val viewId = call.request.queryParameters[VIEW_PARAMETER]
+            val problem = ParameterProblem("There is no view '$viewId'", setOf(VIEW_PARAMETER, "cursor"))
+            support.respondPage(call, humanName, HttpStatusCode.BadRequest) {
+                breadcrumbs(kClass, pathProvider)
+                h2 { +humanName }
+                apply(renderProblems(listOf(problem), call.request.uri))
+            }
+            return
+        }
 
         val (table, voidEvents) = klerk.read(context) {
             Pair(
@@ -83,10 +102,11 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
         }
     }
 
-    private fun selectedView(queryParameters: Parameters, modelViews: ModelViews<T, C>): ModelView<T, C> {
-        val viewId = queryParameters["view"] ?: return modelViews.all
-        val decoded = ViewID.parse(URLDecoder.decode(viewId, Charset.forName("utf-8")))
-        return modelViews.views.single { it.id == decoded }
+    /** Null if the request names a view this model does not have. */
+    private fun selectedView(queryParameters: Parameters, modelViews: ModelViews<T, C>): ModelView<T, C>? {
+        val viewId = queryParameters[VIEW_PARAMETER]?.takeIf { it.isNotBlank() } ?: return modelViews.all
+        val parsed = ViewID.parseOrNull(viewId) ?: return null
+        return modelViews.views.singleOrNull { it.id == parsed }
     }
 
     /*
@@ -109,14 +129,6 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
             }
         }
         apply(addMermaidScript())
-    }
-
-    private fun passesFilter(model: Model<T>, call: ApplicationCall): Boolean {
-        val stateFilter = call.request.queryParameters["filterState"] ?: return true
-        if (stateFilter == "All") {
-            return true
-        }
-        return model.state == stateFilter
     }
 
     private fun renderModelList2(

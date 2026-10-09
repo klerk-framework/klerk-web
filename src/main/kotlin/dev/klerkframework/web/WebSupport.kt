@@ -62,15 +62,19 @@ public class WebSupport<C : KlerkContext, V>(
      * ```
      *
      * To render a fragment instead of a whole page, use `with(support) { ... }`. [pageHead] is rendered last in
-     * `<head>`, for what only this page needs.
+     * `<head>`, for what only this page needs. Without a [status], the one already set on the call is used (e.g. 400
+     * from [TableTemplate.build]), or 200.
      */
     public suspend fun respondPage(
         call: ApplicationCall,
         title: String,
-        status: HttpStatusCode = HttpStatusCode.OK,
+        status: HttpStatusCode? = null,
         pageHead: (HEAD.() -> Unit)? = null,
         block: context(WebSupport<C, V>) FlowContent.() -> Unit,
     ) {
-        call.respondHtml(status = status, block = layout.page(title, pageHead) { block(this@WebSupport, this) })
+        call.respondHtml(
+            status = status ?: call.response.status() ?: HttpStatusCode.OK,
+            block = layout.page(title, pageHead) { block(this@WebSupport, this) },
+        )
     }
 }

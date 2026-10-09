@@ -124,9 +124,12 @@ internal fun renderTemporalContainer(container: Any?): String? = when (container
 private fun <V : Any, T : DataContainer<V>> T.ifAuthorized(render: (V) -> String): String =
     if (valueOrNullIfNotAuthorized == null) toString() else render(value)
 
-/** Produces a complete HTML document inside a read. Use [Layout.page] to get the same head as the generated pages. */
+/**
+ * Produces a complete HTML document inside a read. Use [Layout.page] to get the same head as the generated pages.
+ * Without a [status], the one already set on the call is used (e.g. 400 from [TableTemplate.build]), or 200.
+ */
 public fun <C : KlerkContext, V> Reader<C, V>.html(
-    status: HttpStatusCode = HttpStatusCode.OK,
+    status: HttpStatusCode? = null,
     block: HTML.() -> Unit,
 ): TextContent {
     val text = buildString {

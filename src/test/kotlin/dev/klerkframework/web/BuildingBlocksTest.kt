@@ -105,7 +105,7 @@ class BuildingBlocksTest {
 
         val body = client.get("/authors").bodyAsText()
         assertTrue(body.contains("<th>Surname</th>"), "Expected the custom column")
-        assertTrue(body.contains("<th>State</th>"), "Expected the kept default column")
+        assertTrue(Regex("""<th><a href="[^"]*">State</a></th>""").containsMatchIn(body), "Expected the kept column")
         assertFalse(body.contains("<th>Created</th>"), "Expected the dropped default column to be gone")
         assertTrue(body.contains("Rowling"))
     }

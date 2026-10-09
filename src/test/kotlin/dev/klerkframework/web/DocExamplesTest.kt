@@ -111,9 +111,17 @@ class DocExamplesTest {
 
         // docs/tables.md
         val columns = listOf(
-            Column<Author>("Name") { model -> +model.props.firstName.value },
-        ) + Column.defaults<Author>().filter { it.header == "State" }
-        val table = TableTemplate(klerk, Author::class, support, columns)
+            Column.property(Author::lastName),
+            Column.value("Books") { model -> model.props.lastName.toString().length },
+            Column("Actions") { model -> a("/edit/${model.id}") { +"Edit" } },
+        ) + Column.state()
+        val table = TableTemplate(
+            klerk,
+            Author::class,
+            support,
+            columns,
+            defaultSort = TableSort("lastName", ascending = false),
+        )
 
         application {
             routing {
