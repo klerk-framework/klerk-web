@@ -1,10 +1,8 @@
 package dev.klerkframework.web
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
-import dev.klerkframework.klerk.ViewID
 import dev.klerkframework.klerk.VoidEvent
 import dev.klerkframework.klerk.misc.ObjectSchema
-import dev.klerkframework.klerk.view.ModelView
 import dev.klerkframework.klerk.view.ModelViews
 import io.ktor.client.request.request
 import io.ktor.http.*
@@ -73,26 +71,14 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
     public suspend fun respond(call: ApplicationCall) {
         val context = support.contextProvider(call, klerk)
         val modelView = modelViews
-        val view = selectedView(call.request.queryParameters, modelView)
-        if (view == null) {
-            val viewId = call.request.queryParameters[VIEW_PARAMETER]
-            val problem = ParameterProblem("There is no view '$viewId'", setOf(VIEW_PARAMETER, "cursor"))
-            support.respondPage(call, humanName, HttpStatusCode.BadRequest) {
-                breadcrumbs(kClass, pathProvider)
-                h2 { +humanName }
-                apply(renderProblems(listOf(problem), call.request.uri))
-            }
-            return
-        }
-
         val (table, voidEvents) = klerk.read(context) {
             Pair(
-                tableTemplate.build(view, this, call),
+                tableTemplate.build(modelView.all, this, call),
                 possibleVoidEvents(kClass),
             )
         }
 
-        support.respondPage(call, humanName) {
+        support.respondPage(call, humanName, table.status) {
             breadcrumbs(kClass, pathProvider)
             h2 { +humanName }
 
@@ -100,13 +86,6 @@ public class ModelListPage<T : Any, C : KlerkContext, V>(
                 apply(renderModelList2(table, voidEvents, call, modelView, context))
             }
         }
-    }
-
-    /** Null if the request names a view this model does not have. */
-    private fun selectedView(queryParameters: Parameters, modelViews: ModelViews<T, C>): ModelView<T, C>? {
-        val viewId = queryParameters[VIEW_PARAMETER]?.takeIf { it.isNotBlank() } ?: return modelViews.all
-        val parsed = ViewID.parseOrNull(viewId) ?: return null
-        return modelViews.views.singleOrNull { it.id == parsed }
     }
 
     /*

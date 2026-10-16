@@ -9,6 +9,7 @@ internal class TableParameterNames(private val prefix: String) {
     val sort = "${prefix}sort"
     val direction = "${prefix}dir"
     val cursor = "${prefix}cursor"
+    val view = "${prefix}view"
     val filterPrefix = "${prefix}f."
 
     /** The id of the filter dialog of a column. */

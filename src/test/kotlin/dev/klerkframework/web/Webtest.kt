@@ -115,63 +115,59 @@ object PeriodicPingJob : JobType.Local<String, Context, MyCollections>() {
     ): JobResult<String, Context, MyCollections> {
         if (args.job.step == 0 && args.job.attempt == 0) {
             val nextRun = args.context.time + 15.seconds
+            args.logger.info("Scheduled the next run for $nextRun")
             return JobResult.Yield(
                 cursor = args.cursor,
                 spawn = listOf(PeriodicPingJob.declare(args.cursor, scheduleAt = nextRun)),
-                log = listOf(args.info("Scheduled the next run for $nextRun")),
             )
         }
 
-        val log = mutableListOf(args.info("Working..."))
+        args.logger.info("Working...")
         delay(5.seconds)
-        log += args.info("Done")
+        args.logger.info("Done")
 
         val inProgress = YieldProgress.parse(args.cursor)
         if (inProgress != null) {
             val completed = inProgress.completed + 1
             if (completed >= inProgress.total) {
-                log += args.info("Reached step $completed/${inProgress.total}, succeeding")
-                return JobResult.Success(log = log)
+                args.logger.info("Reached step $completed/${inProgress.total}, succeeding")
+                return JobResult.Success()
             }
-            log += args.info("Progress $completed/${inProgress.total}")
+            args.logger.info("Progress $completed/${inProgress.total}")
             return JobResult.Yield(
                 cursor = YieldProgress(inProgress.total, completed).encode(),
                 progress = JobProgress(completed = completed, total = inProgress.total),
-                log = log,
             )
         }
 
         return when (Random.nextInt(4)) { // set to 5 if you want to test throwing an uncaught exception
             0 -> {
-                log += args.info("Succeeding")
-                JobResult.Success(log = log)
+                args.logger.info("Succeeding")
+                JobResult.Success()
             }
 
             1 -> {
-                log += args.warn("Failing (will retry with backoff)")
-                JobResult.Fail("Simulated transient failure", log = log)
+                args.logger.warn("Failing (will retry with backoff)")
+                JobResult.Fail("Simulated transient failure")
             }
 
             2 -> {
-                log += args.error("Aborting (straight to dead letter)")
-                JobResult.Abort("Simulated permanent failure", log = log)
+                args.logger.error("Aborting (straight to dead letter)")
+                JobResult.Abort("Simulated permanent failure")
             }
 
             3 -> {
                 val total = Random.nextInt(1, 16)
-                log += args.info("Yielding for $total steps")
+                args.logger.info("Yielding for $total steps")
                 val progress = YieldProgress(total, 1)
                 JobResult.Yield(
                     cursor = progress.encode(),
                     progress = JobProgress(completed = progress.completed, total = progress.total),
-                    log = log,
                 )
             }
 
             else -> {
-                // An uncaught exception never reaches a returned JobResult, so it can't carry a log entry — this is
-                // the one outcome that still has to go to stdout instead of the job's own log.
-                println("PeriodicPingJob: throwing an uncaught exception")
+                args.logger.error("Throwing an uncaught exception")
                 throw RuntimeException("Simulated uncaught exception from PeriodicPingJob")
             }
         }

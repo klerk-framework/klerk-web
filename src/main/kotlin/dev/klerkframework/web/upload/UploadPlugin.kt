@@ -375,7 +375,8 @@ public class UploadPlugin<C : KlerkContext, V>(
 
         override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String, C, V> {
             sweep()
-            return JobResult.Success(log = listOf(args.info("Swept the upload staging directory")))
+            args.logger.info("Swept the upload staging directory")
+            return JobResult.Success()
         }
     }
 }

@@ -244,6 +244,7 @@ class TableTemplateTest {
             assertEquals(listOf("Svensson", "Rowling", "Lindgren"), rowsOf("/authors?sort=score"))
             assertEquals(listOf("Svensson", "Lindgren", "Rowling"), rowsOf("/authors?a-sort=score"))
             assertEquals(setOf("Lindgren"), rowsOf("/authors?a-f.score=53&f.score=7").toSet())
+            assertEquals(listOf("Svensson"), rowsOf("/authors?a-view=v.Author.greatAuthors&view=nope"))
         }
 
     @Test
@@ -269,6 +270,7 @@ class TableTemplateTest {
         assertTrue(html.contains(link), html)
         val great = client.get("/authors?view=v.Author.greatAuthors").bodyAsText()
         assertTrue(great.contains("""<strong aria-current="page">Great authors</strong>"""), great)
+        assertEquals(listOf("Svensson"), rows(great))
         // The active arrow removes the sort, the other one sorts.
         assertTrue(
             html.contains(

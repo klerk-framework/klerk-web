@@ -618,7 +618,8 @@ public class ImagePlugin<C : KlerkContext, V>(
             val key = RequestedVariant(width, format, crop).key(id, hash)
             try {
                 if (store.variant(id, hash, width, format, crop) != null) {
-                    return JobResult.Success(log = listOf(args.info("$key already exists")))
+                    args.logger.info("$key already exists")
+                    return JobResult.Success()
                 }
                 if (id != ASSET) {
                     val numeric = id.toIntOrNull()
@@ -657,7 +658,8 @@ public class ImagePlugin<C : KlerkContext, V>(
                 } finally {
                     Files.deleteIfExists(original)
                 }
-                return JobResult.Success(log = listOf(args.info("Generated $key")))
+                args.logger.info("Generated $key")
+                return JobResult.Success()
             } catch (e: ImageRefused) {
                 // Never going to work: remember it, so requests are answered instead of waiting for it.
                 refused.add(key)
@@ -716,7 +718,8 @@ public class ImagePlugin<C : KlerkContext, V>(
 
         override suspend fun step(args: JobStepArgs.Local<String, C, V>): JobResult<String, C, V> {
             sweep()
-            return JobResult.Success(log = listOf(args.info("Swept the image variant directory")))
+            args.logger.info("Swept the image variant directory")
+            return JobResult.Success()
         }
     }
 }

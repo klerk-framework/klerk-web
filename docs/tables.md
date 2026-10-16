@@ -18,6 +18,9 @@ get("/authors") {
 `build` reads the collection, sorting, filtering and paging it as the request's query parameters say. `modelTable`
 renders the filter controls, the table and the pagination links.
 
+The reader can switch to any registered view of the model, which sets the `view` parameter, e.g.
+`/authors?view=v.Author.greatAuthors`. The collection passed to `build` is shown when the request picks no view.
+
 ## Columns
 
 Columns are values, not settings. There are three kinds:

@@ -2,6 +2,7 @@ package dev.klerkframework.web
 import dev.klerkframework.klerk.Klerk
 import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.Model
+import dev.klerkframework.klerk.ViewID
 import dev.klerkframework.klerk.camelCaseToPretty
 import dev.klerkframework.klerk.read.ModelReader
 import dev.klerkframework.klerk.statemachine.VoidState
@@ -77,26 +78,49 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
         .map { it.name }
 
     /**
-     * Builds one page of [source] for a request, sorted and filtered as its query parameters say. Render it with
-     * `modelTable`.
+     * Builds one page for a request, sorted and filtered as its query parameters say. Render it with `modelTable`.
+     *
+     * The page shows the registered view that the request picks with the `view` parameter, or [source] if it picks
+     * none.
      *
      * If a parameter is invalid, the response status is set to 400 and the table renders the problem and a link to
      * the same page without the invalid parameters.
      */
     public fun build(source: ModelView<T, C>, reader: ModelReader<C, V>, call: ApplicationCall): Table<T, C, V> {
         val parameters = call.request.queryParameters
-        val request = parseTableRequest(parameters, columns, names, defaultSort)
-        if (request.problems.isNotEmpty()) {
+        val parsed = parseTableRequest(parameters, columns, names, defaultSort)
+        val view = selectedView(parameters, source)
+        val request = if (view != null) {
+            parsed
+        } else {
+            val problem = ParameterProblem(
+                "There is no view '${parameters[names.view]}'",
+                setOf(names.view, names.cursor),
+            )
+            TableRequest(parsed.sort, parsed.filters, parsed.cursor, parsed.problems + problem)
+        }
+        if (view == null || request.problems.isNotEmpty()) {
             call.response.status(HttpStatusCode.BadRequest)
-            return Table(null, request, support, call, klerk, kClass, columns, names, controls)
+            return Table(null, request, support, call, klerk, kClass, columns, names, controls, source.id)
         }
         val filter = request.filters.takeIf { it.isNotEmpty() }?.let { filters ->
             { model: Model<T> -> filters.all { it.matches(model) } }
         }
         val options = QueryOptions(maxItems = pageSize, cursor = request.cursor, countTotal = true)
         // query() skips a row the actor may not read instead of turning the page into a 500.
-        val queryResponse = with(reader) { source.query(options, sort = request.sort?.comparator(), filter = filter) }
-        return Table(queryResponse, request, support, call, klerk, kClass, columns, names, controls)
+        val queryResponse = with(reader) { view.query(options, sort = request.sort?.comparator(), filter = filter) }
+        return Table(queryResponse, request, support, call, klerk, kClass, columns, names, controls, view.id)
+    }
+
+    /** Null if the request names a view this model does not have. */
+    @Suppress("UNCHECKED_CAST")
+    private fun selectedView(parameters: Parameters, source: ModelView<T, C>): ModelView<T, C>? {
+        val value = parameters[names.view]?.takeIf { it.isNotBlank() } ?: return source
+        val id = ViewID.parseOrNull(value) ?: return null
+        if (id == source.id) return source
+        return klerk.specification.registeredViews
+            .singleOrNull { it.modelClass == kClass && it.view.id == id }
+            ?.view as ModelView<T, C>?
     }
 }
 
@@ -134,6 +158,7 @@ public class Table<T : Any, C : KlerkContext, V> internal constructor(
     private val columns: List<Column<T>>,
     private val names: TableParameterNames,
     private val controls: TableControls,
+    private val shownView: ViewID,
 ) {
     /**
      * 400 if the request had invalid table parameters, otherwise 200. [TableTemplate.build] has already set it on the
@@ -148,8 +173,8 @@ public class Table<T : Any, C : KlerkContext, V> internal constructor(
         } else {
             val views = klerk.specification.registeredViews.filter { it.modelClass == kClass }.map { it.view }
             when (controls) {
-                TableControls.Panel -> apply(renderFilter(call, views, columns, request, names))
-                TableControls.Header -> if (views.isNotEmpty()) apply(renderViewLinks(call, views, names))
+                TableControls.Panel -> apply(renderFilter(call, views, columns, request, names, shownView))
+                TableControls.Header -> if (views.isNotEmpty()) apply(renderViewLinks(call, views, names, shownView))
             }
             apply(renderActiveFilters(call, request, names))
             if (queryResponse.items.isEmpty()) {
@@ -191,7 +216,7 @@ private fun FORM.carryOver(parameters: Parameters, setByForm: (String) -> Boolea
     }
 }
 
-private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, parameters: Parameters) {
+private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, names: TableParameterNames, shownView: ViewID) {
     p {
         label {
             htmlFor = "viewselect"
@@ -200,11 +225,11 @@ private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, parameters: Par
         br()
         select {
             id = "viewselect"
-            name = VIEW_PARAMETER
+            name = names.view
             views.forEach {
                 option {
                     value = it.id.toString()
-                    selected = parameters[VIEW_PARAMETER] == it.id.toString()
+                    selected = it.id == shownView
                     +camelCaseToPretty(it.id.shortId)
                 }
             }
@@ -218,6 +243,7 @@ private fun <T : Any> renderFilter(
     columns: List<Column<T>>,
     request: TableRequest<T>,
     names: TableParameterNames,
+    shownView: ViewID,
 ): FlowContent.() -> Unit = {
     val parameters = call.request.queryParameters
 
@@ -227,9 +253,9 @@ private fun <T : Any> renderFilter(
         }
         summary { +"Filters" }
         form(action = call.request.path(), method = FormMethod.get) {
-            carryOver(parameters) { it == names.cursor || it == VIEW_PARAMETER || names.isFilter(it) }
+            carryOver(parameters) { it == names.cursor || it == names.view || names.isFilter(it) }
             if (views.isNotEmpty()) {
-                viewSelect(views, parameters)
+                viewSelect(views, names, shownView)
             }
             for (column in columns.filter { it.isFilterable }) {
                 apply(renderColumnFilter(column, parameters, names))
@@ -241,14 +267,13 @@ private fun <T : Any> renderFilter(
     }
 }
 
-/** The views as a row of links. The current one, or `all` when none is picked, is marked instead of linked. */
+/** The views as a row of links. The shown one is marked instead of linked. */
 private fun renderViewLinks(
     call: ApplicationCall,
     views: List<ModelView<*, *>>,
     names: TableParameterNames,
+    shownView: ViewID,
 ): FlowContent.() -> Unit = {
-    val current = call.request.queryParameters[VIEW_PARAMETER]?.takeIf { it.isNotBlank() }
-        ?: views.firstOrNull { it.id.shortId == "all" }?.id?.toString()
     nav {
         attributes["aria-label"] = "View"
         p {
@@ -259,15 +284,15 @@ private fun renderViewLinks(
                 }
                 val id = view.id.toString()
                 val name = camelCaseToPretty(view.id.shortId)
-                if (id == current) {
+                if (view.id == shownView) {
                     strong {
                         attributes["aria-current"] = "page"
                         +name
                     }
                 } else {
                     a(
-                        editQuery(call.request.uri, add = { append(VIEW_PARAMETER, id) }) {
-                            it.filter { param -> param == VIEW_PARAMETER || param == names.cursor }
+                        editQuery(call.request.uri, add = { append(names.view, id) }) {
+                            it.filter { param -> param == names.view || param == names.cursor }
                         },
                     ) { +name }
                 }
@@ -652,7 +677,5 @@ private fun editQuery(
     }.build()
     return if (parameters.isEmpty()) path else "$path?${parameters.formUrlEncode()}"
 }
-
-internal const val VIEW_PARAMETER = "view"
 
 private const val BUTTON_STYLE = "margin: 1rem;"
