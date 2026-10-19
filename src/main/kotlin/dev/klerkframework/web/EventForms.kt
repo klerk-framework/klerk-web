@@ -323,6 +323,7 @@ internal fun valueWithCorrectType(value: String?, field: SchemaField): Any? {
             PropertyType.UByte -> field.createContainer(value.toUByte())
             PropertyType.Float -> field.createContainer(value.toFloat())
             PropertyType.Double -> field.createContainer(value.toDouble())
+            PropertyType.Decimal -> field.createContainer(value.toBigDecimal())
             PropertyType.Instant -> {
                 // A datetime-local input sends local time without a zone, so it is interpreted in the server's time
                 // zone.

@@ -7,6 +7,7 @@ import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.datatypes.BooleanContainer
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.DateContainer
+import dev.klerkframework.klerk.datatypes.DecimalContainer
 import dev.klerkframework.klerk.datatypes.DurationContainer
 import dev.klerkframework.klerk.datatypes.EnumContainer
 import dev.klerkframework.klerk.datatypes.InstantContainer
@@ -31,6 +32,7 @@ import kotlinx.html.InputType.number
 import kotlinx.html.InputType.password
 import kotlinx.html.InputType.text
 import mu.KotlinLogging
+import java.math.BigDecimal
 
 /** The most rows a multi-line text field is drawn with. */
 private const val MULTILINE_ROWS = 8
@@ -365,13 +367,15 @@ public class EventForm<T : Any, C : KlerkContext, V>(
             // perhaps use `type=text inputmode=numeric` instead?
             id = elementId(propertyName)
             name = propertyName
-            value = theValue.valueOrNullIfNotAuthorized?.toString() ?: ""
+            value = theValue.valueOrNullIfNotAuthorized?.let(::plain) ?: ""
             attributes["aria-invalid"] = "false"
             attributes["aria-errormessage"] = errorId(propertyName)
             // required = !property.returnType.isMarkedNullable
-            min = theValue.min.toString()
-            max = theValue.max.toString()
-            if (theValue.hasDecimals) {
+            min = plain(theValue.min)
+            max = plain(theValue.max)
+            if (theValue is DecimalContainer) {
+                step = BigDecimal.ONE.movePointLeft(theValue.scale).toPlainString()
+            } else if (theValue.hasDecimals) {
                 step = "any"
             }
         }
@@ -614,3 +618,6 @@ public class EventForm<T : Any, C : KlerkContext, V>(
 public fun <T : Any, C : KlerkContext, V> FlowContent.eventForm(form: EventForm<T, C, V>, postPath: String? = null) {
     form.renderInto(this, postPath)
 }
+
+/** A number without exponent notation, as an HTML number input requires. */
+private fun plain(number: Any?): String = if (number is BigDecimal) number.toPlainString() else number.toString()

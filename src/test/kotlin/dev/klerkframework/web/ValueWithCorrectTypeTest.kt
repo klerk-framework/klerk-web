@@ -1,7 +1,9 @@
 package dev.klerkframework.web
 
+import dev.klerkframework.klerk.datatypes.DecimalContainer
 import dev.klerkframework.klerk.datatypes.EnumContainer
 import dev.klerkframework.klerk.misc.ObjectSchema
+import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -14,7 +16,13 @@ class ValueWithCorrectTypeTest {
 
     class SizeContainer(value: Holder.Size) : EnumContainer<Holder.Size>(value)
 
-    data class Params(val size: SizeContainer, val optionalSize: SizeContainer?)
+    class Amount(value: BigDecimal) : DecimalContainer(value) {
+        override val min: BigDecimal = BigDecimal.ZERO
+        override val max: BigDecimal = BigDecimal("1000")
+        override val scale: Int = 2
+    }
+
+    data class Params(val size: SizeContainer, val optionalSize: SizeContainer?, val amount: Amount)
 
     private val schema = ObjectSchema.of(Params::class)
 
@@ -27,5 +35,11 @@ class ValueWithCorrectTypeTest {
     @Test
     fun `No selection of a nullable enum is null`() {
         assertNull(valueWithCorrectType("", schema.field("optionalSize")!!))
+    }
+
+    @Test
+    fun `A decimal is parsed exactly`() {
+        val value = valueWithCorrectType("0.10", schema.field("amount")!!) as Amount
+        assertEquals("0.10", value.value.toPlainString())
     }
 }

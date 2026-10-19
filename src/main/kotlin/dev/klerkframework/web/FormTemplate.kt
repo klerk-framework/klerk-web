@@ -10,7 +10,6 @@ import dev.klerkframework.klerk.KlerkErrorCode
 import dev.klerkframework.klerk.ModelID
 import dev.klerkframework.klerk.Problem
 import dev.klerkframework.klerk.Translation
-import dev.klerkframework.klerk.Validatable
 import dev.klerkframework.klerk.command.CommandToken
 import dev.klerkframework.klerk.datatypes.AttachedBlobContainer
 import dev.klerkframework.klerk.datatypes.BooleanContainer
@@ -255,7 +254,7 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
                     PropertyType.Boolean -> checkbox(p)
                     PropertyType.Int, PropertyType.Long, PropertyType.Short, PropertyType.Byte,
                     PropertyType.UInt, PropertyType.ULong, PropertyType.UShort, PropertyType.UByte,
-                    PropertyType.Float, PropertyType.Double,
+                    PropertyType.Float, PropertyType.Double, PropertyType.Decimal,
                     -> number(p)
 
                     PropertyType.Ref -> selectReference(p)
@@ -504,13 +503,12 @@ public class FormTemplate<T : Any, C : KlerkContext, V>(
             }
 
             // Level 2: the properties together. Klerk builds the message, so the form shows what the command would.
-            val validationProblems = if (paramsClass is Validatable) {
-                paramsClass.validators().mapNotNull { rule ->
+            val validationProblems = parameters.validatables(paramsClass)
+                .flatMap { it.validators() }
+                .mapNotNull { rule ->
                     (rule.invoke() as? PropertyCollectionValidity.Invalid)?.toProblem(rule, context.translation)
                 }
-            } else {
-                emptyList()
-            }
+                .toList()
 
             if (validationProblems.isNotEmpty()) {
                 return ParseResult.Invalid(validationProblems.toSet())

@@ -56,7 +56,7 @@ val template = FormTemplate(
 }
 ```
 
-`remaining()` picks an input per property type: text (a textarea if the `StringContainer` allows more than one line), checkbox, number, a select for references and enums, a
+`remaining()` picks an input per property type: text (a textarea if the `StringContainer` allows more than one line), checkbox, number (stepping by the `scale` of a `DecimalContainer`), a select for references and enums, a
 `datetime-local` for `Instant`, a `date` for `Date` and a number of seconds for `Duration`. A property it cannot
 render fails here - use `hidden()` or `populatedAfterSubmit()` for it, or build the form yourself.
 

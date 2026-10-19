@@ -7,6 +7,7 @@ import dev.klerkframework.klerk.datatypes.BooleanContainer
 import dev.klerkframework.klerk.datatypes.ByteContainer
 import dev.klerkframework.klerk.datatypes.DataContainer
 import dev.klerkframework.klerk.datatypes.DateContainer
+import dev.klerkframework.klerk.datatypes.DecimalContainer
 import dev.klerkframework.klerk.datatypes.DoubleContainer
 import dev.klerkframework.klerk.datatypes.DurationContainer
 import dev.klerkframework.klerk.datatypes.EnumContainer
@@ -31,6 +32,7 @@ import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.TD
 import java.lang.reflect.ParameterizedType
+import java.math.BigDecimal
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KType
@@ -380,6 +382,7 @@ private fun numberParser(type: PropertyType): ((String) -> Any?)? = when (type) 
     PropertyType.UByte -> String::toUByteOrNull
     PropertyType.Float -> String::toFloatOrNull
     PropertyType.Double -> String::toDoubleOrNull
+    PropertyType.Decimal -> String::toBigDecimalOrNull
     else -> null
 }
 
@@ -414,6 +417,7 @@ private val plainTypes: Map<KClass<*>, PropertyType> = mapOf(
     UByte::class to PropertyType.UByte,
     Float::class to PropertyType.Float,
     Double::class to PropertyType.Double,
+    BigDecimal::class to PropertyType.Decimal,
     Boolean::class to PropertyType.Boolean,
     Instant::class to PropertyType.Instant,
     LocalDate::class to PropertyType.Date,
@@ -433,6 +437,7 @@ private val containerTypes: List<Pair<Class<*>, PropertyType>> = listOf(
     UByteContainer::class.java to PropertyType.UByte,
     FloatContainer::class.java to PropertyType.Float,
     DoubleContainer::class.java to PropertyType.Double,
+    DecimalContainer::class.java to PropertyType.Decimal,
     BooleanContainer::class.java to PropertyType.Boolean,
     EnumContainer::class.java to PropertyType.Enum,
     InstantContainer::class.java to PropertyType.Instant,
