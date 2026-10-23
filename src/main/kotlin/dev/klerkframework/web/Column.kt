@@ -71,6 +71,9 @@ public class Column<T : Any> internal constructor(
     internal val isSortable: Boolean get() = sortable && kind?.sortable == true
     internal val isFilterable: Boolean get() = filterable && kind?.filterable == true
 
+    /** What sorting, filtering and the table controls need of this column. */
+    internal val spec: ColumnSpec<Model<T>> = ColumnSpec(header, key, kind, nullable, value, isSortable, isFilterable)
+
     internal fun withKind(kind: ColumnKind): Column<T> =
         Column(header, key, kind, nullable, value, sortable, filterable, text, cell)
 
@@ -253,6 +256,21 @@ public class Column<T : Any> internal constructor(
         }
     }
 }
+
+/**
+ * A column as sorting, filtering and the controls see it, for rows of type [R]: a [Model] in a [TableTemplate], or
+ * any other row in a table klerk-web renders itself.
+ */
+internal class ColumnSpec<R>(
+    val header: String,
+    val key: String?,
+    val kind: ColumnKind?,
+    val nullable: Boolean,
+    /** The value to sort and filter on: a plain value, null, or [Unreadable]. */
+    val value: ((R) -> Any?)?,
+    val isSortable: Boolean,
+    val isFilterable: Boolean,
+)
 
 /** Marks a value the actor may not read. */
 internal object Unreadable

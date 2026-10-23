@@ -88,7 +88,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
      */
     public fun build(source: ModelView<T, C>, reader: ModelReader<C, V>, call: ApplicationCall): Table<T, C, V> {
         val parameters = call.request.queryParameters
-        val parsed = parseTableRequest(parameters, columns, names, defaultSort)
+        val parsed = parseTableRequest(parameters, columns.map { it.spec }, names, defaultSort)
         val view = selectedView(parameters, source)
         val request = if (view != null) {
             parsed
@@ -125,7 +125,7 @@ public class TableTemplate<T : Any, C : KlerkContext, V>(
 }
 
 /** Values first, in the requested direction, then empty values, then values the actor may not read. */
-private fun <T : Any> ActiveSort<T>.comparator(): Comparator<Model<T>> {
+internal fun <R> ActiveSort<R>.comparator(): Comparator<R> {
     val selector = column.value!!
     val kind = column.kind!!
     return Comparator { a, b ->
@@ -150,7 +150,7 @@ private fun rank(value: Any?): Int = when {
 /** A built table, ready to be rendered. Produced by [TableTemplate.build]. */
 public class Table<T : Any, C : KlerkContext, V> internal constructor(
     private val queryResponse: QueryResponse<T>?,
-    private val request: TableRequest<T>,
+    private val request: TableRequest<Model<T>>,
     private val support: WebSupport<C, V>,
     private val call: ApplicationCall,
     private val klerk: Klerk<C, V>,
@@ -173,7 +173,7 @@ public class Table<T : Any, C : KlerkContext, V> internal constructor(
         } else {
             val views = klerk.specification.registeredViews.filter { it.modelClass == kClass }.map { it.view }
             when (controls) {
-                TableControls.Panel -> apply(renderFilter(call, views, columns, request, names, shownView))
+                TableControls.Panel -> apply(renderFilter(call, views, columns.map { it.spec }, request, names, shownView))
                 TableControls.Header -> if (views.isNotEmpty()) apply(renderViewLinks(call, views, names, shownView))
             }
             apply(renderActiveFilters(call, request, names))
@@ -208,7 +208,7 @@ internal fun renderProblems(problems: List<ParameterProblem>, uri: String): Flow
 }
 
 /** Hidden inputs that carry over the parameters a form does not set itself, e.g. the sort order. */
-private fun FORM.carryOver(parameters: Parameters, setByForm: (String) -> Boolean) {
+internal fun FORM.carryOver(parameters: Parameters, setByForm: (String) -> Boolean) {
     parameters.forEach { name, values ->
         if (!setByForm(name)) {
             values.forEach { hiddenInput(name = name) { value = it } }
@@ -216,7 +216,7 @@ private fun FORM.carryOver(parameters: Parameters, setByForm: (String) -> Boolea
     }
 }
 
-private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, names: TableParameterNames, shownView: ViewID) {
+private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, names: TableParameterNames, shownView: ViewID?) {
     p {
         label {
             htmlFor = "viewselect"
@@ -237,13 +237,13 @@ private fun FlowContent.viewSelect(views: List<ModelView<*, *>>, names: TablePar
     }
 }
 
-private fun <T : Any> renderFilter(
+internal fun <R> renderFilter(
     call: ApplicationCall,
     views: List<ModelView<*, *>>,
-    columns: List<Column<T>>,
-    request: TableRequest<T>,
+    columns: List<ColumnSpec<R>>,
+    request: TableRequest<R>,
     names: TableParameterNames,
-    shownView: ViewID,
+    shownView: ViewID?,
 ): FlowContent.() -> Unit = {
     val parameters = call.request.queryParameters
 
@@ -300,9 +300,9 @@ private fun renderViewLinks(
         }
     }
 }
-private fun <T : Any> renderActiveFilters(
+internal fun <R> renderActiveFilters(
     call: ApplicationCall,
-    request: TableRequest<T>,
+    request: TableRequest<R>,
     names: TableParameterNames,
 ): FlowContent.() -> Unit = {
     if (request.filters.isNotEmpty()) {
@@ -328,7 +328,7 @@ private fun <T : Any> renderActiveFilters(
     }
 }
 
-private fun <T : Any> describe(filter: ColumnFilter<T>): String = buildList {
+private fun <R> describe(filter: ColumnFilter<R>): String = buildList {
     if (filter.anyOf.isNotEmpty()) {
         add(filter.anyOf.joinToString(" or ") { it?.toString() ?: "empty" })
     }
@@ -342,8 +342,8 @@ private fun describeBound(value: Any): String = when (value) {
     else -> value.toString()
 }
 
-private fun <T : Any> renderColumnFilter(
-    column: Column<T>,
+private fun <R> renderColumnFilter(
+    column: ColumnSpec<R>,
     parameters: Parameters,
     names: TableParameterNames,
 ): FlowContent.() -> Unit = {
@@ -428,7 +428,7 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
     support: WebSupport<C, V>,
     kClass: KClass<out Any>,
     columns: List<Column<T>>,
-    request: TableRequest<T>,
+    request: TableRequest<Model<T>>,
     names: TableParameterNames,
     call: ApplicationCall,
     controls: TableControls,
@@ -436,34 +436,13 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
     fun classesFor(element: String, model: Model<*>? = null, property: String? = null) =
         support.classProvider.attr(UiPart.ModelTable, element, property = property, model = model)
 
-    val uri = call.request.uri
-    val filtered = request.filters.map { it.column }.toSet()
-
     table(classes = classesFor("table")) {
         attributes["data-klerk-list"] = ""
         thead(classesFor("thead")) {
             tr(classesFor("tr")) {
                 for (column in columns) {
                     th(classes = classesFor("th", property = column.key)) {
-                        if (controls == TableControls.Header) {
-                            headerControls(column, request, names, call)
-                        } else if (column.isSortable) {
-                            val sort = request.sort?.takeIf { it.column == column }
-                            a(sortUrl(uri, column, sort, names)) {
-                                +column.header
-                                if (sort != null) {
-                                    +(if (sort.ascending) " ▲" else " ▼")
-                                }
-                            }
-                        } else {
-                            +column.header
-                        }
-                        if (controls == TableControls.Panel && column in filtered) {
-                            span {
-                                title = "Filtered"
-                                +" ⧩"
-                            }
-                        }
+                        headerCell(column.spec, request, names, call, controls)
                     }
                 }
             }
@@ -505,18 +484,47 @@ private fun <T : Any, C : KlerkContext, V> renderTable(
     }
 }
 
+/** The contents of a `<th>`: the header text and, if the column can be sorted or filtered, the controls for it. */
+internal fun <R> TH.headerCell(
+    column: ColumnSpec<R>,
+    request: TableRequest<R>,
+    names: TableParameterNames,
+    call: ApplicationCall,
+    controls: TableControls,
+) {
+    if (controls == TableControls.Header) {
+        headerControls(column, request, names, call)
+    } else if (column.isSortable) {
+        val sort = request.sort?.takeIf { it.column === column }
+        a(sortUrl(call.request.uri, column, sort, names)) {
+            +column.header
+            if (sort != null) {
+                +(if (sort.ascending) " ▲" else " ▼")
+            }
+        }
+    } else {
+        +column.header
+    }
+    if (controls == TableControls.Panel && request.filters.any { it.column === column }) {
+        span {
+            title = "Filtered"
+            +" ⧩"
+        }
+    }
+}
+
 /**
  * The sort arrows and the filter button, then the header text and the filter dialog. Active controls are not dimmed.
  */
-private fun <T : Any> TH.headerControls(
-    column: Column<T>,
-    request: TableRequest<T>,
+private fun <R> TH.headerControls(
+    column: ColumnSpec<R>,
+    request: TableRequest<R>,
     names: TableParameterNames,
     call: ApplicationCall,
 ) {
     val uri = call.request.uri
-    val sort = request.sort?.takeIf { it.column == column }
-    val filter = request.filters.firstOrNull { it.column == column }
+    val sort = request.sort?.takeIf { it.column === column }
+    val filter = request.filters.firstOrNull { it.column === column }
     // The popover stays outside this span, so that CSS hiding the controls does not hide an open dialog.
     span {
         attributes["data-table-controls"] = ""
@@ -596,10 +604,10 @@ private const val FUNNEL_SVG = """<svg viewBox="0 0 16 16" width="0.9em" height=
     """aria-hidden="true"><path d="M1 2h14l-5.5 6.5V14l-3-1.5V8.5z"/></svg>"""
 
 /** Unsorted → ascending → descending → unsorted. */
-private fun <T : Any> sortUrl(
+private fun <R> sortUrl(
     uri: String,
-    column: Column<T>,
-    current: ActiveSort<T>?,
+    column: ColumnSpec<R>,
+    current: ActiveSort<R>?,
     names: TableParameterNames,
 ): String {
     val dropped = setOf(names.sort, names.direction, names.cursor)

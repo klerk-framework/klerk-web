@@ -184,6 +184,12 @@ class UploadPluginTest {
             klerk.specification.jobs.crons.any { it.type.name.value == "klerk-web-upload-sweep" },
             "expected a cron for the sweep job",
         )
+        val jobs = klerk.specification.jobs
+        assertEquals(
+            "Uploads",
+            jobs.registeredBy(dev.klerkframework.klerk.job.JobName("klerk-web-upload-sweep")),
+        )
+        assertEquals(null, jobs.registeredBy(dev.klerkframework.klerk.job.JobName("my-job")))
         // and the application's own job configuration is untouched
         assertTrue(types.contains("my-job"), "the application's job types should still be registered, got $types")
         klerk.meta.stop()

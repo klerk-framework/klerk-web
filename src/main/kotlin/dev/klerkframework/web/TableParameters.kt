@@ -1,6 +1,5 @@
 package dev.klerkframework.web
 
-import dev.klerkframework.klerk.Model
 import dev.klerkframework.klerk.view.QueryListCursor
 import io.ktor.http.Parameters
 
@@ -27,11 +26,11 @@ internal class TableParameterNames(private val prefix: String) {
 /** An invalid query parameter, and the parameters to drop to get a valid request. */
 internal class ParameterProblem(val message: String, val drop: Set<String>)
 
-internal class ActiveSort<T : Any>(val column: Column<T>, val ascending: Boolean)
+internal class ActiveSort<R>(val column: ColumnSpec<R>, val ascending: Boolean)
 
 /** What one column is filtered on. A model matches if it matches any of the given conditions. */
-internal class ColumnFilter<T : Any>(
-    val column: Column<T>,
+internal class ColumnFilter<R>(
+    val column: ColumnSpec<R>,
     /** Values in the form [ColumnKind.matchKey] gives; null for "empty". */
     val anyOf: Set<Any?>,
     val min: Any?,
@@ -41,8 +40,8 @@ internal class ColumnFilter<T : Any>(
     private val kind = column.kind!!
     private val hasCondition = min != null || max != null || contains != null
 
-    fun matches(model: Model<T>): Boolean {
-        val value = column.value!!(model)
+    fun matches(row: R): Boolean {
+        val value = column.value!!(row)
         if (value === Unreadable) {
             return false
         }
@@ -60,9 +59,9 @@ internal class ColumnFilter<T : Any>(
     private fun compare(value: Any, bound: Any): Int = kind.sortKey(value).compareTo(bound)
 }
 
-internal class TableRequest<T : Any>(
-    val sort: ActiveSort<T>?,
-    val filters: List<ColumnFilter<T>>,
+internal class TableRequest<R>(
+    val sort: ActiveSort<R>?,
+    val filters: List<ColumnFilter<R>>,
     val cursor: QueryListCursor?,
     val problems: List<ParameterProblem>,
 )
@@ -70,12 +69,12 @@ internal class TableRequest<T : Any>(
 /** The value of a single-valued parameter, or null if it is missing or blank. */
 private fun Parameters.single(name: String): String? = getAll(name)?.lastOrNull { it.isNotBlank() }?.trim()
 
-internal fun <T : Any> parseTableRequest(
+internal fun <R> parseTableRequest(
     parameters: Parameters,
-    columns: List<Column<T>>,
+    columns: List<ColumnSpec<R>>,
     names: TableParameterNames,
     defaultSort: TableSort?,
-): TableRequest<T> {
+): TableRequest<R> {
     val problems = mutableListOf<ParameterProblem>()
     val byKey = columns.filter { it.key != null }.associateBy { it.key!! }
 
@@ -83,7 +82,7 @@ internal fun <T : Any> parseTableRequest(
         problems.add(ParameterProblem(message, setOf(*drop, names.cursor)))
     }
 
-    val filters = mutableListOf<ColumnFilter<T>>()
+    val filters = mutableListOf<ColumnFilter<R>>()
     val filterNames = parameters.names().filter { names.isFilter(it) }
     val filteredKeys = filterNames.map { it.removePrefix(names.filterPrefix).substringBefore('.') }.distinct()
     for (key in filteredKeys) {
@@ -137,13 +136,13 @@ internal fun <T : Any> parseTableRequest(
     return TableRequest(activeSort, filters, cursor, problems)
 }
 
-private fun <T : Any> parseFilter(
+private fun <R> parseFilter(
     parameters: Parameters,
-    column: Column<T>,
+    column: ColumnSpec<R>,
     ownNames: List<String>,
     names: TableParameterNames,
     problem: (String, Array<out String>) -> Unit,
-): ColumnFilter<T>? {
+): ColumnFilter<R>? {
     val key = column.key!!
     val kind = column.kind!!
     var valid = true

@@ -5,15 +5,41 @@ import dev.klerkframework.klerk.KlerkContext
 import dev.klerkframework.klerk.job.JobID
 import dev.klerkframework.klerk.job.JobInfo
 import dev.klerkframework.klerk.job.JobLogEntry
+import dev.klerkframework.klerk.job.JobName
 import dev.klerkframework.klerk.job.JobOperation
+import dev.klerkframework.klerk.job.JobPriority
+import dev.klerkframework.klerk.JobRejectedException
 import dev.klerkframework.klerk.job.JobStatus
 import dev.klerkframework.klerk.job.JobsSpecification
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.html.*
 import io.ktor.server.response.*
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.html.*
+
+private fun <C : KlerkContext, V> jobColumns(jobs: JobsSpecification<C, V>): List<ColumnSpec<JobInfo>> {
+    fun column(
+        header: String,
+        key: String,
+        kind: ColumnKind?,
+        nullable: Boolean = false,
+        value: ((JobInfo) -> Any?)?,
+    ) = ColumnSpec(header, key, kind, nullable, value, kind?.sortable == true, kind?.filterable == true)
+
+    return listOf(
+        column("Id", "id", ColumnKind.Numeric(String::toLongOrNull)) { it.id.value },
+        column("Name", "name", ColumnKind.Text) { it.name.value },
+        column("Registered by", "registered-by", ColumnKind.Text) { registeredByLabel(jobs, it.name) },
+        column("Status", "status", ColumnKind.Choice(JobStatus.entries.map { it.name })) { it.status },
+        column("Priority", "priority", ColumnKind.Choice(JobPriority.entries.map { it.name })) { it.priority },
+        column("Parent", "parent", ColumnKind.Numeric(String::toLongOrNull), nullable = true) { it.parent?.value },
+        ColumnSpec("Progress", null, null, false, null, isSortable = false, isFilterable = false),
+        column("Created", "created", ColumnKind.InstantKind) { it.createdAt },
+    )
+}
 
 internal suspend fun <C : KlerkContext, V> renderJobs(
     call: ApplicationCall,
@@ -22,22 +48,27 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
     klerk: Klerk<C, V>,
 ) {
     val context = support.contextProvider(call, klerk)
-    val statusFilter = call.request.queryParameters["status"]?.let { name ->
-        JobStatus.entries.firstOrNull { it.name == name }
-    }
     // Enabled by default: only an explicit "false" turns it off, so a first visit (no query params at all) has it on.
     val autoRefresh = call.request.queryParameters["autorefresh"] != "false"
-    val jobs = klerk.jobs.all(context).filter { statusFilter == null || it.status == statusFilter }
-
-    fun jobsUrl(status: JobStatus?, autoRefreshValue: Boolean): String {
-        val params = buildList {
-            status?.let { add("status=${it.name}") }
-            if (!autoRefreshValue) add("autorefresh=false")
-        }
-        return if (params.isEmpty()) jobsPath else "$jobsPath?${params.joinToString("&")}"
+    val columns = jobColumns(klerk.specification.jobs)
+    val names = TableParameterNames("")
+    val request = parseTableRequest(call.request.queryParameters, columns, names, defaultSort = null)
+    if (request.problems.isNotEmpty()) {
+        call.response.status(HttpStatusCode.BadRequest)
+    }
+    val filters = request.filters
+    val jobs = if (request.problems.isEmpty()) {
+        klerk.jobs.all(context)
+            .filter { job -> filters.all { it.matches(job) } }
+            .let { all -> request.sort?.let { all.sortedWith(it.comparator()) } ?: all }
+    } else {
+        emptyList()
     }
 
-    support.respondPage(call, "Jobs", pageHead = if (autoRefresh) autoRefresh(15) else null) {
+    val runnableCrons = runnableCrons(klerk, context)
+    val csrfToken = Csrf.issue(call)
+
+    support.respondPage(call, "Jobs", status = null, pageHead = if (autoRefresh) autoRefresh(15) else null) {
         header {
             nav {
                 div {
@@ -53,29 +84,24 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                 label {
                     input(type = InputType.checkBox) {
                         checked = autoRefresh
-                        onChange = "window.location = '${jobsUrl(statusFilter, !autoRefresh)}'"
+                        val toggled = withQueryParam(call.request.uri, "autorefresh", (!autoRefresh).toString())
+                        onChange = "window.location = '$toggled'"
                     }
                     +" Auto-refresh (15s)"
                 }
             }
-            p {
-                +"Filter: "
-                a(href = jobsUrl(null, autoRefresh)) { +"All" }
-                for (status in JobStatus.entries) {
-                    +" | "
-                    a(href = jobsUrl(status, autoRefresh)) { +status.name }
-                }
+            if (request.problems.isNotEmpty()) {
+                apply(renderProblems(request.problems, call.request.uri))
+                return@main
             }
+            apply(renderFilter(call, emptyList(), columns, request, names, shownView = null))
+            apply(renderActiveFilters(call, request, names))
             table {
                 thead {
                     tr {
-                        th { +"Id" }
-                        th { +"Name" }
-                        th { +"Status" }
-                        th { +"Priority" }
-                        th { +"Parent" }
-                        th { +"Progress" }
-                        th { +"Created" }
+                        for (column in columns) {
+                            th { headerCell(column, request, names, call, TableControls.Panel) }
+                        }
                     }
                 }
                 tbody {
@@ -84,6 +110,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                             onClick = """window.location = '$jobsPath/${job.id}';"""
                             td { +job.id.toString() }
                             td { +job.name.value }
+                            td { +registeredByLabel(klerk.specification.jobs, job.name) }
                             td { apply(jobStatusBadge(job.status)) }
                             td { +job.priority.name }
                             td {
@@ -98,7 +125,7 @@ internal suspend fun <C : KlerkContext, V> renderJobs(
                 }
             }
 
-            apply(cronSchedulesTable(klerk.specification.jobs))
+            apply(cronSchedulesTable(klerk.specification.jobs, runnableCrons, jobsPath, csrfToken))
         }
     }
 }
@@ -137,6 +164,10 @@ internal suspend fun <C : KlerkContext, V> renderJobDetails(
                 tr {
                     td { +"Name" }
                     td { +job.name.value }
+                }
+                tr {
+                    td { +"Registered by" }
+                    td { +registeredByLabel(klerk.specification.jobs, job.name) }
                 }
                 tr {
                     td { +"Status" }
@@ -258,6 +289,8 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
     klerk: Klerk<C, V>,
 ) {
     val jobsConfig = klerk.specification.jobs
+    val runnableCrons = runnableCrons(klerk, support.contextProvider(call, klerk))
+    val csrfToken = Csrf.issue(call)
 
     support.respondPage(call, "Job types") {
         nav {
@@ -272,6 +305,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
             thead {
                 tr {
                     th { +"Name" }
+                    th { +"Registered by" }
                     th { +"Agent" }
                     th { +"Priority" }
                     th { +"Max retries" }
@@ -286,6 +320,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
                 jobsConfig.types.values.sortedBy { it.name.value }.forEach { type ->
                     tr {
                         td { +type.name.value }
+                        td { +registeredByLabel(jobsConfig, type.name) }
                         td { +type.agent.name }
                         td { +(type.priority?.name ?: "(inherited)") }
                         td { +type.maxRetries.toString() }
@@ -299,7 +334,7 @@ internal suspend fun <C : KlerkContext, V> renderJobTypes(
             }
         }
 
-        apply(cronSchedulesTable(jobsConfig))
+        apply(cronSchedulesTable(jobsConfig, runnableCrons, jobsPath, csrfToken))
     }
 }
 
@@ -342,7 +377,38 @@ internal suspend fun <C : KlerkContext, V> handleJobDelete(
     call.respondRedirect(jobsPath)
 }
 
-private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsSpecification<C, V>): FlowContent.() -> Unit = {
+internal suspend fun <C : KlerkContext, V> handleCronRun(
+    call: ApplicationCall,
+    support: WebSupport<C, V>,
+    jobsPath: String,
+    klerk: Klerk<C, V>,
+) {
+    val parameters = Csrf.receiveVerifiedParameters(call) ?: return
+    val context = support.contextProvider(call, klerk)
+    val schedule = klerk.specification.jobs.crons.firstOrNull { it.id == parameters["schedule"] }
+        ?: return call.respond(HttpStatusCode.NotFound, "There is no such cron schedule")
+    val id = try {
+        klerk.jobs.runNow(schedule, context)
+    } catch (e: IllegalStateException) {
+        return call.respond(HttpStatusCode.Conflict, e.message ?: "Could not run the schedule")
+    } catch (e: JobRejectedException) {
+        return call.respond(HttpStatusCode.ServiceUnavailable, e.message ?: "The job was refused")
+    }
+    call.respondRedirect("$jobsPath/$id")
+}
+
+private fun <C : KlerkContext, V> registeredByLabel(jobs: JobsSpecification<C, V>, name: JobName): String =
+    jobs.registeredBy(name)?.let { "plugin $it" } ?: "application"
+
+private suspend fun <C : KlerkContext, V> runnableCrons(klerk: Klerk<C, V>, context: C): Set<String> =
+    klerk.specification.jobs.crons.filter { klerk.jobs.canRunNow(it, context) }.map { it.id }.toSet()
+
+private fun <C : KlerkContext, V> cronSchedulesTable(
+    jobsConfig: JobsSpecification<C, V>,
+    runnable: Set<String>,
+    jobsPath: String,
+    csrfToken: String,
+): FlowContent.() -> Unit = {
     h2 { +"Cron jobs" }
     if (jobsConfig.crons.isEmpty()) {
         p { +"No cron jobs configured" }
@@ -351,20 +417,35 @@ private fun <C : KlerkContext, V> cronSchedulesTable(jobsConfig: JobsSpecificati
             thead {
                 tr {
                     th { +"Job" }
+                    th { +"Registered by" }
                     th { +"Expression" }
                     th { +"Catch-up" }
                     th { +"Overlap" }
                     th { +"Jitter" }
+                    th {}
                 }
             }
             tbody {
                 for (cron in jobsConfig.crons) {
                     tr {
                         td { +cron.type.name.value }
+                        td { +registeredByLabel(jobsConfig, cron.type.name) }
                         td { +cron.expression }
                         td { +cron.catchUp.name }
                         td { +cron.overlap.name }
                         td { +cron.jitter.toString() }
+                        td {
+                            if (cron.id in runnable) {
+                                form(action = "$jobsPath/crons/run", method = FormMethod.post) {
+                                    with(Csrf) { tokenInput(csrfToken) }
+                                    hiddenInput(name = "schedule") { value = cron.id }
+                                    button {
+                                        onClick = "return confirm('Run ${cron.type.name.value} now?');"
+                                        +"Run now"
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

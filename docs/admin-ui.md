@@ -61,7 +61,8 @@ or in full at `_eventlog`.
 
 Lists jobs with status, priority, parent and progress, and refreshes itself while a job is running. A job's detail
 page can cancel it, resume a dead-lettered one, or delete a terminal one. Seeing jobs is authorized by Klerk's
-`readJobs` rules; a button is only shown when Klerk's `controlJobs` rules allow the operation.
+`readJobs` rules; a button is only shown when Klerk's `controlJobs` rules allow the operation. The cron table on the
+job types page has a *Run now* button per schedule (`JobOperation.TriggerCron`).
 
 ## Documentation
 

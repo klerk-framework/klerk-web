@@ -120,6 +120,12 @@ public class AdminUI<C : KlerkContext, V>(
                 }
             }
 
+            post("$jobsPath/crons/run") {
+                requireAdmin(call) {
+                    handleCronRun(call, support, jobsPath, klerk)
+                }
+            }
+
             post("$jobsPath/{id}/cancel") {
                 requireAdmin(call) {
                     handleJobCancel(call, support, jobsPath, klerk)

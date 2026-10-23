@@ -58,11 +58,35 @@ class JobsAdminTest {
         assertTrue(listBody.contains(jobId.toString()))
         assertTrue(listBody.contains("my-job"))
 
-        val filtered = client.get("/admin/_jobs?status=${JobStatus.Ready.name}").bodyAsText()
+        val filtered = client.get("/admin/_jobs?f.status=${JobStatus.Ready.name}").bodyAsText()
         assertTrue(filtered.contains(jobId.toString()))
 
-        val filteredOut = client.get("/admin/_jobs?status=${JobStatus.Succeeded.name}").bodyAsText()
+        val filteredOut = client.get("/admin/_jobs?f.status=${JobStatus.Succeeded.name}").bodyAsText()
         assertFalse(filteredOut.contains(jobId.toString()))
+    }
+
+    @Test
+    fun `job list can be sorted and rejects invalid parameters`() = testApplication {
+        System.setProperty("DEVELOPMENT_MODE", "true")
+        val (klerk, klerkWeb) = setup()
+        klerk.meta.start()
+        val first = klerk.jobs.schedule(MyJob.declare(""), Context.system())
+        val second = klerk.jobs.schedule(MyJob.declare(""), Context.system())
+        application { routing { klerkWebRoutes(klerkWeb) } }
+
+        val descending = client.get("/admin/_jobs?sort=id&dir=desc").bodyAsText()
+        // Job ids are random, so the order of creation says nothing about the order of the ids.
+        val (low, high) = listOf(first, second).sortedBy { it.value }
+        assertTrue(descending.indexOf("_jobs/$high") < descending.indexOf("_jobs/$low"))
+        val ascending = client.get("/admin/_jobs?sort=id").bodyAsText()
+        assertTrue(ascending.indexOf("_jobs/$low") < ascending.indexOf("_jobs/$high"))
+
+        val byName = client.get("/admin/_jobs?f.name.contains=my-")
+        assertTrue(byName.bodyAsText().contains("_jobs/$first"))
+        assertFalse(client.get("/admin/_jobs?f.name.contains=nothing-like-it").bodyAsText().contains("_jobs/$first"))
+
+        val invalid = client.get("/admin/_jobs?sort=nonexistent")
+        assertEquals(HttpStatusCode.BadRequest, invalid.status)
     }
 
     @Test
@@ -147,5 +171,47 @@ class JobsAdminTest {
         val body = client.get("/admin/_jobs/types").bodyAsText()
         assertTrue(body.contains("my-job"))
         assertTrue(body.contains("0 3 * * *"))
+    }
+
+    @Test
+    fun `run now starts the cron job`() = testApplication {
+        System.setProperty("DEVELOPMENT_MODE", "true")
+        val (klerk, klerkWeb) = setup()
+        klerk.meta.start()
+
+        application { routing { klerkWebRoutes(klerkWeb) } }
+        val client = createClient { install(HttpCookies) }
+
+        val types = client.get("/admin/_jobs/types").bodyAsText()
+        assertTrue(types.contains("Run now"))
+        val response = client.submitForm(
+            url = "/admin/_jobs/crons/run",
+            formParameters = parameters {
+                append(Csrf.TOKEN_NAME, csrfTokenIn(types))
+                append("schedule", klerk.specification.jobs.crons.single().id)
+            },
+        )
+        assertTrue(response.status.value in 200..399)
+
+        klerk.jobs.runUntilIdle()
+        val jobs = klerk.jobs.all(Context.system())
+        assertEquals(1, jobs.size)
+        assertEquals(JobStatus.Succeeded, jobs.single().status)
+    }
+
+    @Test
+    fun `run now is hidden when the actor may not trigger the schedule`() = testApplication {
+        System.setProperty("DEVELOPMENT_MODE", "true")
+        val bc = BookCollections()
+        val collections = MyCollections(bc, AuthorCollections(bc.all), ModelViews())
+        val klerk = Klerk.create(createConfig(collections), testSettings(jobExecution = JobExecution.Manual))
+        val klerkWeb = KlerkWeb(klerk, { _, _ -> Context.authenticationIdentity() }, canSeeAdminUI = { true })
+        klerk.meta.start()
+
+        application { routing { klerkWebRoutes(klerkWeb) } }
+
+        val types = client.get("/admin/_jobs/types").bodyAsText()
+        assertTrue(types.contains("0 3 * * *"))
+        assertFalse(types.contains("Run now"))
     }
 }
